@@ -47,7 +47,7 @@ export default function AdminLoginPage() {
 
 	return (
 		<main className="flex min-h-screen items-center justify-center bg-bg-page p-4">
-			<div className="relative w-full max-w-105 rounded-lg [box-shadow:0_0_40px_rgba(0,229,255,0.08),0_0_80px_rgba(0,229,255,0.04)]">
+			<div className="relative w-full max-w-105 rounded-lg shadow-neon">
 				<div className="relative z-10 flex flex-col gap-8 rounded-lg border border-border-subtle bg-bg-surface p-8">
 					{/* Header */}
 					<div className="flex items-center justify-between border-b border-border-subtle pb-4">
@@ -139,7 +139,7 @@ export default function AdminLoginPage() {
 						<button
 							type="submit"
 							disabled={isLoading}
-							className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-accent-border bg-accent-muted p-3 font-mono text-(length:--text-body-sm) font-medium text-accent transition-all duration-150 hover:bg-accent-border hover:shadow-[0_0_12px_rgba(0,229,255,0.2)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+							className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-accent-border bg-accent-muted p-3 font-mono text-(length:--text-body-sm) font-medium text-accent transition-all duration-150 hover:bg-accent-border hover:shadow-neon active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							<span>{isLoading ? "Signing In..." : "Sign in"}</span>
 							<ArrowRight size={16} />

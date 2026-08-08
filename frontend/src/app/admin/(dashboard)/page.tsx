@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
 
 				{/* Card: Published */}
 				<div className="flex flex-col gap-4 rounded-lg border border-border-subtle bg-bg-surface p-5">
-					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-[rgba(0,255,136,0.2)] bg-[rgba(0,255,136,0.1)] text-[#00ff88]">
+					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-success/20 bg-success-muted text-success">
 						<CheckCircle2 size={20} />
 					</div>
 					<div>
@@ -111,7 +111,7 @@ export default function AdminDashboardPage() {
 
 				{/* Card: Drafts */}
 				<div className="flex flex-col gap-4 rounded-lg border border-border-subtle bg-bg-surface p-5">
-					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-[rgba(255,204,0,0.2)] bg-[rgba(255,204,0,0.1)] text-[#ffcc00]">
+					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-warning/20 bg-warning-muted text-warning">
 						<Edit3 size={20} />
 					</div>
 					<div>
@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
 
 				{/* Card: Agent Pending */}
 				<div className="flex flex-col gap-4 rounded-lg border border-border-subtle bg-bg-surface p-5">
-					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-border bg-accent-muted text-accent [box-shadow:0_0_15px_rgba(0,229,255,0.2)]">
+					<div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-border bg-accent-muted text-accent shadow-neon">
 						<Sparkles size={20} />
 					</div>
 					<div>
@@ -247,8 +247,8 @@ export default function AdminDashboardPage() {
 										</td>
 										<td className="p-4">
 											{post.status === "published" ? (
-												<span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,255,136,0.3)] bg-[rgba(0,255,136,0.1)] px-2.5 py-0.5 text-[0.65rem] text-[#00ff88]">
-													<span className="h-1 w-1 rounded-full bg-[#00ff88]" />
+												<span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-muted px-2.5 py-0.5 text-[0.65rem] text-success">
+													<span className="h-1 w-1 rounded-full bg-success" />
 													Published
 												</span>
 											) : post.status === "agent_draft" ? (
@@ -257,7 +257,7 @@ export default function AdminDashboardPage() {
 													Agent Draft
 												</span>
 											) : (
-												<span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,204,0,0.3)] bg-[rgba(255,204,0,0.1)] px-2.5 py-0.5 text-[0.65rem] text-[#ffcc00]">
+												<span className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning-muted px-2.5 py-0.5 text-[0.65rem] text-warning">
 													Draft
 												</span>
 											)}

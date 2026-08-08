@@ -22,7 +22,9 @@ import {
 } from "@/hooks/useApi";
 import type { PostStatus } from "@/types";
 import TagSelector from "./TagSelector";
+import MarkdownRenderer from "@/components/blog/MarkdownRenderer";
 import CustomSelect from "@/components/ui/CustomSelect";
+import { SITE } from "@/lib/constants";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
@@ -78,6 +80,10 @@ export default function PostEditorClient({
 	const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
 	const [showPublishModal, setShowPublishModal] = useState(false);
 	const [showNewSeries, setShowNewSeries] = useState(false);
+	// ponytail: in-place preview of the editor's own markdown, not a route.
+	// A draft isn't served by /posts/[slug] (published-only), so linking out
+	// would 404 for exactly the case preview exists for.
+	const [showPreview, setShowPreview] = useState(false);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
 
 	const toast = useToast();
@@ -303,10 +309,16 @@ export default function PostEditorClient({
 
 						{/* BlockNote */}
 						<div className="min-h-125">
-							<BlockNoteEditor
-								initialMarkdown={initialData.content}
-								onChange={(markdown) => handleChange("content", markdown)}
-							/>
+							{showPreview ? (
+								<article>
+									<MarkdownRenderer content={data.content} />
+								</article>
+							) : (
+								<BlockNoteEditor
+									initialMarkdown={initialData.content}
+									onChange={(markdown) => handleChange("content", markdown)}
+								/>
+							)}
 						</div>
 					</div>
 				</div>
@@ -322,7 +334,7 @@ export default function PostEditorClient({
 					<div className="flex h-full flex-col gap-8 overflow-y-auto pb-10 hide-scrollbar">
 						{/* Agent Banner */}
 						{initialData.is_agent_authored && (
-							<div className="flex flex-col gap-1 rounded-md border border-accent-border bg-accent-muted p-4 shadow-[0_0_15px_rgba(0,229,255,0.1)]">
+							<div className="flex flex-col gap-1 rounded-md border border-accent-border bg-accent-muted p-4 shadow-neon">
 								<div className="flex items-center gap-2 font-mono text-xs font-bold text-accent">
 									<Sparkles size={12} />
 									WRITTEN BY AI AGENT
@@ -340,8 +352,8 @@ export default function PostEditorClient({
 							</label>
 							<div className="flex items-center">
 								{data.status === "published" ? (
-									<span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,255,136,0.3)] bg-[rgba(0,255,136,0.1)] px-3 py-1 font-mono text-xs text-[#00ff88]">
-										<div className="h-1.5 w-1.5 rounded-full bg-[#00ff88]"></div>
+									<span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-muted px-3 py-1 font-mono text-xs text-success">
+										<div className="h-1.5 w-1.5 rounded-full bg-success"></div>
 										Published
 									</span>
 								) : data.status === "agent_draft" ? (
@@ -501,7 +513,7 @@ export default function PostEditorClient({
 								onChange={(e) => handleChange("slug", e.target.value)}
 							/>
 							<div className="font-mono text-[0.65rem] text-text-tertiary">
-								https://dejusdevspace.vercel.app/posts/{data.slug || "..."}
+								{SITE.url}/posts/{data.slug || "..."}
 							</div>
 						</div>
 
@@ -524,9 +536,17 @@ export default function PostEditorClient({
 								</div>
 							</div>
 
-							<button className="flex w-full items-center justify-center gap-2 rounded-md border border-border-default bg-transparent py-2.5 font-mono text-xs font-bold text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
+							<button
+								onClick={() => setShowPreview((v) => !v)}
+								aria-pressed={showPreview}
+								className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border py-2.5 font-mono text-xs font-bold transition-colors ${
+									showPreview
+										? "border-accent bg-bg-elevated text-accent"
+										: "border-border-default bg-transparent text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
+								}`}
+							>
 								<Eye size={16} />
-								Preview Post
+								{showPreview ? "Back to Editor" : "Preview Post"}
 							</button>
 						</div>
 					</div>
