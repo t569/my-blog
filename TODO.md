@@ -78,6 +78,24 @@ Fork: `t569/my-blog` (origin) ← upstream `DejusDevspace/my-blog`
     `upstream/main` branch.
 - [x] **`AUTHOR_PERSONA`** — the agent's ghostwriting framing moved out of the
       topic/writer prompts into config, defaulting to upstream's author.
+- [x] **Feature switches** at `/admin/settings/features` — the optional halves
+      are now switchable at runtime, not only by editing the environment.
+      Credentials say what the deployment *can* do (`available`, env, fixed at
+      deploy); the switch says what it *should* (`enabled`, `owners.features`
+      JSONB). A feature runs only when both hold, so an unavailable one shows
+      what to set instead of an off switch that can't be turned on — and keeps
+      its position, so adding the credential later restores the choice.
+      **Dependent parts are one switch.** The agent's schedule, manual trigger
+      and draft generation all die with the LLM key, so they're a single entry
+      whose card lists what goes with it; three switches would let the UI ask
+      for states the backend can't honour. It holds at runtime too — switching
+      the agent off removes the cron job immediately instead of leaving it
+      firing until the next restart, and the Agent Settings page reads the same
+      flag and disables its own controls.
+      Registry lives server-side only, so page and backend can't drift. Missing
+      key = on, so upstream behaviour is unchanged; `AGENT_ENABLED=false` still
+      outranks the switch, asserted in `check_optional_credentials`.
+      Generic, no personal strings — **PR-able upstream**.
 
 ### Fixed along the way — generic bugs, all PR-able upstream
 
