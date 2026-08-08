@@ -1,2 +1,7 @@
 .idea/
 **/__pycache__/
+
+# Fork-specific deployment notes — real URLs, project IDs, dashboard links.
+# Same rule as frontend/.env.local: nothing personal to this fork goes in a
+# diff upstream would see. docs/*.md stays committed and generic.
+*.local.md
