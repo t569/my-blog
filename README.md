@@ -67,3 +67,43 @@ The agent pipeline requires the following additional environment variables in `b
 | `LANGFUSE_HOST`       | No       | `https://cloud.langfuse.com` | LangFuse host URL                                      |
 
 The pipeline runs without Tavily or LangFuse keys — research is skipped and tracing is a no-op. Only `GROQ_API_KEY` is required.
+
+---
+
+## Note for this fork (`t569/my-blog`)
+
+This is a fork of [DejusDevspace/my-blog](https://github.com/DejusDevspace/my-blog),
+which is the original work of **DejusDevspace** — the architecture, the agent
+pipeline, and the design system are all his.
+
+That creates a small dilemma. This fork needs to be *my* blog (my name, my
+links, my favicon, my palette), but I also want upstream merges to stay
+possible in both directions — and a fork that rewrites every string is a fork
+that conflicts on every sync, and quietly takes credit for someone else's work.
+
+The compromise:
+
+- **Branding is env-driven, never hardcoded.** Every brand value in
+  `frontend/src/lib/constants.ts` reads
+  `process.env.NEXT_PUBLIC_SITE_* ?? "<upstream default>"`. My values live in
+  `frontend/.env.local`, which is gitignored — so none of my branding appears
+  in the diff, and merging this fork upstream leaves that site unchanged.
+- **Attribution stays put.** Comment headers, `docs/`, and the
+  `app/devspace_agents/` package keep their original names. Renaming them would
+  be pure merge-conflict fodder for zero user-visible benefit.
+- **Themes are files, not edits.** Palettes live in
+  `frontend/src/styles/themes/*.css`, one file per theme, registered in
+  `providers.tsx`. A new look is a new file, not a rewrite of `globals.css`.
+
+Overriding the brand for your own fork:
+
+| Variable | Default |
+| --- | --- |
+| `NEXT_PUBLIC_SITE_NAME` | `d3jusdevspace` |
+| `NEXT_PUBLIC_SITE_TAGLINE` | `AI engineer, builder, thinker` |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | upstream description |
+| `NEXT_PUBLIC_SITE_MOTTO` | `BUILT FOR THE AGENTIC AGE` |
+| `NEXT_PUBLIC_SITE_ICON` | `/favicon.ico` |
+| `NEXT_PUBLIC_SITE_REPO` / `_GITHUB` / `_TWITTER` / `_LINKEDIN` | upstream links |
+
+Progress and remaining work: [TODO.md](./TODO.md).
