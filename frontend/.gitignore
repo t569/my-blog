@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# personal page content — /about falls back to SITE.intro when absent,
+# so a fork (or upstream) builds fine without one. See (public)/about/page.tsx
+/content/about.md
+
 # vercel
 .vercel
 
