@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Render Blueprint — the FastAPI backend
+# https://render.com/docs/blueprint-spec
+#
+# Point Render at this repo (New → Blueprint) and it provisions the service
+# below, prompting for the values marked `sync: false`. Those are secrets or
+# per-fork URLs, so none of them are committed here.
+#
+# The frontend is not in this file: it deploys to Vercel, which needs the
+# cron scheduler that a sleeping free instance here cannot provide. See
+# docs/deployment.md.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: my-blog-api
+    runtime: docker
+    plan: free
+    # Frankfurt is the closest free region to a London (eu-west-2) database.
+    # Backend↔database latency is paid on every query; browser↔backend is paid
+    # once per request and already goes through Vercel's edge.
+    region: frankfurt
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    # The app answers /health as soon as it can reach the database, so a failed
+    # check means a bad DATABASE_URL rather than a slow boot.
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # The only value the app cannot boot without. Paste any provider's
+      # connection string verbatim — config.py adapts it for asyncpg.
+      - key: DATABASE_URL
+        sync: false
+      # Must be byte-identical to the frontend's, or every admin call is a 401.
+      # Unset closes the admin API rather than opening it.
+      - key: NEXTAUTH_SECRET
+        sync: false
+      # The JWT claim the backend resolves to the owner row. Must match the
+      # frontend's ADMIN_EMAIL and the row seed_owner.py created.
+      - key: ADMIN_EMAIL
+        sync: false
+      # https://<your-app>.vercel.app — only used if something calls this
+      # service directly; normal traffic is proxied server-side by Next.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      # ---------------------------------------------------------------------
+      # Optional — an unset credential disables its feature, it never opens
+      # one up. Once set, the switches at /admin/settings/features decide
+      # whether the feature actually runs, with no redeploy.
+      # ---------------------------------------------------------------------
+      - key: AGENT_ENABLED
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HUGGINGFACE_TOKEN
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
