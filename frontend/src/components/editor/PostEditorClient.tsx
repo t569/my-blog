@@ -10,6 +10,7 @@ import {
 	Circle,
 	SlidersHorizontal,
 	Eye,
+	Code2,
 	Plus,
 	X,
 	Sparkles,
@@ -39,6 +40,11 @@ const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
 		</div>
 	),
 });
+
+// Display math and LaTeX delimiters only. Bare inline $x$ is left out on
+// purpose: "$5 and $10" would match it, and a false positive silently
+// downgrades the editor for a post with no math in it.
+const MATH = /\$\$[\s\S]+?\$\$|\\\(|\\\[/;
 
 interface EditorData {
 	title: string;
@@ -80,10 +86,15 @@ export default function PostEditorClient({
 	const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
 	const [showPublishModal, setShowPublishModal] = useState(false);
 	const [showNewSeries, setShowNewSeries] = useState(false);
-	// ponytail: in-place preview of the editor's own markdown, not a route.
-	// A draft isn't served by /posts/[slug] (published-only), so linking out
-	// would 404 for exactly the case preview exists for.
-	const [showPreview, setShowPreview] = useState(false);
+	// ponytail: preview renders the editor's own markdown in place, not via a
+	// route. A draft isn't served by /posts/[slug] (published-only), so linking
+	// out would 404 for exactly the case preview exists for.
+	const [mode, setMode] = useState<"rich" | "raw" | "preview">(
+		// BlockNote round-trips through blocksToMarkdownLossy, which mangles
+		// LaTeX. Opening a post that contains math in the rich editor is
+		// enough to corrupt it on the next save, so math opens raw.
+		() => (MATH.test(initialData.content || "") ? "raw" : "rich"),
+	);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
 
 	const toast = useToast();
@@ -307,15 +318,26 @@ export default function PostEditorClient({
 							onChange={(e) => handleChange("title", e.target.value)}
 						/>
 
-						{/* BlockNote */}
+						{/* Body — rich editor, raw markdown, or rendered preview */}
 						<div className="min-h-125">
-							{showPreview ? (
+							{mode === "preview" ? (
 								<article>
 									<MarkdownRenderer content={data.content} />
 								</article>
+							) : mode === "raw" ? (
+								<textarea
+									className="min-h-125 w-full resize-y bg-transparent font-mono text-sm leading-relaxed text-text-primary outline-none"
+									spellCheck={false}
+									placeholder="# Write markdown..."
+									value={data.content}
+									onChange={(e) => handleChange("content", e.target.value)}
+								/>
 							) : (
 								<BlockNoteEditor
-									initialMarkdown={initialData.content}
+									// data.content, not initialData.content: switching back
+									// from raw remounts this, and it must pick up the edits
+									// rather than resurrect the version loaded at mount.
+									initialMarkdown={data.content}
 									onChange={(markdown) => handleChange("content", markdown)}
 								/>
 							)}
@@ -536,18 +558,43 @@ export default function PostEditorClient({
 								</div>
 							</div>
 
-							<button
-								onClick={() => setShowPreview((v) => !v)}
-								aria-pressed={showPreview}
-								className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border py-2.5 font-mono text-xs font-bold transition-colors ${
-									showPreview
-										? "border-accent bg-bg-elevated text-accent"
-										: "border-border-default bg-transparent text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
-								}`}
-							>
-								<Eye size={16} />
-								{showPreview ? "Back to Editor" : "Preview Post"}
-							</button>
+							<div className="flex flex-col gap-2">
+								<div
+									className="flex overflow-hidden rounded-md border border-border-default"
+									role="group"
+									aria-label="Editor mode"
+								>
+									{(
+										[
+											["rich", "Rich", Layers],
+											["raw", "Markdown", Code2],
+											["preview", "Preview", Eye],
+										] as const
+									).map(([value, label, Icon]) => (
+										<button
+											key={value}
+											onClick={() => setMode(value)}
+											aria-pressed={mode === value}
+											title={label}
+											className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2.5 font-mono text-xs font-bold transition-colors ${
+												mode === value
+													? "bg-accent-muted text-accent"
+													: "bg-transparent text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
+											}`}
+										>
+											<Icon size={14} />
+											{label}
+										</button>
+									))}
+								</div>
+								{MATH.test(data.content) && (
+									<p className="font-mono text-[0.65rem] leading-snug text-text-tertiary">
+										Contains math — edit in Markdown. The rich editor
+										round-trips through a lossy converter and will mangle
+										LaTeX.
+									</p>
+								)}
+							</div>
 						</div>
 					</div>
 				</aside>
