@@ -56,8 +56,59 @@ def main() -> None:
 
     _check_auth_fails_closed()
     _check_database_url_normalization()
+    _check_feature_resolution()
 
     print("OK — boots on DATABASE_URL alone; unset credentials disable, never open.")
+
+
+def _check_feature_resolution() -> None:
+    """A feature runs only when credentials allow it AND the owner wants it."""
+    from app.config import Settings
+    from app.services.feature_service import (
+        BY_ID,
+        REGISTRY,
+        is_available,
+        is_effective,
+    )
+
+    bare = Settings(_env_file=None, DATABASE_URL="x")  # type: ignore[call-arg]
+    full = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        DATABASE_URL="x",
+        GROQ_API_KEY="k",
+        HUGGINGFACE_TOKEN="k",
+        CLOUDINARY_CLOUD_NAME="c",
+        CLOUDINARY_API_KEY="k",
+        CLOUDINARY_API_SECRET="s",
+    )
+
+    for feature in REGISTRY:
+        assert not is_available(feature, bare), f"{feature.id} available with no keys"
+        assert is_available(feature, full), f"{feature.id} unavailable with all keys"
+        # No stored flag means on — an install that predates the switches, or
+        # never touched them, behaves exactly as upstream does.
+        assert is_effective(feature, {}, full), f"{feature.id} default must be on"
+        assert not is_effective(feature, {feature.id: False}, full), (
+            f"{feature.id} switch must turn it off"
+        )
+        # A switch cannot conjure a feature whose credentials are missing.
+        assert not is_effective(feature, {feature.id: True}, bare), (
+            f"{feature.id} enabled without credentials"
+        )
+
+    # Partial Cloudinary credentials are not credentials.
+    partial = Settings(  # type: ignore[call-arg]
+        _env_file=None, DATABASE_URL="x", CLOUDINARY_CLOUD_NAME="c"
+    )
+    assert not is_available(BY_ID["uploads"], partial), "partial config counted as ready"
+
+    # The agent's env master switch still wins over both the key and the flag.
+    off = Settings(  # type: ignore[call-arg]
+        _env_file=None, DATABASE_URL="x", GROQ_API_KEY="k", AGENT_ENABLED=False
+    )
+    assert not is_effective(BY_ID["agent"], {"agent": True}, off), (
+        "AGENT_ENABLED=false must win over the owner's switch"
+    )
 
 
 def _check_database_url_normalization() -> None:

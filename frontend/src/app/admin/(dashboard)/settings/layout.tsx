@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const SETTINGS_TABS = [
 	{ href: "/admin/settings/context", label: "My Context" },
+	{ href: "/admin/settings/features", label: "Features" },
 	{ href: "/admin/settings/agent", label: "Agent Settings" },
 ];
 

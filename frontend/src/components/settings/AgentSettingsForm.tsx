@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
 	useAdminAgentSchedule,
 	useAdminUpdateAgentSchedule,
 	useAdminAgentRuns,
 	useAdminTriggerAgent,
+	useAdminFeatures,
 } from "@/hooks/useApi";
 import { useToast } from "@/hooks/useToast";
-import { Loader2, Play } from "lucide-react";
+import { Loader2, Play, PowerOff } from "lucide-react";
 
 const SCHEDULE_PRESETS = [
 	{ label: "Daily", sublabel: "Every day", cron: "0 9 * * *" },
@@ -74,6 +76,13 @@ export default function AgentSettingsForm() {
 	const updateSchedule = useAdminUpdateAgentSchedule();
 	const triggerAgent = useAdminTriggerAgent();
 	const { data: runsData } = useAdminAgentRuns({ limit: 1 });
+
+	// The page's controls are all downstream of the agent feature: with it off,
+	// the schedule can't fire and the trigger returns 503. Show that here
+	// rather than letting the settings look live and fail on use.
+	const { data: features } = useAdminFeatures();
+	const agent = features?.find((f) => f.id === "agent");
+	const agentOff = agent !== undefined && !(agent.available && agent.enabled);
 
 	const [presetIndex, setPresetIndex] = useState(1);
 	const [customCron, setCustomCron] = useState("0 9 * * 1");
@@ -172,6 +181,28 @@ export default function AgentSettingsForm() {
 				</p>
 			</div>
 
+			{agentOff && (
+				<div className="mb-6 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-muted p-4">
+					<PowerOff size={16} className="mt-0.5 shrink-0 text-warning" />
+					<p className="m-0 font-display text-body-sm text-text-secondary">
+						<span className="font-semibold text-text-primary">
+							The AI writing agent is off.
+						</span>{" "}
+						Nothing on this page will run until it is switched back on
+						{agent?.missing.length
+							? ` (needs ${agent.missing.join(", ")} in the backend environment)`
+							: ""}
+						. Settings still save.{" "}
+						<Link
+							href="/admin/settings/features"
+							className="text-accent hover:underline"
+						>
+							Features &rarr;
+						</Link>
+					</p>
+				</div>
+			)}
+
 			{/* Schedule section */}
 			<section className="py-8 border-b border-border-subtle">
 				<h2 className="m-0 font-display text-h4 font-semibold text-text-primary">
@@ -242,9 +273,12 @@ export default function AgentSettingsForm() {
 						type="button"
 						role="switch"
 						aria-checked={isActive}
+						disabled={agentOff}
 						onClick={handleToggleActive}
-						className={`relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full border-none transition-colors ${
-							isActive ? "bg-success" : "bg-border-default"
+						className={`relative inline-flex h-6 w-11 items-center rounded-full border-none transition-colors ${
+							agentOff
+								? "cursor-not-allowed bg-border-subtle opacity-50"
+								: `cursor-pointer ${isActive ? "bg-success" : "bg-border-default"}`
 						}`}
 					>
 						<span
@@ -288,8 +322,8 @@ export default function AgentSettingsForm() {
 				<button
 					type="button"
 					onClick={handleTrigger}
-					disabled={triggerAgent.isPending}
-					className="btn-primary cursor-pointer inline-flex items-center gap-2"
+					disabled={triggerAgent.isPending || agentOff}
+					className="btn-primary inline-flex cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{triggerAgent.isPending ? (
 						<Loader2 size={16} className="animate-spin" />

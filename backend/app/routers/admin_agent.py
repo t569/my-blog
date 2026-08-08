@@ -24,7 +24,7 @@ from app.schemas.agent import (
     AgentTriggerResponse,
 )
 from app.schemas.common import PaginatedResponse
-from app.services import agent_run_service
+from app.services import agent_run_service, feature_service
 
 router = APIRouter(
     prefix="/admin/agent",
@@ -45,11 +45,7 @@ async def trigger_pipeline(
 ):
     # Checked before the run row is written, so a disabled agent doesn't leave
     # a row stuck in "running" — the background task can't report failure.
-    if not settings.agent_ready:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Agent pipeline is disabled (set GROQ_API_KEY and AGENT_ENABLED).",
-        )
+    await feature_service.require("agent")
 
     run = AgentRun(
         owner_id=admin.id,

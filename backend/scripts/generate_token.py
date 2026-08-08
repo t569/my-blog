@@ -23,8 +23,8 @@ EXPIRY_HOURS = 24
 
 def main() -> None:
     payload = {
-        "email": "admin@d3jusdevspace.com",
-        "sub": "admin@d3jusdevspace.com",
+        "email": settings.ADMIN_EMAIL,
+        "sub": settings.ADMIN_EMAIL,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=EXPIRY_HOURS),
     }

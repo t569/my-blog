@@ -40,13 +40,17 @@ cloudinary.config(
 )
 
 
-def _require_cloudinary() -> None:
-    """Reject image operations when Cloudinary credentials are unset."""
-    if not settings.cloudinary_ready:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Image storage is not configured (CLOUDINARY_* unset).",
-        )
+async def _require_cloudinary() -> None:
+    """Reject image operations when uploads are unconfigured or switched off.
+
+    Both callers below are the only ones in the app, so the guard stays here
+    rather than in the router — the 503 lives next to the code that knows why.
+    Imported inside the function: feature_service imports the session factory,
+    and this module is imported at startup.
+    """
+    from app.services import feature_service
+
+    await feature_service.require("uploads")
 
 
 async def upload_image(file: UploadFile) -> str:
@@ -59,7 +63,7 @@ async def upload_image(file: UploadFile) -> str:
         HTTPException(502): If the Cloudinary upload fails.
         HTTPException(503): If Cloudinary is not configured.
     """
-    _require_cloudinary()
+    await _require_cloudinary()
 
     # Validate content type.
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
@@ -118,7 +122,7 @@ async def delete_image(url: str) -> None:
         HTTPException(502): If the Cloudinary deletion fails.
         HTTPException(503): If Cloudinary is not configured.
     """
-    _require_cloudinary()
+    await _require_cloudinary()
 
     public_id = _extract_public_id(url)
 

@@ -17,6 +17,7 @@ import {
 import type {
   AdminStatsResponse,
   AgentRunListItem,
+  FeatureState,
   AgentRunResponse,
   AgentScheduleResponse,
   AgentScheduleUpdate,
@@ -97,6 +98,9 @@ export const queryKeys = {
     },
     context: {
       all: ["admin", "context"] as const,
+    },
+    features: {
+      all: ["admin", "features"] as const,
     },
     agent: {
       schedule: ["admin", "agent", "schedule"] as const,
@@ -666,6 +670,46 @@ export function useAdminStats(
     queryKey: queryKeys.stats,
     queryFn: api.adminGetStats,
     staleTime: STALE.taxonomy,
+    ...options,
+  });
+}
+
+/* ============================================================================
+  Admin — Features
+============================================================================ */
+
+/** (Admin) Every switchable feature, resolved against this deployment. */
+export function useAdminFeatures(
+  options?: Partial<UseQueryOptions<FeatureState[], ApiError>>,
+) {
+  return useQuery<FeatureState[], ApiError>({
+    queryKey: queryKeys.admin.features.all,
+    queryFn: api.adminGetFeatures,
+    staleTime: STALE.taxonomy,
+    ...options,
+  });
+}
+
+/** (Admin) Flip one or more feature switches. */
+export function useAdminUpdateFeatures(
+  options?: UseMutationOptions<
+    FeatureState[],
+    ApiError,
+    Record<string, boolean>
+  >,
+) {
+  const queryClient = useQueryClient();
+  return useMutation<FeatureState[], ApiError, Record<string, boolean>>({
+    mutationFn: api.adminUpdateFeatures,
+    onSuccess: (data) => {
+      // The PUT returns the whole resolved list, so seed the cache with it
+      // rather than refetching what the server just told us.
+      queryClient.setQueryData(queryKeys.admin.features.all, data);
+      // The agent switch stops or re-arms the scheduled job server-side.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.agent.schedule,
+      });
+    },
     ...options,
   });
 }

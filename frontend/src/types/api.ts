@@ -260,6 +260,33 @@ export interface AgentScheduleUpdate {
   is_active?: boolean;
 }
 
+/**
+ * One switchable feature, resolved against the running deployment.
+ *
+ * `available` is what the environment allows (credentials, master switches)
+ * and cannot be changed from the UI; `enabled` is the owner's switch, stored
+ * in the database. A feature runs only when both are true, so an unavailable
+ * feature keeps whatever switch position it had rather than reading as "off".
+ */
+export interface FeatureState {
+  id: string;
+  label: string;
+  description: string;
+  /** The parts that go with it — they cannot be switched separately. */
+  covers: string[];
+  /** What still works while it is off. */
+  fallback: string;
+  available: boolean;
+  enabled: boolean;
+  /** Env vars still needed, e.g. ["GROQ_API_KEY", "AGENT_ENABLED=true"]. */
+  missing: string[];
+}
+
+/** Partial feature switch update — omitted ids are left alone. */
+export interface FeatureUpdate {
+  features: Record<string, boolean>;
+}
+
 /** Response from triggering the pipeline. */
 export interface AgentTriggerResponse {
   run_id: string;

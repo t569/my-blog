@@ -100,16 +100,23 @@ async def semantic_search(
     # missing semantic half degrades search to keyword-only rather than
     # failing the whole request.
     # -------------------------------------------------------------------
+    from app.services import feature_service
+
     vector_rows = []
-    try:
-        vectors = await get_embeddings([query])
-        query_vector = vectors[0] if vectors else None
-    except Exception:
-        logger.warning(
-            "Semantic search unavailable — falling back to keyword-only.",
-            exc_info=True,
-        )
-        query_vector = None
+    query_vector = None
+
+    # Switched off by the owner lands in the same place as unconfigured:
+    # keyword-only. Checked before the embedding call, so a disabled feature
+    # costs nothing instead of failing after a network round trip.
+    if await feature_service.enabled("semantic_search"):
+        try:
+            vectors = await get_embeddings([query])
+            query_vector = vectors[0] if vectors else None
+        except Exception:
+            logger.warning(
+                "Semantic search unavailable — falling back to keyword-only.",
+                exc_info=True,
+            )
 
     if query_vector is not None:
         vector_stmt = (

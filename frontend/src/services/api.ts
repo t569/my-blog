@@ -19,6 +19,7 @@ import type {
   CategoryUpdate,
   Comment,
   CommentCreate,
+  FeatureState,
   MessageResponse,
   PaginatedResponse,
   Post,
@@ -468,6 +469,26 @@ export async function adminGetStats(): Promise<AdminStatsResponse> {
   const { data } = await apiClient.get<AdminStatsResponse>(
     "/admin/posts/stats",
   );
+  return data;
+}
+
+/* ============================================================================
+  Admin — Features
+============================================================================ */
+
+/** (Admin) List every switchable feature, resolved against this deployment. */
+export async function adminGetFeatures(): Promise<FeatureState[]> {
+  const { data } = await apiClient.get<FeatureState[]>("/admin/features");
+  return data;
+}
+
+/** (Admin) Flip one or more switches. Omitted features are left alone. */
+export async function adminUpdateFeatures(
+  features: Record<string, boolean>,
+): Promise<FeatureState[]> {
+  const { data } = await apiClient.put<FeatureState[]>("/admin/features", {
+    features,
+  });
   return data;
 }
 

@@ -16,10 +16,15 @@ scheduler = AsyncIOScheduler()
 
 async def start_scheduler(owner_id: uuid.UUID, cron_expr: str) -> None:
     # Single gate for every scheduled entry point — startup and reschedule().
-    if not settings.agent_ready:
+    # Credentials say whether it can run; the owner's switch says whether it
+    # should. Imported here, not at module scope: feature_service imports the
+    # session factory, and this module is imported during app startup.
+    from app.services import feature_service
+
+    if not await feature_service.enabled("agent"):
         logger.info(
-            "Agent pipeline disabled (AGENT_ENABLED=%s, GROQ_API_KEY %s) "
-            "— not scheduling.",
+            "Agent pipeline disabled (AGENT_ENABLED=%s, GROQ_API_KEY %s, "
+            "owner switch may be off) — not scheduling.",
             settings.AGENT_ENABLED,
             "set" if settings.GROQ_API_KEY else "unset",
         )
