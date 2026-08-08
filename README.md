@@ -106,4 +106,7 @@ Overriding the brand for your own fork:
 | `NEXT_PUBLIC_SITE_ICON` | `/favicon.ico` |
 | `NEXT_PUBLIC_SITE_REPO` / `_GITHUB` / `_TWITTER` / `_LINKEDIN` | upstream links |
 
+Deploying it: [docs/deployment.md](./docs/deployment.md) — Vercel, Render and
+Neon, all on free tiers, including the two things that only break once hosted.
+
 Progress and remaining work: [TODO.md](./TODO.md).
