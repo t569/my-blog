@@ -40,6 +40,15 @@ cloudinary.config(
 )
 
 
+def _require_cloudinary() -> None:
+    """Reject image operations when Cloudinary credentials are unset."""
+    if not settings.cloudinary_ready:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image storage is not configured (CLOUDINARY_* unset).",
+        )
+
+
 async def upload_image(file: UploadFile) -> str:
     """Validate and upload an image to Cloudinary.
 
@@ -48,7 +57,10 @@ async def upload_image(file: UploadFile) -> str:
     Raises:
         HTTPException(400): If the file type is unsupported or exceeds size limit.
         HTTPException(502): If the Cloudinary upload fails.
+        HTTPException(503): If Cloudinary is not configured.
     """
+    _require_cloudinary()
+
     # Validate content type.
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
@@ -104,7 +116,10 @@ async def delete_image(url: str) -> None:
     Raises:
         HTTPException(400): If the URL is not a valid Cloudinary URL.
         HTTPException(502): If the Cloudinary deletion fails.
+        HTTPException(503): If Cloudinary is not configured.
     """
+    _require_cloudinary()
+
     public_id = _extract_public_id(url)
 
     try:

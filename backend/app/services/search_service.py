@@ -93,38 +93,49 @@ async def semantic_search(
        matched FTS; append any FTS‑only results at the end.
     """
     # -------------------------------------------------------------------
-    # 1. Vector search
+    # 1. Vector search — the optional half.
+    #
+    # Embeddings need HUGGINGFACE_TOKEN and a network call, either of which
+    # can be absent or fail. The full-text half below needs neither, so a
+    # missing semantic half degrades search to keyword-only rather than
+    # failing the whole request.
     # -------------------------------------------------------------------
-    vectors = await get_embeddings([query])
-    if not vectors:
-        return []
-
-    query_vector = vectors[0]
-
-    vector_stmt = (
-        select(
-            PostEmbedding.post_id,
-            PostEmbedding.chunk_text,
-            (1 - PostEmbedding.embedding.cosine_distance(query_vector)).label(
-                "similarity"
-            ),
-            Post.title,
-            Post.slug,
-            Post.excerpt,
-            Post.id.label("pid"),
+    vector_rows = []
+    try:
+        vectors = await get_embeddings([query])
+        query_vector = vectors[0] if vectors else None
+    except Exception:
+        logger.warning(
+            "Semantic search unavailable — falling back to keyword-only.",
+            exc_info=True,
         )
-        .join(Post, PostEmbedding.post_id == Post.id)
-        .where(
-            Post.status == "published",
-            Post.deleted_at.is_(None),
-            PostEmbedding.embedding.is_not(None),
-        )
-        .order_by(text("similarity DESC"))
-        .limit(limit * 3)
-    )
+        query_vector = None
 
-    vector_result = await db.execute(vector_stmt)
-    vector_rows = vector_result.all()
+    if query_vector is not None:
+        vector_stmt = (
+            select(
+                PostEmbedding.post_id,
+                PostEmbedding.chunk_text,
+                (1 - PostEmbedding.embedding.cosine_distance(query_vector)).label(
+                    "similarity"
+                ),
+                Post.title,
+                Post.slug,
+                Post.excerpt,
+                Post.id.label("pid"),
+            )
+            .join(Post, PostEmbedding.post_id == Post.id)
+            .where(
+                Post.status == "published",
+                Post.deleted_at.is_(None),
+                PostEmbedding.embedding.is_not(None),
+            )
+            .order_by(text("similarity DESC"))
+            .limit(limit * 3)
+        )
+
+        vector_result = await db.execute(vector_stmt)
+        vector_rows = vector_result.all()
 
     # -------------------------------------------------------------------
     # 2. Full‑text search

@@ -15,7 +15,7 @@ from app.config import settings
 from app.db.base import async_session_factory
 from app.models.owner import Owner
 
-ADMIN_EMAIL = "admin@d3jusdevspace.com"
+ADMIN_EMAIL = settings.ADMIN_EMAIL
 
 
 async def seed() -> None:

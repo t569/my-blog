@@ -94,8 +94,8 @@ async def writer_node(state: AgentState, config: RunnableConfig) -> dict:
                 f"Personality: {author.get('lifestyle_context', '')}\n"
             )
 
-        system_prompt = f"""You are ghostwriting a technical blog post for a Nigerian AI/ML and software \
-        engineer. You are not writing a generic tutorial. You are writing in the author's voice, from \
+        system_prompt = f"""You are ghostwriting a technical blog post for {settings.AUTHOR_PERSONA}. \
+        You are not writing a generic tutorial. You are writing in the author's voice, from \
         their perspective, drawing on their specific background and what they are actively learning.
 
         ═══════════════════════════════════════════

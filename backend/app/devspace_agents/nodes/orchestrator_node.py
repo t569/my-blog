@@ -107,7 +107,7 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
             "career": ["career", "learning", "open source", "junior", "engineer",
                        "productivity", "growth", "reflection"],
             "projects": ["built", "project", "ship", "launched", "weekend",
-                         "side project", "d3jus"],
+                         "side project"],
         }
 
         domain_counts = {domain: 0 for domain in domain_map}
@@ -140,9 +140,12 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
                 f"adjacent topic is a failure.\n"
             )
 
-        system_prompt = """You are a topic selection assistant for a developer blog run by a Nigerian \
-        AI/ML and software engineer with a background in mechatronics, robotics, and embedded systems. \
-        Your job is to select a specific, non-generic blog topic that reflects what the author is \
+        # Split rather than made an f-string: the prompt below contains a
+        # literal JSON schema, whose braces an f-string would try to interpolate.
+        system_prompt = (
+            f"You are a topic selection assistant for a developer blog run by "
+            f"{settings.AUTHOR_PERSONA}. "
+            """Your job is to select a specific, non-generic blog topic that reflects what the author is \
         actively learning or building, avoids repeating recently covered ground, and serves a general \
         tech audience of peers, potential employers, and junior developers.
 
@@ -170,6 +173,7 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
 
         The "rationale" must explain: (a) why this topic now given the author's current focus, \
         (b) what makes it non-generic, and (c) which audience segment it most benefits."""
+        )
 
         user_prompt = f"""MANDATORY DOMAIN ROTATION CONSTRAINT:
         {rotation_hint or 'No clustering detected — all domains available.'}

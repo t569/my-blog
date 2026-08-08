@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_admin
+from app.config import settings
 from app.db.base import get_db
 from app.devspace_agents.pipeline.runner import run_agent_pipeline
 from app.devspace_agents.scheduler import reschedule as scheduler_reschedule
@@ -42,6 +43,14 @@ async def trigger_pipeline(
     db: Annotated[AsyncSession, Depends(get_db)],
     admin: Annotated[Owner, Depends(get_current_admin)],
 ):
+    # Checked before the run row is written, so a disabled agent doesn't leave
+    # a row stuck in "running" — the background task can't report failure.
+    if not settings.agent_ready:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent pipeline is disabled (set GROQ_API_KEY and AGENT_ENABLED).",
+        )
+
     run = AgentRun(
         owner_id=admin.id,
         triggered_by="manual",

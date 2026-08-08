@@ -6,6 +6,7 @@ import uuid
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.config import settings
 from app.devspace_agents.pipeline.runner import run_agent_pipeline
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,16 @@ scheduler = AsyncIOScheduler()
 
 
 async def start_scheduler(owner_id: uuid.UUID, cron_expr: str) -> None:
+    # Single gate for every scheduled entry point — startup and reschedule().
+    if not settings.agent_ready:
+        logger.info(
+            "Agent pipeline disabled (AGENT_ENABLED=%s, GROQ_API_KEY %s) "
+            "— not scheduling.",
+            settings.AGENT_ENABLED,
+            "set" if settings.GROQ_API_KEY else "unset",
+        )
+        return
+
     if not scheduler.running:
         scheduler.start()
 
