@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPostBySlug } from "@/services/api";
+import { SITE } from "@/lib/constants";
 import PostDetailClient from "@/components/blog/PostDetailClient";
 import ReadingProgress from "@/components/blog/ReadingProgress";
 
@@ -16,8 +17,8 @@ export async function generateMetadata({
 		const post = await getPostBySlug(slug);
 
 		return {
-			title: `${post.title} — d3jusdevspace`,
-			description: post.excerpt || `Read ${post.title} on d3jusdevspace`,
+			title: post.title,
+			description: post.excerpt || `Read ${post.title} on ${SITE.name}`,
 			openGraph: {
 				title: post.title,
 				description: post.excerpt || undefined,
@@ -26,9 +27,9 @@ export async function generateMetadata({
 				tags: post.tags?.map((t) => t.name) || [],
 			},
 		};
-	} catch (error) {
+	} catch {
 		return {
-			title: "Post Not Found — d3jusdevspace",
+			title: "Post Not Found",
 		};
 	}
 }

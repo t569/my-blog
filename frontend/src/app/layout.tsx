@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/lib/providers";
+import { SITE } from "@/lib/constants";
 
 export const metadata: Metadata = {
 	title: {
-		default: "d3jusdevspace",
-		template: "%s — d3jusdevspace",
+		default: SITE.name,
+		template: `%s — ${SITE.name}`,
 	},
-	description:
-		"Personal AI knowledge hub, engineering blog, and agentic AI observability platform.",
-	metadataBase: new URL(
-		process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-	),
+	description: SITE.description,
+	metadataBase: new URL(SITE.url),
+	icons: { icon: SITE.icon },
 	openGraph: {
 		type: "website",
-		siteName: "d3jusdevspace",
+		siteName: SITE.name,
 		locale: "en_US",
 	},
 };
@@ -25,7 +24,12 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+		<html
+			lang="en"
+			suppressHydrationWarning
+			data-scroll-behavior="smooth"
+			data-skin={SITE.skin}
+		>
 			<body className="min-h-screen bg-bg-page text-text-primary font-body antialiased">
 				<Providers>{children}</Providers>
 			</body>

@@ -16,7 +16,7 @@ export async function generateMetadata({
 	try {
 		const series = await getSeriesBySlug(slug);
 		return {
-			title: `${series.title} — Series — d3jusdevspace`,
+			title: `${series.title} — Series`,
 			description: series.description || `Browse the ${series.title} series.`,
 			openGraph: {
 				title: `${series.title} — Series`,
@@ -25,7 +25,7 @@ export async function generateMetadata({
 		};
 	} catch {
 		return {
-			title: "Series Not Found — d3jusdevspace",
+			title: "Series Not Found",
 		};
 	}
 }

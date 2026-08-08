@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import { SITE } from "@/lib/constants";
 
 interface HeroSectionProps {
 	totalPosts: number;
@@ -17,16 +18,13 @@ export default function HeroSection({ totalPosts }: HeroSectionProps) {
 						className="inline-block rounded-full bg-accent px-4 py-1 text-bg-page"
 						style={{ boxShadow: "var(--shadow-neon-accent)" }}
 					>
-						d3ju
+						{SITE.author}
 					</span>
 				</h1>
 
 				{/* Sub-headline */}
 				<p className="max-w-2xl font-body text-body-lg text-text-secondary">
-					I'm just another human finding my voice in a noisy world. Here, I'm a{" "}
-					<strong>Full-Stack AI/ML Engineer</strong>, and I document my
-					projects, lessons, ideas, thoughts, and basically, just{" "}
-					<strong>ME</strong>. Hope you find something for you!
+					{SITE.intro}
 				</p>
 
 				{/* Post count */}

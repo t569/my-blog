@@ -1,15 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import HomeFeedClient from "@/components/feed/HomeFeedClient";
+import { SITE } from "@/lib/constants";
 
 export const metadata: Metadata = {
-	title: "d3jusdevspace — AI engineer, builder, thinker",
-	description:
-		"Personal blog by d3ju. Writing about AI engineering, projects, and thoughts.",
-	openGraph: {
-		title: "d3jusdevspace",
-		description: "Personal blog by d3ju.",
-	},
+	// absolute: the root layout's "%s — name" template would otherwise double the name
+	title: { absolute: `${SITE.name} — ${SITE.tagline}` },
+	description: SITE.description,
 };
 
 export default function HomePage() {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { SITE } from "@/lib/constants";
 import {
 	Menu,
 	X,
@@ -96,7 +97,7 @@ export default function AdminShell({
 						target="_blank"
 						className="font-mono text-(length:--text-h4) font-bold text-accent no-underline text-shadow(--shadow-neon-accent)"
 					>
-						d3jusdevspace
+						{SITE.name}
 					</Link>
 				</div>
 

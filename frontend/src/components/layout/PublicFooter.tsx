@@ -1,3 +1,5 @@
+import { SITE } from "@/lib/constants";
+
 export default function PublicFooter() {
 	return (
 		<footer className="w-full border-t border-border-subtle bg-bg-surface py-8">
@@ -5,29 +7,32 @@ export default function PublicFooter() {
 				{/* Left: Social Links */}
 				<div className="flex items-center gap-6 font-mono text-xs uppercase text-text-secondary">
 					<a
-						href="https://x.com/adejo_deju"
+						href={SITE.twitter}
 						className="hover:text-accent transition-colors"
 					>
 						Twitter
 					</a>
 					<a
-						href="https://github.com/DejusDevspace"
+						href={SITE.github}
 						className="hover:text-accent transition-colors"
 					>
 						GitHub
 					</a>
-					<a
-						href="https://linkedin.com/in/deju-adejo"
-						className="hover:text-accent transition-colors"
-					>
-						LinkedIn
-					</a>
+					{/* Hidden when the env override is blank — a fork that has no
+					    LinkedIn shouldn't render a dead link. */}
+					{SITE.linkedin && (
+						<a
+							href={SITE.linkedin}
+							className="hover:text-accent transition-colors"
+						>
+							LinkedIn
+						</a>
+					)}
 				</div>
 
 				{/* Right: Copyright */}
 				<div className="font-mono text-xs uppercase text-text-tertiary">
-					© {new Date().getFullYear()} D3JUSDEVSPACE // BUILT FOR THE AGENTIC
-					AGE
+					© {new Date().getFullYear()} {SITE.name} // {SITE.motto}
 				</div>
 			</div>
 		</footer>

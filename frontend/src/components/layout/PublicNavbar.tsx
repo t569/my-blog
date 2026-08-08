@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Loader2, Layers } from "lucide-react";
+import { Search, Moon, Sun, Loader2, Layers, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
+import { SITE } from "@/lib/constants";
 
 // Simple custom hook for debouncing a value.
 function useDebounce<T>(value: T, delay: number): T {
@@ -160,7 +161,7 @@ export default function PublicNavbar() {
 					className="font-mono text-lg font-bold tracking-wider text-accent uppercase"
 					style={{ textShadow: "var(--shadow-neon-accent)" }}
 				>
-					d3jusdevspace
+					{SITE.name}
 				</Link>
 
 				{/* Center: Search (Desktop) */}
@@ -202,8 +203,16 @@ export default function PublicNavbar() {
 						Series
 					</Link>
 
+					<Link
+						href="/about"
+						className="hidden md:inline-flex items-center gap-1.5 rounded border border-border-default px-3 py-1.5 font-mono text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors"
+					>
+						<User size={12} />
+						About
+					</Link>
+
 					<a
-						href="https://github.com/DejusDevspace/my-blog"
+						href={SITE.repo}
 						target="_blank"
 						rel="noopener noreferrer"
 						className="hidden md:inline-flex rounded border border-border-default px-3 py-1.5 font-mono text-sm text-accent hover:border-accent hover:bg-accent-muted transition-colors"
@@ -225,6 +234,14 @@ export default function PublicNavbar() {
 						>
 							<Layers size={12} />
 							Series
+						</Link>
+						<Link
+							href="/about"
+							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
+							onClick={() => setIsMobileSearchOpen(false)}
+						>
+							<User size={12} />
+							About
 						</Link>
 					</div>
 				</div>

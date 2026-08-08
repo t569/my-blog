@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Layers } from "lucide-react";
 import * as api from "@/services/api";
+import { SITE } from "@/lib/constants";
 
 interface FilterSidebarProps {
 	activeCategory: string | null;
@@ -139,10 +140,10 @@ export default function FilterSidebar({
 				</div>
 				<div className="flex flex-col">
 					<span className="font-mono text-sm font-bold text-text-primary">
-						d3ju
+						{SITE.author}
 					</span>
 					<span className="font-mono text-[0.65rem] font-bold text-accent uppercase tracking-wider">
-						AI/ML ENGINEER
+						{SITE.role}
 					</span>
 				</div>
 			</div>

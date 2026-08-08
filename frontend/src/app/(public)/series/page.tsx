@@ -4,12 +4,8 @@ import { Layers, ArrowLeft } from "lucide-react";
 import { getPublicSeries } from "@/services/api";
 
 export const metadata: Metadata = {
-	title: "Series — d3jusdevspace",
-	description: "Browse all blog series on d3jusdevspace.",
-	openGraph: {
-		title: "Series — d3jusdevspace",
-		description: "Browse all blog series.",
-	},
+	title: "Series",
+	description: "Browse all series.",
 };
 
 export default async function SeriesIndexPage() {

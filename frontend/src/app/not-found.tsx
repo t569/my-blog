@@ -8,6 +8,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import styles from "./not-found.module.css";
+import { SITE } from "@/lib/constants";
 
 export const metadata: Metadata = {
 	title: "404 — Page Not Found",
@@ -36,14 +37,14 @@ export default function NotFound() {
 						<span className={styles.terminalDot} data-color="danger" />
 						<span className={styles.terminalDot} data-color="warning" />
 						<span className={styles.terminalDot} data-color="success" />
-						<span className={styles.terminalTitle}>d3jusdevspace — bash</span>
+						<span className={styles.terminalTitle}>{SITE.name} — bash</span>
 					</div>
 
 					<div className={styles.terminalBody}>
 						<p className={styles.terminalLine}>
 							<span className={styles.prompt}>$</span>{" "}
 							<span className={styles.command}>
-								curl -s https://d3jusdevspace.dev/this-page
+								curl -s {SITE.url}/this-page
 							</span>
 						</p>
 						<p className={styles.terminalOutput}>
