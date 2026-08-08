@@ -246,8 +246,9 @@
 
 /* ── The figure ──
    Lives in the empty margin to the right of the measure, pinned while you read.
-   Below the width where that margin exists it goes back into the flow and
-   appears once at the end of the article, which is where it sits in the DOM. */
+   Below the width where that margin exists there is no margin to pin it in, so
+   it moves behind the prose instead — same element, same timeline, one layer
+   back. See the 78rem query. */
 
 .figure {
 	position: absolute;
@@ -421,15 +422,68 @@
    timeline is the page, not the element — it just isn't alongside the reading. */
 
 /* 78rem: the column is 46rem and the figure needs 2.5rem + 13rem of margin
-   beside it, so it stops fitting at 46 + 2×15.5 = 77rem. A little headroom. */
+   beside it, so it stops fitting at 46 + 2×15.5 = 77rem. A little headroom.
+
+   With no margin to live in it goes *behind* the prose rather than after it.
+   Ending the article with it meant it was only ever seen by people who read to
+   the bottom, which is the opposite of an instrument you consult while reading.
+
+   Only the wireframe crosses the text. The filled bands are dropped here, and
+   that is the whole reason this is safe: hairlines cover a tiny fraction of a
+   glyph's area, so measured contrast is essentially untouched, while a
+   translucent surface behind body copy is a real tint on every pixel of it.
+   Same figure, one layer lighter. */
 @media (max-width: 78rem) {
+	/* The backdrop is deliberately wider than the column, so something has to
+	   absorb the bleed or the document scrolls sideways on a phone.
+
+	   Scoped to this query, not on .wrap outright: above this width the figure
+	   sits at `left: 100%`, which is *outside* .wrap's content box, so a clip
+	   there deletes it from the margin entirely. It did, and the build stayed
+	   green — the screenshot is what caught it.
+
+	   `clip`, not `hidden`: hidden makes this a scroll container, which breaks
+	   the figure's `position: sticky` and the scroll-driven timelines. The rail
+	   lives inside the left padding, so it is not what gets cut. */
+	.wrap {
+		overflow-x: clip;
+	}
 	.figure {
-		position: static;
-		width: 9rem;
-		margin: clamp(3rem, 8vw, 4.5rem) auto 0;
+		left: 50%;
+		top: 0;
+		bottom: 0;
+		width: min(32rem, 116%);
+		margin-left: 0;
+		transform: translateX(-50%);
+		/* Behind the words, and not in the way of selecting them. It is already
+		   aria-hidden, so nothing is lost to a screen reader either. */
+		z-index: 0;
+		pointer-events: none;
+		opacity: 0.55;
 	}
 	.figureSticky {
-		position: static;
+		top: 22vh;
+	}
+	/* The prose has to claim a layer, or the figure — later in the DOM — paints
+	   over it. */
+	.body :global(.prose) {
+		position: relative;
+		z-index: 1;
+	}
+	.figureBand {
+		display: none;
+	}
+	/* The lit ring is drawn last, at full accent and a heavier stroke, because
+	   in the margin it is the readout you look at. Crossing body copy it is the
+	   heaviest ink on the page and wins against the words. Muted here only —
+	   still the one mark that moves, just no longer the loudest. */
+	.figureSection {
+		opacity: 0.6;
+	}
+	/* A caption is for a figure you are looking at. Behind running text it is
+	   just two lines of stray mono in the middle of a paragraph. */
+	.figureReadout {
+		display: none;
 	}
 }
 
@@ -457,28 +511,19 @@
 		right: auto;
 	}
 	/* Kept, not hidden. The paths are in the HTML whatever the viewport — a
-	   media query can't un-download them — so hiding it here meant phones paid
-	   for the figure and were shown nothing. It ends the article instead, at a
-	   size that doesn't crowd the measure.
+	   media query can't un-download them — so hiding it here would mean phones
+	   paid for the figure and were shown nothing.
 
-	   Not a background wash behind the text, which was the other option: the
-	   figure earns its place by being legible as a diagram, and at the opacity
-	   body copy would need it stops being one. The rail and its nodes still run
-	   down the page here, so mobile isn't short of the page's signature. */
+	   Wider than the column on purpose: a phone measure is narrow enough that a
+	   figure fitted inside it reads as an illustration sitting in the text. Let
+	   it bleed past both edges and it reads as the surface the text is written
+	   on, which is the point. Fainter too — a narrow column gives a line of
+	   type fewer places to hide from a stroke crossing it. */
 	.figure {
-		width: 9rem;
-		margin-top: clamp(2.5rem, 8vw, 3.5rem);
+		width: min(26rem, 132%);
+		opacity: 0.45;
 	}
-	/* Stacked, because side by side the label and the value don't fit a phone's
-	   figure width. And a size down: measured, the label is 147px at 0.58rem
-	   against a 144px box — three pixels over, which is enough to break it at
-	   the hyphen into "FIGURE-" / "8". At 0.54rem/0.1em it's 129px and holds. */
-	.figureReadout {
-		flex-direction: column;
-		align-items: center;
-		gap: 0.2rem;
-		font-size: 0.54rem;
-		letter-spacing: 0.1em;
-		text-align: center;
+	.figureSticky {
+		top: 26vh;
 	}
 }

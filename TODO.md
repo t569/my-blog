@@ -301,8 +301,8 @@ not a file copy. 11 markdown files in `t569/blog` under `content/`.
       `KleinFigure.tsx`: the figure-8 immersion, wireframed as rings crossed by
       longitudes, with the ring at the current scroll position lit and a mono
       readout of `u`. Sticky in the right margin while you read; below 78rem
-      there's no margin to live in, so it drops back into the flow at the end of
-      the article; below 40rem it's hidden.
+      there's no margin to live in, so it moves **behind the prose** — same
+      element, same timeline, one layer back.
       It shares the rail's timeline rather than introducing a second one — the
       figure is a readout of the mechanism already on the page. Sections change
       shape but never point count, which is what lets CSS `d` interpolate them;
@@ -370,6 +370,33 @@ not a file copy. 11 markdown files in `t569/blog` under `content/`.
       Note the hero axis still reads compilers · CPU schedulers · cloud
       sandboxes · theoretical physics and mentions none of this; changing the
       `·` line in `about.md` is all it takes if the axis should say so too.
+- [x] **The figure became the backdrop on narrow screens.** Ending the article
+      with it meant only people who read to the bottom ever saw it — the
+      opposite of an instrument you consult *while* reading. Below 78rem it is
+      now a wide, faint layer behind the prose, still driven by the same scroll
+      timeline.
+      The earlier note in `about.module.css` rejected exactly this ("at the
+      opacity body copy would need it stops being [a diagram]") — and that was
+      right about the *fills*. Dropping `.figureBand` and keeping only the
+      wireframe is what makes it safe: hairlines cover a tiny fraction of a
+      glyph's area, so contrast is essentially untouched, while a translucent
+      surface tints every pixel under the text. The lit ring is muted to 0.6
+      here too; at full accent it was the heaviest ink on the page.
+      Deliberately bleeds past both edges — a figure fitted inside a phone's
+      measure reads as an illustration sitting *in* the text, not as the surface
+      it's written on.
+  - **The bleed needs `overflow-x: clip`, scoped to the same query.** Put on
+    `.wrap` outright it deleted the desktop figure entirely, because above
+    78rem the figure sits at `left: 100%` — outside `.wrap`'s content box. The
+    build stayed green and the type-check passed; the screenshot is what caught
+    it. `clip` not `hidden`, because `hidden` makes a scroll container and
+    breaks both `position: sticky` and every scroll-driven timeline here.
+  - Verified over CDP at 1440 / 760 / 390 / 320: `scrollWidth === clientWidth`
+    at all four. Worth knowing for next time — `chrome --headless --screenshot`
+    does **not** apply `--window-size` to the layout viewport, so it renders at
+    ~800px and crops. That artefact looked exactly like a horizontal-overflow
+    bug and sent me chasing one that wasn't there. Use
+    `Emulation.setDeviceMetricsOverride` over CDP instead.
 - [ ] Replace the draft prose in `frontend/content/about.md` with the real
       thing. It's scaffolded from the intro and the four domains, with `<!-- -->`
       notes marking what's yours to write. Content changes need a rebuild;
