@@ -4,11 +4,15 @@ import { useRef, useState } from "react";
 import type { ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
+import "katex/dist/katex.min.css";
 import { Check, Copy } from "lucide-react";
-// Use a dark highlight.js theme that matches Cyber-Luxury well
-import "highlight.js/styles/atom-one-dark.css";
+// No vendored highlight.js stylesheet: those hardcode one palette, so code
+// blocks stayed dark in light mode. The .hljs-* classes are styled from theme
+// tokens in globals.css instead.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Pre = ({ children, ...props }: any) => {
@@ -63,12 +67,20 @@ interface MarkdownRendererProps {
 	content: string;
 }
 
+/**
+ * HTML comments are the one piece of raw HTML that leaks: react-markdown skips
+ * raw HTML elements but prints comments verbatim, so an authoring note ends up
+ * on the page. Strip them — every other markdown renderer treats them as
+ * invisible, and content is imported from tools that leave them behind.
+ */
+const COMMENT = /<!--[\s\S]*?-->/g;
+
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
 	return (
 		<div className="prose max-w-none">
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm]}
-				rehypePlugins={[rehypeSlug, rehypeHighlight]}
+				remarkPlugins={[remarkGfm, remarkMath]}
+				rehypePlugins={[rehypeSlug, rehypeHighlight, rehypeKatex]}
 				components={{
 					pre: Pre,
 					ul: ({ children, ...props }: ComponentPropsWithoutRef<"ul">) => (
@@ -88,7 +100,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
 					),
 				}}
 			>
-				{content}
+				{content.replace(COMMENT, "")}
 			</ReactMarkdown>
 		</div>
 	);
