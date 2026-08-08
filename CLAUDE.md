@@ -46,6 +46,7 @@ decide which kind of change this is:
 | Test | Would upstream want it? | Is it my name/face/taste? |
 | Examples | KaTeX math, markdown import script, theme-aware code blocks, the constellation component, a raw-markdown editor toggle | `.env.local` values, `garden.css`, the Kerbal icon, my bio |
 | Lives in | Normal code, generic, no personal strings | Env vars and additive files only |
+| Committed? | Yes | Env values never; additive files only when a clean CI build needs them (`content/about.md`, the Kerbal icon) |
 | Goes upstream | Yes — branch off `upstream/main`, PR it | Never |
 
 Anything with a personal string baked in is not a feature yet. Extract the
@@ -92,7 +93,10 @@ git checkout dev/t569 && git merge feat/<name>
   `app/favicon.ico` and an `app/icon.png` emits two `<link rel="icon">` tags
   and lets the browser pick.
 - `NEXT_PUBLIC_*` is inlined at **build** time — restart dev after editing
-  `.env.local`, and set the same vars on the host for deploys.
+  `.env.local`, and set the same vars on the host for deploys. On Vercel a
+  changed value needs a *redeploy*, and that is the platform's model, not the
+  prefix's: deployments are immutable, so runtime-read env would behave the
+  same. `frontend/.env.example` is the checklist of what a host must set.
 - Don't rename theme names (`dark`/`light`) casually — `next-themes`, the
   navbar toggle, and BlockNote's `resolvedTheme` all key off them.
 

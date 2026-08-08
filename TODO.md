@@ -268,11 +268,14 @@ not a file copy. 11 markdown files in `t569/blog` under `content/`.
       the existing `MarkdownRenderer` — so it gets KaTeX, themed code blocks and
       prose styling for free, and the DB isn't involved (it's a page, not a
       post).
-      `content/about.md` is **gitignored**: it's the one thing that can't have a
+      `content/about.md` is **optional**: it's the one thing that can't have a
       shared default, being by definition somebody's own words. Absent, the page
       falls back to `SITE.intro`, so upstream builds a real /about rather than a
-      404, and my copy never shows up in a diff. Nav link added (desktop +
-      mobile panel).
+      404. Nav link added (desktop + mobile panel).
+      It started out gitignored; now committed, because Vercel builds from a
+      clean clone and a gitignored file means the deployed page silently serves
+      the fallback. The words are published either way — the fallback is what
+      keeps the *code* forkable, not the file's absence from git.
 - [x] **Designed, with motion.** `about.module.css` (scoped to the route, purely
       additive). One hairline carries the page: horizontal under the headline it
       is an *axis* ticked with the four things in the hero line; at the left
@@ -425,6 +428,30 @@ current state then rather than trusting notes from now.)
       `?sslmode=require` — asyncpg rejects `sslmode` as an unknown kwarg. Set
       `LOCAL_POSTGRES_DOCKER_FOR_DEV=false` once off the container.
 - [ ] Only then: keep pgvector, or drop semantic search and reconsider
+
+---
+
+### 6. Hosting — free tier, three services
+
+Written up in [docs/deployment.md](./docs/deployment.md): Vercel → Render →
+Neon, the env tables for each, and a first-deploy checklist.
+
+- [x] **Scheduled agent runs survive a sleeping backend.** Render's free
+      instance spins down after ~15 min, and the scheduler is APScheduler
+      *inside* that process — so it fires nothing, silently. The timing moved to
+      Vercel Cron (`/api/cron/agent`), the work stayed put: the route mints the
+      same admin JWT the browser session uses and calls the existing
+      `/admin/agent/trigger`. No pipeline logic, no second auth scheme, and the
+      agent feature switch still governs it. Fails closed — no `CRON_SECRET`,
+      no runs, because the URL is public.
+      Turn **Schedule active** off on `/admin/settings/agent` so an always-on
+      host later doesn't run both and produce two drafts.
+- [x] **`frontend/.env.example`** — every var the frontend reads, each with
+      upstream's default, so a deploy has a checklist instead of guesswork.
+      Generic — **PR-able upstream**.
+- [ ] Actually deploy: Neon is seeded and holds the 9 imported posts, so it's
+      Render + Vercel and the checklist.
+- [ ] Custom domain, once there's something worth pointing it at.
 
 ---
 

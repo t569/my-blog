@@ -17,10 +17,10 @@ export const metadata: Metadata = {
  * The page body is markdown on disk, not in the database — it's a page, not a
  * post, so it never needed the CMS.
  *
- * `content/about.md` is gitignored: it's the one thing here that can't have a
- * shared default, since it is by definition somebody's own words. A fork drops
- * its own file in and gets its own page; with no file, this falls back to the
- * site's own `SITE.intro`, so /about is never a dead route or a 404.
+ * `content/about.md` is optional. It's the one thing here that can't have a
+ * shared default, being by definition somebody's own words, so a fork replaces
+ * it or deletes it; with no file, this falls back to the site's own
+ * `SITE.intro` and /about is never a dead route or a 404.
  */
 function readAbout(): string {
 	try {
