@@ -22,7 +22,10 @@ export default function HomeFeedClient() {
 	const [page, setPage] = useState(1);
 	const [allPosts, setAllPosts] = useState<PostListItem[]>([]);
 
-	const { data, isLoading, isFetching, error } = usePosts({
+	// isPending, not isLoading: during the persisted-cache restore on the client,
+	// react-query reports isLoading=false while the server rendered isLoading=true
+	// — that gap is a hydration mismatch. isPending ("no data yet") agrees on both.
+	const { data, isPending, isFetching, error } = usePosts({
 		page,
 		limit: 10,
 		category: activeCategory || undefined,
@@ -80,7 +83,7 @@ export default function HomeFeedClient() {
 
 	// Full-page skeleton while the very first fetch is in-flight.
 	// Nothing hardcoded (hero, sidebar, filters) renders until data arrives for the first time.
-	if (isLoading && !hasLoadedOnce) {
+	if (isPending && !hasLoadedOnce) {
 		return (
 			<div className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-12 lg:flex-row lg:px-8">
 				{/* Sidebar skeleton — desktop only */}

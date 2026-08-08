@@ -11,7 +11,9 @@ interface PostCommentsProps {
 }
 
 export default function PostComments({ postId, postSlug }: PostCommentsProps) {
-	const { data: comments, isLoading, error } = usePostComments(postSlug);
+	// isPending, not isLoading — see HomeFeedClient: isLoading disagrees between
+	// SSR and the client's cache-restore render, which breaks hydration.
+	const { data: comments, isPending, error } = usePostComments(postSlug);
 	const submitComment = useSubmitComment();
 
 	const [isAnonymous, setIsAnonymous] = useState(false);
@@ -62,7 +64,7 @@ export default function PostComments({ postId, postSlug }: PostCommentsProps) {
 
 			{/* Comment List */}
 			<div className="mb-12 flex flex-col gap-6">
-				{isLoading ? (
+				{isPending ? (
 					<div className="space-y-4">
 						{[1, 2, 3].map((i) => (
 							<div
