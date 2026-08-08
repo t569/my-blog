@@ -56,6 +56,9 @@ export default function Providers({ children }: ProvidersProps) {
 			defaultTheme="system"
 			enableSystem
 			disableTransitionOnChange
+			// Theme registry — one name per file in src/styles/themes/.
+			// Adding a palette means adding it here and importing the file in globals.css.
+			themes={["light", "dark"]}
 		>
 			<ToastProvider>{children}</ToastProvider>
 		</ThemeProvider>

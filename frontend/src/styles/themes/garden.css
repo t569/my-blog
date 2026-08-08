@@ -1,0 +1,136 @@
+/* ============================================================================
+  Skin: garden — the digital-garden look for t569/KaRlS3fN1.
+
+  Derived from the Quartz garden's own palette, which names its colors
+  constellation lines, a node blue, and a bright white star for the active
+  node. Two decisions follow and are deliberate:
+
+  1. Dark backgrounds are layered indigo, not flat black. Near-black plus one
+     bright accent is the most over-used dark theme there is; a night sky has
+     depth.
+  2. The accent is the node blue and the *hover* brightens toward white — a
+     link lighting up the way an active node does, rather than the usual
+     "saturate on hover".
+
+  Type: Source Serif 4 for reading, because KaTeX typesets math in a serif
+  face and against a sans body every inline formula sits on top of the line
+  instead of in it. Schibsted Grotesk and IBM Plex Mono carry over from Quartz.
+
+  This file never edits cyber-luxury.css — the original look stays intact and
+  selectable. Switch with NEXT_PUBLIC_SITE_SKIN.
+============================================================================ */
+
+[data-skin="garden"] {
+	/* ── Fonts ── */
+	--font-body-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+	--font-mono-family: "IBM Plex Mono", ui-monospace, monospace;
+	--font-display-family: "Schibsted Grotesk", system-ui, sans-serif;
+
+	/* ── Backgrounds — layered night sky ── */
+	--color-bg-page: #06070f;
+	--color-bg-surface: #0b0e1a;
+	--color-bg-elevated: #121628;
+	--color-bg-subtle: #1a1f36;
+
+	/* ── Text — star white down to dust ── */
+	--color-text-primary: #f0f6fc;
+	--color-text-secondary: #a8b2c6;
+	--color-text-tertiary: #6b7689;
+	--color-text-inverse: #06070f;
+
+	/* ── Accent — node blue, brightening to a white star on hover ── */
+	--color-accent: #58a6ff;
+	--color-accent-hover: #dce9ff;
+	--color-accent-muted: #58a6ff1a;
+	--color-accent-border: #58a6ff33;
+
+	/* ── Borders — constellation lines, deliberately faint ── */
+	--color-border-subtle: #1b2137;
+	--color-border-default: #2a3350;
+	--color-border-strong: #3d4870;
+
+	/* ── Semantic — success is sage: a garden that grows ── */
+	--color-success: #4f9e86;
+	--color-success-muted: #4f9e8620;
+	--color-warning: #d08b2c;
+	--color-warning-muted: #d08b2c20;
+	--color-danger: #e2555a;
+	--color-danger-muted: #e2555a20;
+	--color-info: #6aa6e8;
+	--color-info-muted: #6aa6e820;
+
+	/* ── Special ──
+	   Agent-authored posts get their own hue rather than the site accent, so
+	   "written by the pipeline" is legible at a glance. */
+	--color-agent-badge: #a78bfa;
+	/* Starlight, not signage — softer than a full-opacity neon. */
+	--shadow-neon-accent: 0 0 6px #58a6ff66, 0 0 18px #58a6ff33;
+
+	/* ── Syntax ── */
+	--syn-comment: #6b7689;
+	--syn-keyword: #c99bf5;
+	--syn-string: #7fc7a9;
+	--syn-number: #e0a458;
+	--syn-function: #58a6ff;
+	--syn-type: #6fd8d0;
+	--syn-variable: #f0f6fc;
+
+	/* ── Shadows ── */
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Light: "paper" ──
+   Built from the Quartz garden's light palette — warm off-white #faf8f8, slate
+   blue #284b63, sage #84a59d. Both reference blogs (fractalkitty, mathsedideas)
+   work on light, roomy pages, so this is the theme to read long proofs in, not
+   an afterthought inversion of the dark one. */
+[data-skin="garden"][data-theme="light"] {
+	--color-bg-page: #faf8f8;
+	--color-bg-surface: #ffffff;
+	--color-bg-elevated: #f4f1ef;
+	--color-bg-subtle: #edeae6;
+
+	--color-text-primary: #232a30;
+	--color-text-secondary: #4e5a63;
+	--color-text-tertiary: #8a949c;
+	--color-text-inverse: #ffffff;
+
+	--color-accent: #284b63;
+	--color-accent-hover: #17344a;
+	--color-accent-muted: #284b6312;
+	--color-accent-border: #284b6333;
+
+	/* Warm greys, to match the paper rather than fight it. */
+	--color-border-subtle: #e6e1dc;
+	--color-border-default: #d2cbc4;
+	--color-border-strong: #ada49c;
+
+	/* Sage again, darkened until it passes contrast on paper. */
+	--color-success: #4a7a6b;
+	--color-success-muted: #4a7a6b18;
+	--color-warning: #8a5a12;
+	--color-warning-muted: #8a5a1218;
+	--color-danger: #a33636;
+	--color-danger-muted: #a3363618;
+	--color-info: #285f8a;
+	--color-info-muted: #285f8a18;
+
+	--color-agent-badge: #6d5bb5;
+	/* No glow. Neon is a night-sky effect; on paper it reads as a printing
+	   fault. Components keep using the token, it just resolves to nothing. */
+	--shadow-neon-accent: none;
+
+	--syn-comment: #8a949c;
+	--syn-keyword: #6d3f9e;
+	--syn-string: #3f6f5c;
+	--syn-number: #96591a;
+	--syn-function: #284b63;
+	--syn-type: #1f6b6b;
+	--syn-variable: #232a30;
+
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+}

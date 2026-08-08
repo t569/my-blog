@@ -1,0 +1,125 @@
+/* ============================================================================
+  Skin: cyber-luxury — the ORIGINAL d3jusdevspace look. Do not restyle.
+
+  These are upstream's values, verbatim. This file exists so that adding a new
+  look never means deleting the old one: the original site is still fully
+  intact and one env var away.
+
+  It is also the fallback. `:root` carries the dark palette, so a page with no
+  data-skin/data-theme attribute — upstream's own build, or ours before
+  next-themes hydrates — renders exactly as it always did.
+
+  Structure of a skin file:
+    [data-skin="<name>"]                      → the dark palette + fonts
+    [data-skin="<name>"][data-theme="light"]  → light overrides only
+  Colors, fonts, shadows and syntax live here. Structural tokens (type scale,
+  spacing, radii, layout) stay in globals.css and are shared by every skin.
+============================================================================ */
+
+:root,
+[data-skin="cyber-luxury"] {
+	/* ── Fonts ── */
+	--font-body-family: "Space Grotesk", sans-serif;
+	--font-mono-family: "JetBrains Mono", monospace;
+	--font-display-family: "Montserrat", sans-serif;
+
+	/* ── Backgrounds ── */
+	--color-bg-page: #010b20;
+	--color-bg-surface: #0a1628;
+	--color-bg-elevated: #0f1e35;
+	--color-bg-subtle: #162440;
+
+	/* ── Text ── */
+	--color-text-primary: #e8eaf0;
+	--color-text-secondary: #9aa3b4;
+	--color-text-tertiary: #5a6478;
+	--color-text-inverse: #010b20;
+
+	/* ── Accent ── */
+	--color-accent: #00e5ff;
+	--color-accent-hover: #33eeff;
+	--color-accent-muted: #00e5ff1a;
+	--color-accent-border: #00e5ff33;
+
+	/* ── Borders ── */
+	--color-border-subtle: #1e2f4a;
+	--color-border-default: #2a3f5f;
+	--color-border-strong: #3a5070;
+
+	/* ── Semantic ── */
+	--color-success: #1d9e75;
+	--color-success-muted: #1d9e7520;
+	--color-warning: #ba7517;
+	--color-warning-muted: #ba751720;
+	--color-danger: #e24b4a;
+	--color-danger-muted: #e24b4a20;
+	--color-info: #378add;
+	--color-info-muted: #378add20;
+
+	/* ── Special ── */
+	--color-agent-badge: #00e5ff;
+	--shadow-neon-accent: 0 0 6px #00e5ff, 0 0 18px #00e5ff40;
+
+	/* ── Syntax ──
+	   Approximates the atom-one-dark stylesheet this skin used to import, so
+	   code blocks look as they did before highlighting became theme-driven. */
+	--syn-comment: #5c6370;
+	--syn-keyword: #c678dd;
+	--syn-string: #98c379;
+	--syn-number: #d19a66;
+	--syn-function: #61afef;
+	--syn-type: #e6c07b;
+	--syn-variable: #e06c75;
+
+	/* ── Shadows ── */
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+[data-skin="cyber-luxury"][data-theme="light"] {
+	--color-bg-page: #f0f2f5;
+	--color-bg-surface: #ffffff;
+	--color-bg-elevated: #f7f8fa;
+	--color-bg-subtle: #eef0f3;
+
+	--color-text-primary: #0d1117;
+	--color-text-secondary: #4a5568;
+	--color-text-tertiary: #9aa3b2;
+	--color-text-inverse: #ffffff;
+
+	--color-accent: #0066ff;
+	--color-accent-hover: #0052cc;
+	--color-accent-muted: #0066ff12;
+	--color-accent-border: #0066ff30;
+
+	--color-border-subtle: #e2e6ed;
+	--color-border-default: #cdd2db;
+	--color-border-strong: #a0aab8;
+
+	--color-success: #0f6e56;
+	--color-success-muted: #0f6e5615;
+	--color-warning: #854f0b;
+	--color-warning-muted: #854f0b15;
+	--color-danger: #a32d2d;
+	--color-danger-muted: #a32d2d15;
+	--color-info: #185fa5;
+	--color-info-muted: #185fa515;
+
+	--color-agent-badge: #0066ff;
+	--shadow-neon-accent: 0 0 6px #0066ff40, 0 0 18px #0066ff20;
+
+	/* Light counterparts — the original imported a dark-only highlight theme,
+	   so these are new rather than restored. */
+	--syn-comment: #9aa3b2;
+	--syn-keyword: #a626a4;
+	--syn-string: #40803f;
+	--syn-number: #9a5c1a;
+	--syn-function: #0066ff;
+	--syn-type: #7a5a12;
+	--syn-variable: #a32d2d;
+
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+}

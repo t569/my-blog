@@ -1,14 +1,37 @@
 /* ============================================================================
   d3jusdevspace — Global Stylesheet (Tailwind v4 + Design Tokens)
-  Style guide v1.0 — Dark mode default, light mode via [data-theme="light"]
+  Style guide v1.0 — palettes live in src/styles/themes/*.css, selected by
+  [data-theme="…"]. This file holds structure only: token mapping, base styles,
+  and prose. Restyling should not require editing it.
   ============================================================================ */
 
-/* ── Google Fonts ── */
+/* ── Google Fonts ──
+   Every skin's faces are declared here, because CSS @import cannot be
+   conditional. This is close to free: the browser fetches only the small
+   stylesheet per family and downloads a woff2 only for faces actually used to
+   render, so the inactive skin's fonts cost three cheap requests, not files.
+
+   cyber-luxury: Space Grotesk · JetBrains Mono · Montserrat
+   garden:       Schibsted Grotesk · Source Serif 4 · IBM Plex Mono */
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap");
 
 @import "tailwindcss";
+
+/* ── Skins ──
+   One file per look, each owning both its dark and light palettes plus fonts.
+   Selected by data-skin on <html> (NEXT_PUBLIC_SITE_SKIN), independently of
+   the light/dark toggle.
+
+   Order matters: cyber-luxury is first because it also defines the :root
+   fallback, and later skins override it at equal specificity. Adding a skin
+   never edits an existing one — add a file, import it below, done. */
+@import "../styles/themes/cyber-luxury.css";
+@import "../styles/themes/garden.css";
 
 /* ============================================================================
   1. Tailwind Theme — maps design tokens into utility classes
@@ -17,9 +40,13 @@
 
 @theme inline {
 	/* ── Font Families ── */
-	--font-body: "Space Grotesk", sans-serif;
-	--font-mono: "JetBrains Mono", monospace;
-	--font-display: "Montserrat", sans-serif;
+	/* Indirect on purpose. @theme inline bakes a literal value straight into
+	   the utility (.font-body{font-family:"Space Grotesk"…}), which no skin
+	   could then override. Pointing at a runtime var keeps the utility
+	   skin-aware — same trick the colors below use. */
+	--font-body: var(--font-body-family);
+	--font-mono: var(--font-mono-family);
+	--font-display: var(--font-display-family);
 
 	/* ── Colors ── */
 	--color-bg-page: var(--color-bg-page);
@@ -82,48 +109,13 @@
 }
 
 /* ============================================================================
-  2. CSS Custom Properties — the canonical source for all tokens
-  Dark mode = default :root | Light mode = [data-theme="light"]
+  2. Structural tokens — theme-INDEPENDENT.
+
+  Colors and shadows do not belong here; they live in src/styles/themes/*.css,
+  imported above. Anything in this block is identical across every theme.
 ============================================================================ */
 
 :root {
-	/* ── Backgrounds ── */
-	--color-bg-page: #010b20;
-	--color-bg-surface: #0a1628;
-	--color-bg-elevated: #0f1e35;
-	--color-bg-subtle: #162440;
-
-	/* ── Text ── */
-	--color-text-primary: #e8eaf0;
-	--color-text-secondary: #9aa3b4;
-	--color-text-tertiary: #5a6478;
-	--color-text-inverse: #010b20;
-
-	/* ── Accent ── */
-	--color-accent: #00e5ff;
-	--color-accent-hover: #33eeff;
-	--color-accent-muted: #00e5ff1a;
-	--color-accent-border: #00e5ff33;
-
-	/* ── Borders ── */
-	--color-border-subtle: #1e2f4a;
-	--color-border-default: #2a3f5f;
-	--color-border-strong: #3a5070;
-
-	/* ── Semantic ── */
-	--color-success: #1d9e75;
-	--color-success-muted: #1d9e7520;
-	--color-warning: #ba7517;
-	--color-warning-muted: #ba751720;
-	--color-danger: #e24b4a;
-	--color-danger-muted: #e24b4a20;
-	--color-info: #378add;
-	--color-info-muted: #378add20;
-
-	/* ── Special ── */
-	--color-agent-badge: #00e5ff;
-	--shadow-neon-accent: 0 0 6px #00e5ff, 0 0 18px #00e5ff40;
-
 	/* ── Type Scale ── */
 	--text-display: 2.5rem;
 	--text-h1: 2rem;
@@ -162,10 +154,7 @@
 	--space-20: 80px;
 	--space-24: 96px;
 
-	/* ── Shadows ── */
-	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+	/* Shadows are theme-tinted — see src/styles/themes/*.css */
 
 	/* ── Iconography ── */
 	--icon-sm: 16px;
@@ -186,44 +175,6 @@
 	--reading-max: 720px;
 	--toc-width: 260px;
 	--admin-max: 1400px;
-}
-
-/* ── Light Mode Overrides ── */
-[data-theme="light"] {
-	--color-bg-page: #f0f2f5;
-	--color-bg-surface: #ffffff;
-	--color-bg-elevated: #f7f8fa;
-	--color-bg-subtle: #eef0f3;
-
-	--color-text-primary: #0d1117;
-	--color-text-secondary: #4a5568;
-	--color-text-tertiary: #9aa3b2;
-	--color-text-inverse: #ffffff;
-
-	--color-accent: #0066ff;
-	--color-accent-hover: #0052cc;
-	--color-accent-muted: #0066ff12;
-	--color-accent-border: #0066ff30;
-
-	--color-border-subtle: #e2e6ed;
-	--color-border-default: #cdd2db;
-	--color-border-strong: #a0aab8;
-
-	--color-success: #0f6e56;
-	--color-success-muted: #0f6e5615;
-	--color-warning: #854f0b;
-	--color-warning-muted: #854f0b15;
-	--color-danger: #a32d2d;
-	--color-danger-muted: #a32d2d15;
-	--color-info: #185fa5;
-	--color-info-muted: #185fa515;
-
-	--color-agent-badge: #0066ff;
-	--shadow-neon-accent: 0 0 6px #0066ff40, 0 0 18px #0066ff20;
-
-	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
-	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 
 /* ============================================================================
@@ -385,6 +336,16 @@ body {
 	line-height: var(--leading-tight);
 }
 
+/* h1 needs its own size: preflight resets headings to font-size: inherit, so
+   without this a markdown `# Title` renders smaller than the `##` below it. */
+.prose h1 {
+	font-size: var(--text-h1);
+	margin: var(--space-10) 0 var(--space-5);
+}
+.prose h1:first-child {
+	margin-top: 0;
+}
+
 .prose h2 {
 	font-size: var(--text-h2);
 	margin: var(--space-10) 0 var(--space-4);
@@ -423,6 +384,93 @@ body {
 	font-family: var(--font-mono);
 	font-size: var(--text-caption);
 	line-height: 1.7;
+}
+
+/* ── Math (KaTeX) ──
+   No token pass needed: katex.min.css sets `color: currentColor` and nothing
+   else, so formulas already follow the theme. The one thing it leaves open is
+   a display equation wider than the column pushing the whole page sideways. */
+.katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.5em 0;
+}
+
+/* ── Syntax highlighting ──
+   Replaces the vendored highlight.js stylesheet (was atom-one-dark, hardcoded,
+   so code blocks stayed dark in light mode). These map rehype-highlight's
+   output onto theme tokens, so code follows the active theme. Values live in
+   src/styles/themes/*.css. */
+
+/* Inline-code styling must not leak into fenced blocks. */
+.prose pre code,
+.prose pre code.hljs {
+	background: none;
+	padding: 0;
+	font-size: inherit;
+}
+
+.hljs {
+	color: var(--syn-variable);
+	background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+	color: var(--syn-comment);
+	font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name {
+	color: var(--syn-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-symbol,
+.hljs-bullet {
+	color: var(--syn-string);
+}
+
+.hljs-number,
+.hljs-deletion {
+	color: var(--syn-number);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-selector-id {
+	color: var(--syn-function);
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-params {
+	color: var(--syn-type);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-selector-attr {
+	color: var(--syn-variable);
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+.hljs-strong {
+	font-weight: var(--weight-bold);
 }
 
 .prose blockquote {
