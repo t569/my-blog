@@ -449,8 +449,37 @@ Neon, the env tables for each, and a first-deploy checklist.
 - [x] **`frontend/.env.example`** — every var the frontend reads, each with
       upstream's default, so a deploy has a checklist instead of guesswork.
       Generic — **PR-able upstream**.
-- [ ] Actually deploy: Neon is seeded and holds the 9 imported posts, so it's
-      Render + Vercel and the checklist.
+- [x] **Actually deployed.** Backend on Render
+      (`my-blog-api-mapo.onrender.com`), frontend on Vercel, both reading the
+      seeded Neon database. The one thing that broke: `BACKEND_URL` was never
+      set on Vercel, so `/api/proxy/*` fell back to `http://localhost:8000` and
+      returned 502 on every call — while the pages themselves rendered fine,
+      because `NEXT_PUBLIC_*` branding is baked in at build time and needs no
+      backend. A green build and a working home page prove less than they look
+      like they do; the check that actually catches this is
+      `curl /api/proxy/posts`.
+- [x] **A push deploys everything, with no CI file.** Both hosts do it natively,
+      so the work was configuration plus one line of Dockerfile:
+  - `alembic upgrade head && uvicorn …` as the container's start command, so a
+    commit carrying a migration carries its own schema change. Fails closed —
+    a bad migration means the container never starts, the health check fails,
+    and the previous version stays up. It also runs on every wake from sleep,
+    which is the price of a free instance having no pre-deploy hook; noted in
+    the `ponytail:` comment with `preDeployCommand` as the upgrade path.
+  - Render's deploy branch lives in the dashboard, **not** in `render.yaml`. A
+    blueprint with no `branch:` tracks the repo default, and hardcoding
+    `dev/t569` would put a branch name that exists in exactly one fork into the
+    file whose entire job is being forkable.
+  - Vercel's Root Directory has to be `frontend` *before* connecting the repo.
+    CLI deploys run from wherever you invoke them so they never noticed; a
+    Git-triggered build uses the setting and dies in two seconds at the repo
+    root.
+  - Preview deployments get their own copy of the environment or they get none.
+    `NEXTAUTH_URL` is the one var deliberately left off Preview: it's unread in
+    `src/`, and NextAuth falls back to the per-deployment `VERCEL_URL`, so a
+    fixed value would send every preview's sign-in callback to production.
+      The seeds stayed manual — idempotent, but one-time fixtures rather than
+      something a push invalidates.
 - [ ] Custom domain, once there's something worth pointing it at.
 
 ---

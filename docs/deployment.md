@@ -8,9 +8,8 @@ this document; the clicking is not.
 ## TL;DR
 
 ```bash
-# 1. Database — from your machine, with backend/.env pointing at Neon
+# 1. Seed the database — once, from your machine, backend/.env pointing at Neon
 cd backend
-uv run alembic upgrade head
 uv run python -m scripts.seed_owner
 uv run python -m scripts.seed_data
 
@@ -20,6 +19,10 @@ uv run python -m scripts.seed_data
 # 4. Prove it
 curl https://<render-app>.onrender.com/health
 ```
+
+Migrations are not in that list: the backend container runs `alembic upgrade
+head` before it serves, so a push carries its own schema change. See
+["Migrations ride along with the deploy"](#migrations-ride-along-with-the-deploy).
 
 ---
 
@@ -61,21 +64,38 @@ DATABASE_URL=postgresql://user:pw@ep-xxx-pooler.region.aws.neon.tech/neondb?sslm
 `channel_binding` (libpq understands it, asyncpg raises `TypeError` on it).
 Switching Postgres hosts is this one value and nothing else.
 
-### Migrations run from your machine, not from Render
+### Migrations ride along with the deploy
 
-Render's free instances have no pre-deploy hook and no shell, so there is
-nowhere on the host to run Alembic from. That is fine — the database is
-reachable from anywhere:
+Render's free instances have no pre-deploy hook and no shell, so there is no
+*separate* step on the host to run Alembic from. The container's start command
+is that step instead — `backend/Dockerfile` ends with:
+
+```dockerfile
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+```
+
+So the schema is brought to head before anything is served, and a commit
+containing a migration deploys itself. If the migration fails the container
+never starts, the health check fails, and the previous version stays up —
+failing closed, the same way an unset credential here disables a feature rather
+than opening it.
+
+The cost of putting it there rather than in a pre-deploy hook: it also runs on
+every wake from sleep, not only on deploy. At head that is one `SELECT` against
+`alembic_version`, which is cheap but not free on an instance that already
+takes ~15s to wake. `preDeployCommand` in `render.yaml` is the upgrade path,
+and it needs a paid instance type.
+
+The seeds are still manual, because they are one-time fixtures rather than
+something a push invalidates. Both are idempotent, so re-running is safe:
 
 ```bash
 cd backend            # with .env pointing at Neon
-uv run alembic upgrade head
 uv run python -m scripts.seed_owner    # creates the owner row from ADMIN_EMAIL
 uv run python -m scripts.seed_data     # categories and tags
 ```
 
-Run this **before** the first deploy and after any migration. Content comes in
-the same way, from wherever the markdown lives:
+Content comes in the same way, from wherever the markdown lives:
 
 ```bash
 uv run python -m scripts.import_markdown ../path/to/content --map blog=Thoughts --publish
@@ -222,12 +242,74 @@ grep -rho 'skin:"[a-z-]*",theme:"[a-z]*"' .next/static/chunks/ | sort -u
 
 ---
 
+## 4. Push to deploy
+
+Both hosts do this natively, so there is no CI file here and nothing to keep in
+sync with them. A push to the deploy branch rebuilds both halves; the backend
+brings the schema with it (above). What that costs is one setting on each side,
+and they must name the **same branch** — otherwise a push deploys one half and
+silently leaves the other on the previous commit, which looks exactly like a
+caching problem and is not one.
+
+| Host | Setting | Where |
+|---|---|---|
+| Render | Auto-Deploy on, deploy branch | Service → Settings → Build & Deploy |
+| Vercel | Root Directory = `frontend` | Project → Settings → Build & Deployment |
+| Vercel | Production Branch | Project → Settings → Git |
+
+Three things that will bite:
+
+- **`render.yaml` carries `autoDeploy: true`, but only if the service was
+  created from the blueprint** (New → Blueprint). A service created by hand
+  never read the file, so check the toggle rather than the repo.
+- **The deploy branch is a dashboard setting, deliberately not in
+  `render.yaml`.** A blueprint with no `branch:` key tracks the repository's
+  *default* branch. Adding one would hardcode a branch name that only exists in
+  one fork, into the file whose whole job is to be forkable — the same reason
+  every secret in it is `sync: false`.
+- **Vercel's Root Directory must be `frontend` before you connect the repo.**
+  CLI deploys run from wherever you invoke them, so they work regardless;
+  Git-triggered builds use this setting, and pointed at the repo root they fail
+  in about two seconds with no obvious cause.
+
+Connect Vercel to the repo with the Root Directory already set:
+
+```bash
+cd frontend && npx vercel git connect https://github.com/<you>/my-blog
+```
+
+### Previews get none of your environment
+
+Vercel scopes environment variables per environment, and pasting `.env.local`
+sets them for whichever ones were ticked at the time — usually Production
+alone. Once the repo is connected, every push to a non-production branch builds
+a preview that has *none* of them: upstream's branding, and a 502 from the
+proxy because `BACKEND_URL` is unset and it falls back to localhost.
+
+Paste the same file again with **Preview** ticked, with two changes:
+
+- Add `BACKEND_URL` and `NEXT_PUBLIC_SITE_URL` — neither lives in `.env.local`.
+- **Leave `NEXTAUTH_URL` out.** NextAuth reads it from the environment itself
+  and falls back to Vercel's per-deployment `VERCEL_URL`; a fixed production URL
+  would send every preview's sign-in callback to production. Unset is correct
+  here, not an omission.
+
+`CRON_SECRET` is not needed either — cron jobs only fire on production.
+
+Previews share the production backend and the production database, so a
+preview's admin UI writes to live data. Separating them means a second Render
+service and a Neon branch, which is past what the free tiers cover.
+
 ## First deploy checklist
 
-- [ ] `alembic upgrade head`, `seed_owner`, `seed_data` against Neon
+- [ ] `seed_owner` and `seed_data` against Neon (migrations run themselves)
 - [ ] Content imported (`scripts/import_markdown`), or posts written in the admin
 - [ ] `NEXTAUTH_SECRET` and `ADMIN_EMAIL` identical on Render and Vercel
 - [ ] `https://<render>/health` returns `{"status":"ok"}`
+- [ ] `BACKEND_URL` set on Vercel — without it the proxy falls back to
+      `localhost:8000` and every API call is a 502, while the pages themselves
+      render fine
+- [ ] Render and Vercel deploy from the **same** branch
 - [ ] Sign in at `/admin` — a 401 here is almost always mismatched secrets
 - [ ] `/admin/settings/features` shows each feature as On or as *Unavailable*
       naming the variable it wants — that page is the fastest read of whether

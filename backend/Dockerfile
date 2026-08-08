@@ -30,5 +30,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PORT=10000
 EXPOSE ${PORT}
 
-# Run uvicorn.
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+# Bring the schema to head, then serve. A failed migration keeps the container
+# from starting, so the health check fails and the old version stays up.
+# ponytail: this also runs on every wake from sleep, not only on deploy — a
+# free instance has no pre-deploy hook to put it in. At head it is one SELECT
+# against alembic_version; if that ever matters, move it to
+# `preDeployCommand` in render.yaml, which needs a paid instance type.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
