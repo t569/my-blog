@@ -15,6 +15,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { ThemeProvider } from "next-themes";
 import { ToastProvider } from "@/context/ToastContext";
+import { SITE } from "@/lib/constants";
 
 interface ProvidersProps {
 	children: ReactNode;
@@ -53,8 +54,10 @@ export default function Providers({ children }: ProvidersProps) {
 	const themed = (
 		<ThemeProvider
 			attribute="data-theme"
-			defaultTheme="system"
-			enableSystem
+			defaultTheme={SITE.theme}
+			// Only follow the OS when no theme is pinned — with enableSystem on,
+			// next-themes resolves "system" over any defaultTheme it is given.
+			enableSystem={SITE.theme === "system"}
 			disableTransitionOnChange
 			// Theme registry — one name per file in src/styles/themes/.
 			// Adding a palette means adding it here and importing the file in globals.css.

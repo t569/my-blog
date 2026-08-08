@@ -50,6 +50,13 @@ export const SITE = {
    * merge back into DejusDevspace/my-blog changes nothing visually.
    */
   skin: process.env.NEXT_PUBLIC_SITE_SKIN ?? "cyber-luxury",
+  /**
+   * Which of light/dark a first-time visitor gets. "system" follows the OS,
+   * which is upstream's behaviour and stays the default; naming a theme pins
+   * it, and the toggle still overrides either way (next-themes remembers the
+   * choice in localStorage).
+   */
+  theme: process.env.NEXT_PUBLIC_SITE_THEME ?? "system",
 } as const;
 
 /** Pagination defaults. */
