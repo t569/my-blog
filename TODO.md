@@ -81,6 +81,15 @@ Fork: `t569/my-blog` (origin) ← upstream `DejusDevspace/my-blog`
 
 ### Fixed along the way — generic bugs, all PR-able upstream
 
+- [x] **"Preview Post" did nothing.** The button had no `onClick` at all. It
+      toggles the editor body to a `MarkdownRenderer` of the current content,
+      in place — a draft isn't served by `/posts/[slug]` (published-only), so
+      linking out would 404 for exactly the case preview exists for. Previewing
+      through the same component as the public page means KaTeX, themed code
+      blocks and prose styling come for free.
+- [x] **The slug hint in the editor hardcoded the upstream deployment URL.**
+      Reads `SITE.url` now.
+
 - [x] **Hydration mismatch on the home feed.** `PersistQueryClientProvider`
       restores the localStorage cache on the client, and during that restore
       react-query reports `isLoading: false` (it is `isPending && isFetching`,
@@ -160,8 +169,13 @@ Common thread in both references: **light background, generous whitespace,
 visual-first.** That's the opposite of this stack's dark cyber-luxury default —
 hence doing the theme split *before* restyling, so both can coexist.
 
-- [ ] A "paper" light theme as the default for reading, keeping deep-space as
-      the alternate
+- [x] **A "paper" light theme as the default for reading**, keeping deep-space
+      as the alternate. `NEXT_PUBLIC_SITE_THEME` picks the starting mode,
+      defaulting to `system` — upstream's behaviour, unchanged. `enableSystem`
+      is switched off when a theme is pinned, because next-themes resolves
+      `system` over any `defaultTheme` while that flag is on. The toggle still
+      overrides and is remembered, so pinning never makes a mode unreachable.
+      Verified in the built bundle: `skin:"garden",theme:"light"` is inlined.
 - [ ] Post cards get a cover-image slot (both references lead with visuals)
 
 ### 2. Math notation (KaTeX)
@@ -179,11 +193,16 @@ math renders identically with the same engine.
       instead of pushing the page sideways on mobile.
       Verified in the built CSS (`.next/static/chunks/*.css`), 60 KaTeX font
       files emitted.
-- [ ] **Editor hazard:** `BlockNoteEditor.tsx:143` uses
-      `blocksToMarkdownLossy()`. Opening a post containing `$$…$$` in the admin
-      editor and saving may mangle the LaTeX. Either import posts via the API
-      directly, or add a raw-markdown textarea toggle. Do *not* build a custom
-      BlockNote LaTeX block.
+- [x] ~~**Editor hazard:** `blocksToMarkdownLossy()` mangles `$$…$$`~~ — the
+      editor body now has three modes (Rich / Markdown / Preview), and a post
+      containing display math or `\(` `\[` **opens in Markdown**, with the
+      reason stated in the sidebar. Opening and saving was enough to lose the
+      LaTeX, so the guard is at load, not at save. Bare inline `$x$` is
+      deliberately not detected — "$5 and $10" matches it, and a false positive
+      downgrades the editor for a post with no math. Switching back to Rich
+      remounts BlockNote with `data.content`, not `initialData.content`, so raw
+      edits survive instead of being overwritten by its first `onChange`.
+      No custom BlockNote LaTeX block — a textarea was the whole fix.
 
 ### 3. Content migration
 Content lives in **Postgres** here, not files — so this is an import script,
@@ -198,12 +217,32 @@ not a file copy. 11 markdown files in `t569/blog` under `content/`.
 | frontmatter `title`/`date`/`description` | title / published_at / excerpt |
 | `content/about.md` | needs a static `/about` route — it's a page, not a post |
 
-- [ ] Import script in `backend/scripts/` (follow the `seed_data.py` pattern)
-- [ ] **Wikilinks:** content uses `[[projects/cloud-ide/backend|Read the Docs]]`
-      heavily. `react-markdown` renders these as literal text. Rewrite them to
-      normal markdown links at import time (cheaper than a remark plugin).
-- [ ] `content/assets/Obrike-Oghenekome-Timothy-Resume.pdf` → `frontend/public/`
-      (Cloudinary here is for images only)
+- [x] **Import script** — `backend/scripts/import_markdown.py`. Generic: any
+      tree of markdown with YAML frontmatter, no Quartz specifics, no personal
+      strings — **PR-able upstream**.
+      `series/<name>/NN-title.md` creates the Series and takes `series_order`
+      from the filename prefix; `--map <dir>=<Category>` assigns categories;
+      `index.md` takes its parent folder's slug, so
+      `projects/cloud-ide/index.md` is `/posts/cloud-ide` and not a second
+      `/index`. Idempotent by slug, so a partial run is just repeated.
+      `--dry-run` parses and rolls back, `--self-check` runs the parser and
+      rewriter asserts with no database at all, `--publish` opts out of
+      importing as drafts.
+- [x] **Wikilinks** — rewritten to normal markdown links in a second pass, so
+      forward references resolve. Unresolved ones degrade to their label rather
+      than to a dead href.
+- [x] Ran it: 9 posts, the `cloud-ide` series detected, tags created from
+      frontmatter, **zero `[[` left** in the imported content. The four
+      root-level garden pages (`index`, `about`, `admin`, `cloud-search`) are
+      skipped as furniture; nested `index.md` files are real content.
+      The series lands as **"Cloud Ide"** — the folder name title-cased. Rename
+      it in admin; teaching the script about acronyms isn't worth it.
+      This run went into the local container. The Neon database needs its own
+      run once `DATABASE_URL` points there.
+- [x] `Obrike-Oghenekome-Timothy-Resume.pdf` → `frontend/public/`. Committed
+      rather than gitignored like `about.md`: a clean CI build would 404 on the
+      link otherwise. The cost is that an upstream merge inherits one unused
+      file.
 
 ### 4. `/about` page
 - [x] Static route at `frontend/src/app/(public)/about/page.tsx`. Reads
@@ -358,6 +397,15 @@ current state then rather than trusting notes from now.)
       `LOCAL_POSTGRES_DOCKER_FOR_DEV=true` in `backend/.env` (default false —
       with `DATABASE_URL` on Neon, a script that starts containers is a
       surprise). Details in [docs/local-development.md](./docs/local-development.md).
+      Schema and seeds are in: `alembic upgrade head` (7 migrations, the
+      pgvector one runs `CREATE EXTENSION IF NOT EXISTS vector`), then
+      `seed_owner` and `seed_data`, then the content import.
+- [ ] **Point `DATABASE_URL` at Neon and re-run the same three steps.**
+      `neonctl init` is not needed — that scaffolds a *new* project; a
+      connection string is enough. Two details it will fail on otherwise: the
+      URL needs the `postgresql+asyncpg://` scheme, and `?ssl=require`, *not*
+      `?sslmode=require` — asyncpg rejects `sslmode` as an unknown kwarg. Set
+      `LOCAL_POSTGRES_DOCKER_FOR_DEV=false` once off the container.
 - [ ] Only then: keep pgvector, or drop semantic search and reconsider
 
 ---
