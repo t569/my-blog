@@ -26,6 +26,7 @@ import TagSelector from "./TagSelector";
 import MarkdownRenderer from "@/components/blog/MarkdownRenderer";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { SITE } from "@/lib/constants";
+import { MATH } from "@/lib/math";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
@@ -41,10 +42,8 @@ const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
 	),
 });
 
-// Display math and LaTeX delimiters only. Bare inline $x$ is left out on
-// purpose: "$5 and $10" would match it, and a false positive silently
-// downgrades the editor for a post with no math in it.
-const MATH = /\$\$[\s\S]+?\$\$|\\\(|\\\[/;
+// Moved to src/lib/math.ts so `npm run check:math` can assert it — inline
+// `$x$` is detected now, which it was not before.
 
 interface EditorData {
 	title: string;

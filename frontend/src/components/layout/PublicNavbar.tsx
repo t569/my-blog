@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Loader2, Layers, User } from "lucide-react";
+import { Search, Moon, Sun, Loader2, Layers, User, Menu, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
@@ -25,7 +25,7 @@ export default function PublicNavbar() {
 	// Search state
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
-	const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const desktopSearchRef = useRef<HTMLDivElement>(null);
 	const mobileSearchRef = useRef<HTMLDivElement>(null);
 	const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export default function PublicNavbar() {
 
 			if (isOutsideDesktop && isOutsideMobile) {
 				setIsSearchOpen(false);
-				setIsMobileSearchOpen(false);
+				setIsMobileMenuOpen(false);
 			}
 		}
 		document.addEventListener("mousedown", handleClickOutside);
@@ -102,7 +102,7 @@ export default function PublicNavbar() {
 										onClick={() => {
 											setIsSearchOpen(false);
 											setSearchQuery("");
-											if (isMobile) setIsMobileSearchOpen(false);
+											if (isMobile) setIsMobileMenuOpen(false);
 										}}
 									>
 										<div className="flex justify-between items-start mb-1">
@@ -171,12 +171,22 @@ export default function PublicNavbar() {
 
 				{/* Right: Actions */}
 				<div className="flex items-center gap-2 md:gap-4">
+					{/* The panel this opens holds Series and About as well as the
+					    search box, so it is the only route to those pages on a
+					    phone. A magnifying glass advertised none of that — nobody
+					    taps search looking for an About page. */}
 					<button
 						className="md:hidden rounded-md p-2 text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-						onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-						aria-label="Toggle mobile search"
+						onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+						aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+						aria-expanded={isMobileMenuOpen}
+						aria-controls="mobile-menu"
 					>
-						<Search className="h-5 w-5" />
+						{isMobileMenuOpen ? (
+							<X className="h-5 w-5" />
+						) : (
+							<Menu className="h-5 w-5" />
+						)}
 					</button>
 
 					<button
@@ -222,15 +232,17 @@ export default function PublicNavbar() {
 				</div>
 			</div>
 
-			{/* Mobile Search Panel */}
-			{isMobileSearchOpen && (
-				<div ref={mobilePanelRef} className="md:hidden border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-md">
+			{/* Mobile menu — search plus every destination the desktop bar shows
+			    as its own button. Anything added there needs adding here too, or
+			    it is unreachable on a phone. */}
+			{isMobileMenuOpen && (
+				<div id="mobile-menu" ref={mobilePanelRef} className="md:hidden border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-md">
 					{renderSearchBar(mobileSearchRef, true)}
-					<div className="mt-3 flex items-center gap-3 border-t border-border-subtle pt-3">
+					<div className="mt-3 flex items-center gap-4 border-t border-border-subtle pt-3">
 						<Link
 							href="/series"
 							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
-							onClick={() => setIsMobileSearchOpen(false)}
+							onClick={() => setIsMobileMenuOpen(false)}
 						>
 							<Layers size={12} />
 							Series
@@ -238,11 +250,20 @@ export default function PublicNavbar() {
 						<Link
 							href="/about"
 							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
-							onClick={() => setIsMobileSearchOpen(false)}
+							onClick={() => setIsMobileMenuOpen(false)}
 						>
 							<User size={12} />
 							About
 						</Link>
+						<a
+							href={SITE.repo}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="ml-auto text-sm font-mono text-accent hover:underline transition-colors"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							GitHub
+						</a>
 					</div>
 				</div>
 			)}

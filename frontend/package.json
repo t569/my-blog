@@ -6,7 +6,8 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
-		"lint": "eslint"
+		"lint": "eslint",
+		"check:math": "node --experimental-strip-types --no-warnings scripts/check-math.ts"
 	},
 	"dependencies": {
 		"@blocknote/code-block": "^0.49.0",
