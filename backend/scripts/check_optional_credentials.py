@@ -83,18 +83,39 @@ def _check_feature_resolution() -> None:
     )
 
     for feature in REGISTRY:
-        assert not is_available(feature, bare), f"{feature.id} available with no keys"
+        # A feature that names no credentials and no master switch has nothing
+        # to be unavailable *for* — it is a preference, not a capability, so it
+        # is always available and only the owner's switch decides. Asserting
+        # otherwise would forbid that whole category from ever existing.
+        gated = bool(feature.requires) or feature.switch is not None
+        if gated:
+            assert not is_available(feature, bare), (
+                f"{feature.id} available with no keys"
+            )
+        else:
+            assert is_available(feature, bare), (
+                f"{feature.id} gates on nothing, so it must always be available"
+            )
         assert is_available(feature, full), f"{feature.id} unavailable with all keys"
-        # No stored flag means on — an install that predates the switches, or
-        # never touched them, behaves exactly as upstream does.
-        assert is_effective(feature, {}, full), f"{feature.id} default must be on"
+
+        # An untouched switch falls back to the feature's own default. It is on
+        # for everything that predates `default_enabled`, so an install that
+        # never touched the switches behaves exactly as upstream does.
+        assert (
+            is_effective(feature, {}, full) is feature.default_enabled
+        ), f"{feature.id} untouched must resolve to default_enabled"
+
         assert not is_effective(feature, {feature.id: False}, full), (
             f"{feature.id} switch must turn it off"
         )
-        # A switch cannot conjure a feature whose credentials are missing.
-        assert not is_effective(feature, {feature.id: True}, bare), (
-            f"{feature.id} enabled without credentials"
+        assert is_effective(feature, {feature.id: True}, full), (
+            f"{feature.id} switch must turn it on"
         )
+        # A switch cannot conjure a feature whose credentials are missing.
+        if gated:
+            assert not is_effective(feature, {feature.id: True}, bare), (
+                f"{feature.id} enabled without credentials"
+            )
 
     # Partial Cloudinary credentials are not credentials.
     partial = Settings(  # type: ignore[call-arg]
