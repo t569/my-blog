@@ -20,13 +20,14 @@ import {
 	useAdminCategories,
 	useAdminSeries,
 	useAdminCreateSeries,
+	useAdminFeatures,
 } from "@/hooks/useApi";
 import type { PostStatus } from "@/types";
 import TagSelector from "./TagSelector";
 import MarkdownRenderer from "@/components/blog/MarkdownRenderer";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { SITE } from "@/lib/constants";
-import { NEEDS_RAW_EDITOR } from "@/lib/math";
+import { needsRawEditor } from "@/lib/math";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
@@ -90,12 +91,10 @@ export default function PostEditorClient({
 	// ponytail: preview renders the editor's own markdown in place, not via a
 	// route. A draft isn't served by /posts/[slug] (published-only), so linking
 	// out would 404 for exactly the case preview exists for.
-	const [mode, setMode] = useState<"rich" | "raw" | "preview">(
-		// BlockNote round-trips through blocksToMarkdownLossy, which has no
-		// concept of *display* math. Opening such a post in the rich editor is
-		// enough to corrupt it on the next save, so those open raw.
-		() => (NEEDS_RAW_EDITOR.test(initialData.content || "") ? "raw" : "rich"),
-	);
+	// The author's explicit choice, or null meaning "whatever suits the content".
+	const [modeOverride, setModeOverride] = useState<
+		"rich" | "raw" | "preview" | null
+	>(null);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
 
 	const toast = useToast();
@@ -103,6 +102,33 @@ export default function PostEditorClient({
 	const { data: categories } = useAdminCategories();
 	const { data: seriesList } = useAdminSeries();
 	const createSeriesMutation = useAdminCreateSeries();
+	const { data: features } = useAdminFeatures();
+
+	/** Feature ids that are both possible here and switched on. */
+	const enabledFeatures = useMemo(
+		() =>
+			(features ?? [])
+				.filter((f) => f.available && f.enabled)
+				.map((f) => f.id),
+		[features],
+	);
+
+	// Which editor is safe depends on which math plugins are switched on, so
+	// this stays null until the switches have loaded — opening one and swapping
+	// would mean guessing, and guessing wrong sends a post to an editor that
+	// corrupts it.
+	//
+	// Derived rather than stored, so an explicit choice always wins and nothing
+	// yanks the editor out from under someone mid-edit. Note it reads
+	// `initialData.content`, not `data.content`: typing display math into the
+	// rich editor must not eject you into the textarea mid-sentence.
+	const mode =
+		modeOverride ??
+		(features === undefined
+			? null
+			: needsRawEditor(initialData.content || "", enabledFeatures)
+				? "raw"
+				: "rich");
 
 	// Auto-slugify title if new and slug hasn't been manually touched much
 	useEffect(() => {
@@ -321,7 +347,15 @@ export default function PostEditorClient({
 
 						{/* Body — rich editor, raw markdown, or rendered preview */}
 						<div className="min-h-125">
-							{mode === "preview" ? (
+							{mode === null ? (
+								// Which editor is safe depends on the feature switches, so the
+								// body waits for them rather than opening one and swapping.
+								<div className="flex h-64 items-center justify-center">
+									<span className="font-mono text-sm text-text-tertiary animate-pulse">
+										Loading Editor...
+									</span>
+								</div>
+							) : mode === "preview" ? (
 								<article>
 									<MarkdownRenderer content={data.content} />
 								</article>
@@ -335,10 +369,14 @@ export default function PostEditorClient({
 								/>
 							) : (
 								<BlockNoteEditor
+									// The schema is fixed when the editor is created, so a
+									// changed plugin set has to remount rather than update.
+									key={enabledFeatures.join(",")}
 									// data.content, not initialData.content: switching back
 									// from raw remounts this, and it must pick up the edits
 									// rather than resurrect the version loaded at mount.
 									initialMarkdown={data.content}
+									enabledFeatures={enabledFeatures}
 									onChange={(markdown) => handleChange("content", markdown)}
 								/>
 							)}
@@ -574,7 +612,7 @@ export default function PostEditorClient({
 									).map(([value, label, Icon]) => (
 										<button
 											key={value}
-											onClick={() => setMode(value)}
+											onClick={() => setModeOverride(value)}
 											aria-pressed={mode === value}
 											title={label}
 											className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2.5 font-mono text-xs font-bold transition-colors ${
@@ -588,11 +626,26 @@ export default function PostEditorClient({
 										</button>
 									))}
 								</div>
-								{NEEDS_RAW_EDITOR.test(data.content) && (
+								{needsRawEditor(data.content, enabledFeatures) && (
 									<p className="font-mono text-[0.65rem] leading-snug text-text-tertiary">
-										Contains display math — edit in Markdown. The rich editor
-										round-trips through a lossy converter and will mangle
-										it. Inline <code>$x$</code> is safe there.
+										{enabledFeatures.includes("display_math") ? (
+											<>
+												Contains <code>\(</code> or <code>\[</code> — edit in
+												Markdown. Nothing renders those; convert them to{" "}
+												<code>$</code> and the rich editor handles them.
+											</>
+										) : (
+											<>
+												Contains display math — edit in Markdown, or turn on{" "}
+												<Link
+													href="/admin/settings/features"
+													className="underline hover:text-accent"
+												>
+													display math
+												</Link>{" "}
+												to edit it in the rich editor.
+											</>
+										)}
 									</p>
 								)}
 							</div>

@@ -23,7 +23,16 @@ in posts, in `/about`, and in Preview with nothing to switch on.
 | Syntax | Renders as |
 |---|---|
 | `$x^2 + y^2 = r^2$` | inline, in the flow of the sentence |
-| `$$\int_0^1 f(x)\,dx$$` | display, centred on its own line |
+| `` $`x^2`$ `` | inline — GitHub's form, works too |
+| `$$` on their **own lines**, LaTeX between | display, centred |
+| ```` ```math ```` fence | display — GitHub's form, works too |
+| `$$a = b$$` all on one line | **inline**, not display |
+
+That last row surprises people and is not a bug here: remark-math only opens a
+math *block* when the `$$` is followed by a line ending. Put the fences on their
+own lines and you get a centred equation; keep it on one line and you get inline
+math with a two-character delimiter. Both were checked against the real plugin
+chain rather than assumed.
 
 The garden skin sets a serif body face specifically so inline formulas sit *in*
 the line rather than on top of it — KaTeX typesets in a serif, and a sans body
@@ -62,34 +71,52 @@ There is no input rule, so typing `$x$` directly in Rich mode stays literal text
 until the post is saved and reloaded. Use `/math`, or write in Markdown mode —
 imported and saved content arrives already converted.
 
-### Display math still needs Markdown mode
+### Display math is a switch
 
-`$$…$$` has no block-level equivalent yet, so BlockNote's
-`blocksToMarkdownLossy()` would eat it. **Opening such a post in Rich mode is
-enough to lose it on the next save** — you do not have to touch the formula.
+Turn on **Display math in the editor** at `/admin/settings/features` and `$$`
+blocks and ```` ```math ```` fences become centred equations you can click to
+edit, with `/display math` in the slash menu. It is **off by default** — an
+opt-in, because a bug on this path costs someone their formulas.
 
-The editor defends against this automatically: a post matching
-`NEEDS_RAW_EDITOR` in `src/lib/math.ts` **opens in Markdown mode**, with the
-reason shown under the mode toggle. The guard is at load, not at save, because
-loading is where the damage happens.
+With it off, a post containing display math opens in Markdown mode instead, with
+the reason shown under the mode toggle. Either way the published page renders
+the equation; the switch only decides how you *edit* it.
 
-The guard errs toward Markdown. A false positive costs you one editor mode; a
-false negative costs you your formulas.
+Whatever no plugin can render — `\(` and `\[` — always forces Markdown mode. The
+guard is at load, not at save, because loading is where the damage happens, and
+it errs toward Markdown: a false positive costs one editor mode, a false
+negative costs you your formulas.
 
-### Why formulas are extracted before the markdown parser runs
+### Why formulas never touch the markdown machinery
 
-Non-obvious, and the reason `protectInlineMath()` exists: markdown escapes are a
-subset of LaTeX syntax. `\{` is a valid markdown escape that parses to `{`, so
-`$\{x\}$` handed straight to the parser comes back as `${x}$` with the LaTeX
-already broken and nothing left to detect. Emphasis does the same to `$a*b*c$`.
+Non-obvious, and the reason `src/lib/math.ts` exists. Both directions damage
+LaTeX, so a formula is swapped for an opaque token before either runs:
 
-So each formula is swapped for an opaque token *first*, the parser only ever
-sees characters it has no rules for, and the tokens become math nodes
-afterwards. All of it is asserted by:
+- **In.** Markdown escapes are a subset of LaTeX syntax. `\{` is a valid escape
+  that parses to `{`, so `$\{x\}$` handed to the parser comes back as `${x}$`,
+  already broken with nothing left to detect. Emphasis does the same to
+  `$a*b*c$`.
+- **Out.** Display math handed to the serialiser inside a `<p>` has its newlines
+  collapsed *and* loses backslashes — `\end{aligned}` returns as
+  `end{aligned}`. Inside a `<pre>` it survives but becomes a code fence.
+
+**Order matters more than anything else here.** Display forms are tokenised
+first; run the single-`$` pattern first and it pairs delimiters straight across
+a `$$` block, turning `$$a$$ and $b$` into the formulas `a` and `" and "`.
+`protect()` owns that ordering so no plugin can get it wrong.
+
+All of it is asserted by:
 
 ```bash
 cd frontend && npm run check:math
 ```
+
+### Adding another delimiter family
+
+`src/components/editor/plugins/` holds one file per plugin — a pattern, a node
+and a renderer — plus `registry.ts`, which owns tokenising, the shared counter
+and the ordering. A new plugin declares its patterns and `order`; it never mints
+its own tokens, which is what stops two of them colliding.
 
 Switching from Markdown back to Rich remounts BlockNote against the *current*
 content rather than the version loaded at mount, so raw edits survive the

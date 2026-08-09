@@ -19,8 +19,7 @@ import { useTheme } from "next-themes";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { adminUploadImage } from "@/services/api";
-import { protectInlineMath, splitMathTokens } from "@/lib/math";
-import { inlineMathSpec } from "./InlineMathSpec";
+import { activePlugins, composePlugins } from "./plugins/registry";
 
 const cyberDarkTheme: Theme = {
 	...darkDefaultTheme,
@@ -99,59 +98,23 @@ const cyberTheme = {
 	dark: cyberDarkTheme,
 };
 
-/**
- * Swaps the math tokens left by `protectInlineMath` for inlineMath nodes.
- *
- * Walks whatever shape the parser produced rather than assuming one: a block's
- * `content` is an array of inline items for text blocks, but a string or
- * undefined for others (images, tables), and blocks nest.
- *
- * Typed loosely on purpose. The precise generic here is
- * `PartialBlock<BSchema, ISchema, SSchema>` with three schema parameters the
- * call site cannot name, and every alternative was worse than one cast at the
- * boundary of a function this small.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function restoreMath(blocks: any[], latex: string[]): any[] {
-	return blocks.map((block) => {
-		const next = { ...block };
-
-		if (Array.isArray(block.content)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			next.content = block.content.flatMap((item: any) => {
-				if (item?.type !== "text" || typeof item.text !== "string") return item;
-
-				const segments = splitMathTokens(item.text, latex);
-				// One text segment means nothing matched — keep the original item so
-				// its styles survive untouched.
-				if (segments.length === 1 && segments[0].type === "text") return item;
-
-				return segments.map((seg) =>
-					seg.type === "math"
-						? { type: "inlineMath", props: { latex: seg.latex } }
-						: { ...item, text: seg.text },
-				);
-			});
-		}
-
-		if (Array.isArray(block.children) && block.children.length) {
-			next.children = restoreMath(block.children, latex);
-		}
-
-		return next;
-	});
-}
-
 interface BlockNoteEditorProps {
 	initialMarkdown?: string;
 	onChange: (markdown: string) => void;
 	editable?: boolean;
+	/**
+	 * Feature ids that are switched on. Changing this must remount the editor —
+	 * the BlockNote schema is fixed at `useCreateBlockNote` time — so the caller
+	 * keys on it.
+	 */
+	enabledFeatures?: readonly string[];
 }
 
 export default function BlockNoteEditor({
 	initialMarkdown = "",
 	onChange,
 	editable = true,
+	enabledFeatures = [],
 }: BlockNoteEditorProps) {
 	const [initialContentLoaded, setInitialContentLoaded] = useState(false);
 
@@ -161,40 +124,38 @@ export default function BlockNoteEditor({
 		return url;
 	};
 
+	// The active math plugins and everything composed from them: schema specs,
+	// the ordered markdown bridge, the slash entries. Held for the life of the
+	// component — the schema below cannot change after creation anyway, which is
+	// why the caller remounts when the switches change.
+	const math = useMemo(
+		() => composePlugins(activePlugins(enabledFeatures)),
+		[enabledFeatures],
+	);
+
 	// Create the editor instance.
 	const editor = useCreateBlockNote({
 		uploadFile: handleUpload,
 		schema: BlockNoteSchema.create().extend({
 			blockSpecs: {
 				codeBlock: createCodeBlockSpec(codeBlockOptions),
+				...math.blockSpecs,
 			},
-			inlineContentSpecs: {
-				inlineMath: inlineMathSpec,
-			},
+			inlineContentSpecs: math.inlineContentSpecs,
 		}),
 	});
 
 	const { resolvedTheme } = useTheme();
 
-	// "/math" inserts an empty formula, which renders as a clickable f(x)
-	// placeholder — the node has to exist before there is anything to type into.
+	// Each plugin contributes its own entries. They insert an *empty* formula —
+	// the node has to exist before there is anything to type into.
 	const slashItems = useMemo(
-		() => [
-			...getDefaultReactSlashMenuItems(editor),
-			{
-				title: "Inline math",
-				subtext: "A LaTeX formula in the line — click it to edit",
-				aliases: ["math", "latex", "katex", "formula", "equation"],
-				group: "Other",
-				onItemClick: () => {
-					editor.insertInlineContent([
-						{ type: "inlineMath", props: { latex: "" } },
-						" ",
-					]);
-				},
-			} satisfies DefaultReactSuggestionItem,
-		],
-		[editor],
+		() =>
+			[
+				...getDefaultReactSlashMenuItems(editor),
+				...math.slashItems(editor),
+			] as DefaultReactSuggestionItem[],
+		[editor, math],
 	);
 
 	// Load initial markdown into the editor.
@@ -204,12 +165,9 @@ export default function BlockNoteEditor({
 				// Formulas are tokenised *before* the markdown parser sees them —
 				// markdown escapes overlap LaTeX syntax, so `$\{x\}$` would come back
 				// as `${x}$` with nothing left to detect. See src/lib/math.ts.
-				const { text, latex } = protectInlineMath(initialMarkdown);
+				const { text, items } = math.protect(initialMarkdown);
 				const blocks = await editor.tryParseMarkdownToBlocks(text);
-				editor.replaceBlocks(
-					editor.document,
-					latex.length ? restoreMath(blocks, latex) : blocks,
-				);
+				editor.replaceBlocks(editor.document, math.restore(blocks, items));
 			}
 			setInitialContentLoaded(true);
 		}
@@ -217,12 +175,19 @@ export default function BlockNoteEditor({
 		if (!initialContentLoaded && editor) {
 			loadMarkdown();
 		}
-	}, [editor, initialMarkdown, initialContentLoaded]);
+	}, [editor, initialMarkdown, initialContentLoaded, math]);
 
 	// Listen for changes and convert back to markdown.
+	//
+	// The serialiser is sandwiched: block-level formulas are swapped for tokens
+	// before it runs and written back after, because it destroys multi-line
+	// LaTeX (collapses the newlines and eats backslashes). Inline formulas pass
+	// straight through — they export correctly via toExternalHTML, verified end
+	// to end. See plugins/registry.ts.
 	const handleChange = async () => {
-		const markdown = await editor.blocksToMarkdownLossy(editor.document);
-		onChange(markdown);
+		const { blocks, items } = math.prepareExport(editor.document);
+		const markdown = await editor.blocksToMarkdownLossy(blocks);
+		onChange(math.restoreMarkdown(markdown, items));
 	};
 
 	if (!initialContentLoaded) {

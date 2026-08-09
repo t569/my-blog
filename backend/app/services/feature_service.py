@@ -49,6 +49,10 @@ class Feature:
     switch: str | None = None
     #: What still works with it off, shown as reassurance in the UI.
     fallback: str = ""
+    #: State when the owner has never touched the switch. Defaults to on, which
+    #: is what keeps a fork's behaviour unchanged when a feature is added to
+    #: this registry. Set it off for anything the owner should opt into.
+    default_enabled: bool = True
 
 
 REGISTRY: tuple[Feature, ...] = (
@@ -101,6 +105,31 @@ REGISTRY: tuple[Feature, ...] = (
         unavailable_detail="Semantic search is turned off.",
         fallback="Search still runs full-text keyword matching.",
     ),
+    Feature(
+        id="display_math",
+        label="Display math in the editor",
+        description=(
+            "Lets the rich editor hold centred LaTeX equations — $$…$$ on "
+            "their own lines, or a ```math fence — instead of sending the "
+            "whole post to the markdown textarea. Published pages render "
+            "these either way; this is about how you edit them."
+        ),
+        covers=(
+            "Display equations in the rich editor",
+            "The /display math command",
+        ),
+        # No credentials: nothing external is called, so this is always
+        # available and the switch is purely the owner's choice. It is also the
+        # one entry here the backend never enforces — an authoring preference,
+        # not a deployment capability, so there is no require() call for it.
+        requires=(),
+        default_enabled=False,
+        unavailable_detail="Display math editing is turned off.",
+        fallback=(
+            "Posts with display math still open in the markdown editor, and "
+            "still render on the site."
+        ),
+    ),
 )
 
 BY_ID: dict[str, Feature] = {f.id: f for f in REGISTRY}
@@ -115,8 +144,15 @@ def is_available(feature: Feature, cfg: Settings | None = None) -> bool:
 
 
 def is_effective(feature: Feature, flags: dict, cfg: Settings | None = None) -> bool:
-    """The one rule: available AND not switched off. Missing key = on."""
-    return is_available(feature, cfg) and bool(flags.get(feature.id, True))
+    """The one rule: available AND not switched off.
+
+    A feature the owner has never touched falls back to its own
+    ``default_enabled``, which is on for everything that predates that field —
+    so adding it changed no existing behaviour.
+    """
+    return is_available(feature, cfg) and bool(
+        flags.get(feature.id, feature.default_enabled)
+    )
 
 
 @dataclass
@@ -158,7 +194,7 @@ async def list_features(db: AsyncSession) -> list[FeatureView]:
             available=is_available(f),
             # Report the switch itself, not the resolved state: an unavailable
             # feature should not read as "off by choice" once credentials land.
-            enabled=bool(flags.get(f.id, True)),
+            enabled=bool(flags.get(f.id, f.default_enabled)),
             missing=missing_for(f),
         )
         for f in REGISTRY
