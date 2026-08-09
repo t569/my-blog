@@ -507,6 +507,34 @@ Neon, the env tables for each, and a first-deploy checklist.
     fixed value would send every preview's sign-in callback to production.
       The seeds stayed manual — idempotent, but one-time fixtures rather than
       something a push invalidates.
+- [x] **Push-to-deploy is live, from `main`.** Merging `dev/t569` → `main` is
+      the release gate; there is no other one. Verified end to end: a push to
+      `main` produced a git-triggered production build (commit `3394ad5`), and
+      the deployed CSS carries the new `@media (max-width:78rem)` backdrop rule.
+  - Vercel's **Root Directory** had been `.` since day one and nobody noticed,
+    because a CLI deploy uploads the working directory as the deployment root
+    and never consults the setting. Git builds do. It is `frontend` now, set
+    via `PATCH /v9/projects/{id}` after the dashboard form silently failed to
+    save it twice.
+  - **Vercel's production branch has no API** — that PATCH rejects both
+    `productionBranch` and `link` as unknown properties, and `/link`, `/branch`,
+    `/production-branch` all 404. Dashboard-only. Hence deploying from `main`:
+    it is the default on both hosts, so no branch field needs touching at all.
+  - The Vercel **CLI cannot use a team token** (`vercel git connect --token`
+    dies on a `/v2/user` lookup with "User not found"), while the REST API takes
+    the same token happily. `POST /v9/projects/{id}/link` did the connection.
+  - **`vercel pull` output is not an env file you can paste back.**
+    `.vercel/.env.production.local` mixes Vercel's own injected variables
+    (`VERCEL`, `VERCEL_ENV`, `VERCEL_TARGET_ENV`, `VERCEL_OIDC_TOKEN`,
+    `NX_DAEMON`, `TURBO_*`) in with yours. All nine got copied onto Preview
+    before it was caught, then removed. `VERCEL_ENV=production` on a preview
+    tells the app it is live. Preview now holds exactly the 19 real values,
+    minus `NEXTAUTH_URL` (NextAuth falls back to each deployment's own
+    `VERCEL_URL`) and `CRON_SECRET` (cron only fires on production).
+- [ ] **Confirm Render's deploy branch is `main`**, not `dev/t569` — it was set
+      to the latter before the branch decision changed. If the two hosts
+      disagree, a push updates one half and leaves the other on the previous
+      commit, with no error anywhere.
 - [ ] Custom domain, once there's something worth pointing it at.
 
 ---
