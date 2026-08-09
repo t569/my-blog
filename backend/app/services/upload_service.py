@@ -1,6 +1,7 @@
 """Upload service — handles image uploads to Cloudinary."""
 
 import re
+from pathlib import Path
 
 import cloudinary
 import cloudinary.uploader
@@ -15,6 +16,10 @@ _MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 _MAX_IMAGE_WIDTH = 1600
 
 # Allowed image MIME types.
+#
+# HEIC/HEIF are here because they are what an iPhone produces by default, and
+# some Android models optionally. Cloudinary accepts and converts them, so the
+# only thing that ever rejected them was this list.
 _ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
     "image/png",
@@ -22,7 +27,53 @@ _ALLOWED_CONTENT_TYPES = {
     "image/webp",
     "image/svg+xml",
     "image/avif",
+    "image/heic",
+    "image/heif",
 }
+
+# Types a browser sends when it does not know, which is not the same as a type
+# we refuse. Windows maps extensions to MIME through the registry, so an
+# unregistered extension arrives as one of these from an ordinary file picker —
+# the same file can upload from one machine and fail from another.
+_UNKNOWN_CONTENT_TYPES = {"", "application/octet-stream", "binary/octet-stream"}
+
+# Fallback for those, by extension. Deliberately a separate map rather than
+# guessing from the bytes: it decides what we accept, so it stays explicit.
+_EXTENSION_CONTENT_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".jfif": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".avif": "image/avif",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+}
+
+
+def resolve_content_type(content_type: str | None, filename: str | None) -> str | None:
+    """The image type to treat this upload as, or None to refuse it.
+
+    Trusts the browser's type when it is one we allow. When the browser says it
+    does not know, falls back to the file extension — otherwise a perfectly
+    ordinary PNG is refused because of a registry entry on the uploader's
+    machine. A type we simply do not allow is never overridden by the
+    extension; the fallback fills silence, it does not argue.
+
+    Checked by ``python -m scripts.check_uploads``.
+    """
+    declared = (content_type or "").split(";")[0].strip().lower()
+
+    if declared in _ALLOWED_CONTENT_TYPES:
+        return declared
+
+    if declared in _UNKNOWN_CONTENT_TYPES:
+        suffix = Path(filename or "").suffix.lower()
+        return _EXTENSION_CONTENT_TYPES.get(suffix)
+
+    return None
 
 # Regex to extract the public_id from a Cloudinary secure URL.
 # Example: https://res.cloudinary.com/cloud/image/upload/v1234/blog/posts/abc123.jpg
@@ -66,11 +117,16 @@ async def upload_image(file: UploadFile) -> str:
     await _require_cloudinary()
 
     # Validate content type.
-    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+    if resolve_content_type(file.content_type, file.filename) is None:
+        # Name what arrived, including the filename: when a browser sends no
+        # type at all, "Unsupported file type: None" tells the author nothing
+        # about which file it objected to.
+        got = file.content_type or "no type"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {file.content_type}. "
-            f"Allowed types: {', '.join(sorted(_ALLOWED_CONTENT_TYPES))}",
+            detail=f"Unsupported file type for {file.filename or 'the file'} "
+            f"({got}). Allowed types: "
+            f"{', '.join(sorted(_ALLOWED_CONTENT_TYPES))}.",
         )
 
     # Read file contents and validate size.

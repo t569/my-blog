@@ -51,6 +51,14 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://user:pass@localhost/db
 
+      # Decides what a browser may put into the post editor, so it is asserted
+      # rather than reasoned about — including that a mislabelled extension
+      # cannot smuggle a non-image past the type check.
+      - name: Upload type resolution
+        run: uv run python -m scripts.check_uploads
+        env:
+          DATABASE_URL: postgresql+asyncpg://user:pass@localhost/db
+
   # ── Frontend ─────────────────────────────────────────────────────────────
   frontend:
     name: Frontend — Build & Type Check
