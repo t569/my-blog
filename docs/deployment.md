@@ -267,6 +267,12 @@ Three things that will bite:
   *default* branch. Adding one would hardcode a branch name that only exists in
   one fork, into the file whose whole job is to be forkable — the same reason
   every secret in it is `sync: false`.
+- **Vercel's production branch has no API.** `PATCH /v9/projects/{id}` rejects
+  `productionBranch` and `link` alike as unknown properties, and `/link`,
+  `/branch` and `/production-branch` all 404 as sub-resources. Root Directory
+  *is* patchable; this is not. So the path of least resistance is to deploy from
+  the repository's default branch, which both hosts track already — then no
+  branch field needs setting anywhere, and merging into it is the release gate.
 - **Vercel's Root Directory must be `frontend` before you connect the repo.**
   CLI deploys run from wherever you invoke them, so they work regardless;
   Git-triggered builds use this setting, and pointed at the repo root they fail
@@ -295,6 +301,14 @@ Paste the same file again with **Preview** ticked, with two changes:
   here, not an omission.
 
 `CRON_SECRET` is not needed either — cron jobs only fire on production.
+
+**Do not source those values from `vercel pull`.** It writes
+`.vercel/.env.production.local` containing Vercel's own injected variables —
+`VERCEL`, `VERCEL_ENV`, `VERCEL_TARGET_ENV`, `VERCEL_OIDC_TOKEN`, `NX_DAEMON`,
+`TURBO_*` — mixed in with yours. Storing those as project variables is at best
+dead weight and at worst actively wrong: `VERCEL_ENV=production` on a preview
+tells the application it is live. `.env.local` is the safe source; it only ever
+contained things you set.
 
 Previews share the production backend and the production database, so a
 preview's admin UI writes to live data. Separating them means a second Render
