@@ -26,7 +26,7 @@ import TagSelector from "./TagSelector";
 import MarkdownRenderer from "@/components/blog/MarkdownRenderer";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { SITE } from "@/lib/constants";
-import { MATH } from "@/lib/math";
+import { NEEDS_RAW_EDITOR } from "@/lib/math";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
@@ -42,8 +42,10 @@ const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
 	),
 });
 
-// Moved to src/lib/math.ts so `npm run check:math` can assert it — inline
-// `$x$` is detected now, which it was not before.
+// The math regexes live in src/lib/math.ts so `npm run check:math` can assert
+// them. Inline `$x$` is no longer among them: the rich editor renders it as an
+// inlineMath node and round-trips it, so it no longer forces this editor down
+// to a textarea.
 
 interface EditorData {
 	title: string;
@@ -89,10 +91,10 @@ export default function PostEditorClient({
 	// route. A draft isn't served by /posts/[slug] (published-only), so linking
 	// out would 404 for exactly the case preview exists for.
 	const [mode, setMode] = useState<"rich" | "raw" | "preview">(
-		// BlockNote round-trips through blocksToMarkdownLossy, which mangles
-		// LaTeX. Opening a post that contains math in the rich editor is
-		// enough to corrupt it on the next save, so math opens raw.
-		() => (MATH.test(initialData.content || "") ? "raw" : "rich"),
+		// BlockNote round-trips through blocksToMarkdownLossy, which has no
+		// concept of *display* math. Opening such a post in the rich editor is
+		// enough to corrupt it on the next save, so those open raw.
+		() => (NEEDS_RAW_EDITOR.test(initialData.content || "") ? "raw" : "rich"),
 	);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
 
@@ -586,11 +588,11 @@ export default function PostEditorClient({
 										</button>
 									))}
 								</div>
-								{MATH.test(data.content) && (
+								{NEEDS_RAW_EDITOR.test(data.content) && (
 									<p className="font-mono text-[0.65rem] leading-snug text-text-tertiary">
-										Contains math — edit in Markdown. The rich editor
+										Contains display math — edit in Markdown. The rich editor
 										round-trips through a lossy converter and will mangle
-										LaTeX.
+										it. Inline <code>$x$</code> is safe there.
 									</p>
 								)}
 							</div>

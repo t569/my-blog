@@ -5,7 +5,7 @@ body has three modes, toggled from the right sidebar:
 
 | Mode | What it is |
 |---|---|
-| **Rich** | BlockNote WYSIWYG. Convenient, and lossy — see below |
+| **Rich** | BlockNote WYSIWYG. Handles inline math; loses display math — see below |
 | **Markdown** | A plain textarea holding the actual stored content |
 | **Preview** | Rendered through `MarkdownRenderer`, the same component the public page uses |
 
@@ -52,19 +52,40 @@ it costs \$5 and \$10 today   →  correct
 This bites the rendered page, not just the editor. Backslash-escape any literal
 `$` in prose.
 
-## The rich editor destroys LaTeX
+## Inline math works in the rich editor
 
-BlockNote round-trips content through `blocksToMarkdownLossy()`, which has no
-concept of math. **Opening a post containing math in Rich mode is enough to lose
-it on the next save** — you do not have to touch the formula.
+`$…$` is a real node in Rich mode. It renders through KaTeX as you write, you
+can click it to edit the LaTeX, and `/math` in the slash menu inserts a new one.
+Formulas survive the round-trip back to markdown unchanged.
 
-The editor defends against this automatically: a post whose content matches the
-detector in `src/lib/math.ts` **opens in Markdown mode**, with the reason shown
-under the mode toggle. The guard is at load, not at save, because loading is
-where the damage happens.
+There is no input rule, so typing `$x$` directly in Rich mode stays literal text
+until the post is saved and reloaded. Use `/math`, or write in Markdown mode —
+imported and saved content arrives already converted.
 
-The detector deliberately errs toward yes. A false positive costs you one editor
-mode; a false negative costs you your formulas. Its cases are asserted by:
+### Display math still needs Markdown mode
+
+`$$…$$` has no block-level equivalent yet, so BlockNote's
+`blocksToMarkdownLossy()` would eat it. **Opening such a post in Rich mode is
+enough to lose it on the next save** — you do not have to touch the formula.
+
+The editor defends against this automatically: a post matching
+`NEEDS_RAW_EDITOR` in `src/lib/math.ts` **opens in Markdown mode**, with the
+reason shown under the mode toggle. The guard is at load, not at save, because
+loading is where the damage happens.
+
+The guard errs toward Markdown. A false positive costs you one editor mode; a
+false negative costs you your formulas.
+
+### Why formulas are extracted before the markdown parser runs
+
+Non-obvious, and the reason `protectInlineMath()` exists: markdown escapes are a
+subset of LaTeX syntax. `\{` is a valid markdown escape that parses to `{`, so
+`$\{x\}$` handed straight to the parser comes back as `${x}$` with the LaTeX
+already broken and nothing left to detect. Emphasis does the same to `$a*b*c$`.
+
+So each formula is swapped for an opaque token *first*, the parser only ever
+sees characters it has no rules for, and the tokens become math nodes
+afterwards. All of it is asserted by:
 
 ```bash
 cd frontend && npm run check:math
