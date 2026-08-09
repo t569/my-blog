@@ -296,6 +296,24 @@ Connect Vercel to the repo with the Root Directory already set:
 cd frontend && npx vercel git connect https://github.com/<you>/my-blog
 ```
 
+### On a fork, enable Actions first — they are off by default
+
+GitHub disables workflows on forked repositories until you say otherwise, and it
+does so **silently**: the workflow file is present and valid, the Actions tab
+shows a banner rather than an error, and nothing ever runs. The tell is the API
+reporting `total_count: 0` for workflow runs — not a failed run, *no* runs,
+ever.
+
+So on a fresh fork the CI in this repo is decorative until:
+
+> GitHub → the repo → **Actions** tab → *"I understand my workflows, go ahead
+> and enable them"*
+
+That matters more than it looks, because the deploy job below lives in that
+workflow. With Actions off you get a backend that never deploys, no error
+anywhere, and a Vercel frontend that updates normally — which reads exactly
+like a Render problem and is not one.
+
 ### The backend deploys from CI, not from Render's webhook
 
 `.github/workflows/ci.yml` ends with a `deploy-backend` job that POSTs a Render

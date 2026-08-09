@@ -549,6 +549,14 @@ Neon, the env tables for each, and a first-deploy checklist.
     The tell is Render's Events tab showing **no attempt at all** for the commit
     rather than a failed one — trigger, not build. Cross-check at GitHub → repo
     → Settings → Webhooks for an `api.render.com` hook with green deliveries.
+  - **And a third cause, upstream of both: Actions were off.** GitHub disables
+    workflows on *forked* repositories by default, silently — the file is valid,
+    the tab shows a banner rather than an error, and the API reports
+    `total_count: 0` runs. So `ci.yml` had never executed once since this fork
+    was made, and the `deploy-backend` job inside it could not either. Enabled
+    via the Actions tab. Worth remembering that "no runs at all" and "runs that
+    fail" are completely different diagnoses, in exactly the way "no deploy
+    attempt" and "a failed deploy" were on Render.
   - **Not a reason to change host.** Railway has had no free tier since August
     2023 — it is a paid Hobby plan now, so `backend/railway.toml` describes an
     era, not an option. Fly.io is not straightforwardly free either. The build
