@@ -531,10 +531,24 @@ Neon, the env tables for each, and a first-deploy checklist.
     tells the app it is live. Preview now holds exactly the 19 real values,
     minus `NEXTAUTH_URL` (NextAuth falls back to each deployment's own
     `VERCEL_URL`) and `CRON_SECRET` (cron only fires on production).
-- [ ] **Confirm Render's deploy branch is `main`**, not `dev/t569` — it was set
-      to the latter before the branch decision changed. If the two hosts
-      disagree, a push updates one half and leaves the other on the previous
-      commit, with no error anywhere.
+- [x] **Both halves confirmed on one commit.** `/health` reports
+      `{"status":"ok","commit":"04320c8"}` and Vercel production is the same
+      commit, so a single push really does move the whole stack.
+      That the backend answers at all is the proof that migrate-on-deploy works:
+      the container only reaches uvicorn if `alembic upgrade head` exited 0
+      first, so a serving instance *is* a successful migration.
+  - **`autoDeploy: true` in `render.yaml` had never applied** — that key is only
+    read when the service is created *from* the blueprint, and this one was made
+    by hand. The toggle in Settings → Build & Deploy is the real switch.
+    Failing this way is silent and total: pushes did nothing, no error anywhere,
+    and `/health` kept answering happily from the old build.
+  - Which is why `/health` now reports the commit. The gap that cost the time
+    was not being able to tell "deployed and fine" from "never deployed" from
+    outside a dashboard. One `curl` answers it now.
+  - Watch the failure mode, since it stays invisible: if a migration fails, the
+    container never starts, Render keeps the **old** instance serving, and the
+    only external symptom is `commit` not changing. Not an error — a stale
+    success.
 - [ ] Custom domain, once there's something worth pointing it at.
 
 ---
