@@ -1,5 +1,6 @@
 """d3jusdevspace — FastAPI application entry point."""
 
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -115,7 +116,24 @@ app.include_router(debug.router)
 # ---------------------------------------------------------------------------
 
 
+# Which commit is actually serving. Hosts inject this themselves — Render as
+# RENDER_GIT_COMMIT, Railway as RAILWAY_GIT_COMMIT_SHA — and GIT_COMMIT covers
+# anything else, so nothing has to be set by hand.
+#
+# Worth having because "did that push actually deploy?" is otherwise only
+# answerable from a dashboard. A deploy that half-lands — one host on the new
+# commit, the other still on the old one — produces no error anywhere and reads
+# exactly like a caching problem.
+_COMMIT = (
+    os.getenv("RENDER_GIT_COMMIT")
+    or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+    or os.getenv("GIT_COMMIT")
+)
+
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Basic health check endpoint."""
-    return {"status": "ok"}
+    # Key omitted rather than reported as "unknown" when running locally, where
+    # there is no deploy to identify.
+    return {"status": "ok", **({"commit": _COMMIT[:7]} if _COMMIT else {})}
