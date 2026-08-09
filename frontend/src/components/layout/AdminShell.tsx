@@ -165,10 +165,17 @@ export default function AdminShell({
 					</div>
 
 					<div className="flex items-center gap-4">
-						<Link href="/" target="_blank" className="btn-ghost hidden md:flex">
-							<ExternalLink size={16} />
-							<span>View site</span>
-						</Link>
+						{/* Same trap as the editor's settings toggle: `.btn-ghost` is
+						    unlayered in globals.css and so outranks `hidden`, which
+						    lives in @layer utilities. On the button itself the "hidden
+						    below md" half silently did nothing and this stayed visible
+						    on phones. The wrapper carries no component class. */}
+						<span className="hidden md:inline-flex">
+							<Link href="/" target="_blank" className="btn-ghost">
+								<ExternalLink size={16} />
+								<span>View site</span>
+							</Link>
+						</span>
 						<div className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-accent-border bg-accent-muted font-mono text-xs font-bold text-accent">
 							OA
 						</div>

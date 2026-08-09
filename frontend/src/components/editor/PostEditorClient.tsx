@@ -307,12 +307,26 @@ export default function PostEditorClient({
 						)}
 					</div>
 
-					<button
-						className="btn-ghost cursor-pointer flex items-center lg:hidden"
-						onClick={() => setSidebarOpen(!sidebarOpen)}
-					>
-						<SlidersHorizontal size={16} />
-					</button>
+					{/* The wrapper does the hiding, not the button.
+					    `.btn-ghost` is defined outside any @layer in globals.css, and
+					    unlayered CSS outranks every cascade layer — so its
+					    `display: inline-flex` beats `lg:hidden`, which Tailwind emits
+					    into @layer utilities. Put `lg:hidden` on the button and it
+					    stays visible above 1024px, where the sidebar is already
+					    pinned open and the button therefore does nothing at all.
+					    A plain element carries no component class, so the utility
+					    applies. `flex items-center` dropped as well: `.btn-ghost`
+					    already supplies both. */}
+					<span className="lg:hidden">
+						<button
+							className="btn-ghost cursor-pointer"
+							onClick={() => setSidebarOpen(!sidebarOpen)}
+							aria-label={sidebarOpen ? "Hide post settings" : "Show post settings"}
+							aria-expanded={sidebarOpen}
+						>
+							<SlidersHorizontal size={16} />
+						</button>
+					</span>
 
 					<button
 						className="btn-ghost cursor-pointer"
