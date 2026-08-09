@@ -262,6 +262,18 @@ Three things that will bite:
 - **`render.yaml` carries `autoDeploy: true`, but only if the service was
   created from the blueprint** (New → Blueprint). A service created by hand
   never read the file, so check the toggle rather than the repo.
+- **The Auto-Deploy toggle can be on and still do nothing.** Render only
+  receives push events for repositories connected through its **GitHub App**,
+  which is what installs the webhook. Connect a service by pasting a public git
+  URL instead and you get the same toggle, in the same position, wired to
+  nothing — manual deploys work perfectly, pushes are simply never heard.
+
+  The tell is that the Events tab shows **no attempt at all** for the commit,
+  rather than a failed one. Confirm it on the GitHub side: repository →
+  Settings → Webhooks should list an `api.render.com` hook, and its Recent
+  Deliveries should be green. No hook is the whole answer. The fix is to
+  reconnect the repository through GitHub in Render's settings and authorise
+  the Render app for it.
 - **The deploy branch is a dashboard setting, deliberately not in
   `render.yaml`.** A blueprint with no `branch:` key tracks the repository's
   *default* branch. Adding one would hardcode a branch name that only exists in
@@ -332,6 +344,23 @@ service and a Neon branch, which is past what the free tiers cover.
 - [ ] `/sitemap.xml` shows the real domain
 - [ ] Vercel → Settings → Cron Jobs lists `/api/cron/agent`; run it once by hand
       and read the response
+
+## Is another host cheaper?
+
+Worth answering once, because "the backend host is misbehaving, try another"
+is a tempting move that usually costs more than the bug.
+
+- **Railway** — no free tier since August 2023. It is a paid Hobby plan with a
+  small usage credit bundled, so it is not an alternative to a free Render
+  instance, whatever `backend/railway.toml` in this repo implies. That file
+  predates the change. (Check current pricing; it moves.)
+- **Fly.io** — no straightforward free tier either; pay-as-you-go with small
+  allowances.
+
+Before switching for any reason, separate *the build* from *the trigger*. If a
+manual deploy succeeds, the host and the Dockerfile are fine and the problem is
+a webhook — which no amount of migrating fixes, because you would just be
+reconnecting the same integration somewhere else.
 
 ## When free stops being enough
 

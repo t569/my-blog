@@ -542,6 +542,19 @@ Neon, the env tables for each, and a first-deploy checklist.
     by hand. The toggle in Settings → Build & Deploy is the real switch.
     Failing this way is silent and total: pushes did nothing, no error anywhere,
     and `/health` kept answering happily from the old build.
+  - **Then it failed a second way, with the toggle on.** Render only receives
+    push events for repositories connected through its **GitHub App**, which is
+    what installs the webhook; a service connected by pasting a git URL shows
+    the same toggle wired to nothing. Manual deploys worked the whole time.
+    The tell is Render's Events tab showing **no attempt at all** for the commit
+    rather than a failed one — trigger, not build. Cross-check at GitHub → repo
+    → Settings → Webhooks for an `api.render.com` hook with green deliveries.
+  - **Not a reason to change host.** Railway has had no free tier since August
+    2023 — it is a paid Hobby plan now, so `backend/railway.toml` describes an
+    era, not an option. Fly.io is not straightforwardly free either. The build
+    was never the problem: a working manual deploy proves the host and the
+    Dockerfile are fine, and migrating would only mean reconnecting the same
+    integration somewhere else.
   - Which is why `/health` now reports the commit. The gap that cost the time
     was not being able to tell "deployed and fine" from "never deployed" from
     outside a dashboard. One `curl` answers it now.
