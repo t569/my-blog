@@ -296,6 +296,28 @@ Connect Vercel to the repo with the Root Directory already set:
 cd frontend && npx vercel git connect https://github.com/<you>/my-blog
 ```
 
+### The backend deploys from CI, not from Render's webhook
+
+`.github/workflows/ci.yml` ends with a `deploy-backend` job that POSTs a Render
+**deploy hook** once the backend and frontend jobs pass. A deploy hook is a
+plain URL, so it works however the repository happens to be connected — which
+is the point, given how many ways the native trigger can be silently inert.
+
+Two things to set up, once:
+
+1. Render → the service → Settings → **Deploy Hook** → copy the URL. It is a
+   credential: anyone holding it can trigger a deploy.
+2. GitHub → repo → Settings → Secrets and variables → Actions → new secret
+   named **`RENDER_DEPLOY_HOOK`**.
+
+Without it the job fails loudly naming both places, rather than skipping —
+a deploy trigger that quietly does nothing is the failure being replaced.
+
+This is also stricter than Render's own trigger, which deploys regardless of
+whether anything builds: here a commit that fails CI cannot reach production.
+If you also get the native webhook working, both fire and Render coalesces
+them.
+
 ### Previews get none of your environment
 
 Vercel scopes environment variables per environment, and pasting `.env.local`

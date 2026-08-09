@@ -43,6 +43,14 @@ jobs:
           GROQ_API_KEY: ci-dummy-groq-key
           TAVILY_API_KEY: ci-dummy-tavily-key
 
+      # Asserts that every optional credential *disables* its feature rather
+      # than crashing or, worse, opening it up. Deliberately run with a bare
+      # environment — that is the case it exists to check.
+      - name: Feature and credential resolution
+        run: uv run python -m scripts.check_optional_credentials
+        env:
+          DATABASE_URL: postgresql+asyncpg://user:pass@localhost/db
+
   # ── Frontend ─────────────────────────────────────────────────────────────
   frontend:
     name: Frontend — Build & Type Check
@@ -64,9 +72,58 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The math detector decides which editor a post opens in. Getting it
+      # wrong does not throw — it silently rewrites someone's formulas — so it
+      # is asserted rather than trusted.
+      - name: Math detection and round-trip
+        run: npm run check:math
+
       - name: Build (includes TypeScript type-check)
         run: npm run build
         env:
           BACKEND_URL: http://localhost:8000
           NEXTAUTH_SECRET: ci-dummy-secret
           NEXTAUTH_URL: http://localhost:3000
+
+  # ── Deploy ───────────────────────────────────────────────────────────────
+  # Render only auto-deploys repositories connected through its GitHub App,
+  # which is what installs the webhook. A service connected by pasting a public
+  # git URL shows the same Auto-Deploy toggle wired to nothing: manual deploys
+  # work, pushes are never heard, and the Events tab stays empty. A deploy hook
+  # is a plain URL Render accepts a POST on, so this works however the
+  # repository happens to be connected.
+  #
+  # Gated on both jobs, which is stricter than Render's own trigger: a build
+  # that fails CI cannot reach production. Harmless if the native webhook is
+  # working too — Render coalesces the duplicate.
+  #
+  # ponytail: no path filter. Render's own trigger rebuilds on any push to the
+  # branch, and matching that keeps /health's commit equal to origin/main —
+  # which is the check that tells you whether a deploy actually landed. Add one
+  # if build minutes ever start to bite, and fix the check at the same time.
+  deploy-backend:
+    name: Backend — Deploy to Render
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK is not set. Render → the service →" \
+                 "Settings → Deploy Hook, then add it under this repository's" \
+                 "Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          status=$(curl -sS -o response.txt -w '%{http_code}' -X POST "$HOOK")
+          echo "Render responded $status"
+          cat response.txt
+          # Fail loudly. A silently-ignored deploy trigger is the exact failure
+          # this job exists to replace.
+          case "$status" in
+            2*) ;;
+            *) echo "::error::Deploy hook returned $status"; exit 1 ;;
+          esac
