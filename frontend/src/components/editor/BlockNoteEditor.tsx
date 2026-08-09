@@ -19,6 +19,8 @@ import { useTheme } from "next-themes";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { adminUploadImage } from "@/services/api";
+import { useToast } from "@/hooks/useToast";
+import type { ApiError } from "@/types";
 import { activePlugins, composePlugins } from "./plugins/registry";
 
 const cyberDarkTheme: Theme = {
@@ -117,11 +119,27 @@ export default function BlockNoteEditor({
 	enabledFeatures = [],
 }: BlockNoteEditorProps) {
 	const [initialContentLoaded, setInitialContentLoaded] = useState(false);
+	const toast = useToast();
 
 	// Upload images to Cloudinary via the backend.
+	//
+	// The backend says exactly why an upload was refused — an unsupported
+	// content type names the type it got and lists what it accepts; too large
+	// names the limit. BlockNote catches whatever this throws and shows its own
+	// generic failure, so without this the reason is discarded and a rejected
+	// upload looks like a random 400 in the console.
 	const handleUpload = async (file: File) => {
-		const { url } = await adminUploadImage(file);
-		return url;
+		try {
+			const { url } = await adminUploadImage(file);
+			return url;
+		} catch (error) {
+			// apiClient normalises errors to { detail, status }.
+			const detail = (error as ApiError)?.detail;
+			toast.error(detail || "Image upload failed.");
+			// Rethrown, not swallowed: BlockNote still needs to know the upload
+			// failed so it does not insert a broken image block.
+			throw error;
+		}
 	};
 
 	// The active math plugins and everything composed from them: schema specs,
