@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Loader2, Layers, User, Menu, X } from "lucide-react";
+import { Search, Moon, Sun, Loader2, Layers, User, Menu, X,
+	BookOpen,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
@@ -214,6 +216,14 @@ export default function PublicNavbar() {
 					</Link>
 
 					<Link
+						href="/notes"
+						className="hidden md:inline-flex items-center gap-1.5 rounded border border-border-default px-3 py-1.5 font-mono text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors"
+					>
+						<BookOpen size={12} />
+						Notes
+					</Link>
+
+					<Link
 						href="/about"
 						className="hidden md:inline-flex items-center gap-1.5 rounded border border-border-default px-3 py-1.5 font-mono text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors"
 					>
@@ -246,6 +256,14 @@ export default function PublicNavbar() {
 						>
 							<Layers size={12} />
 							Series
+						</Link>
+						<Link
+							href="/notes"
+							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							<BookOpen size={12} />
+							Notes
 						</Link>
 						<Link
 							href="/about"

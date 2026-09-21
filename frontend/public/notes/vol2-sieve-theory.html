@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Sieve Theory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="notes.css">
+<style>
+  :root{
+    --acc:#c2410c; --acc-2:#0f766e;
+    --acc-soft:rgba(194,65,12,.09); --acc-line:rgba(194,65,12,.36);
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --acc:#fb923c; --acc-2:#5eead4;
+    --acc-soft:rgba(251,146,60,.13); --acc-line:rgba(251,146,60,.40);
+  }}
+  :root[data-theme="dark"]{
+    --acc:#fb923c; --acc-2:#5eead4;
+    --acc-soft:rgba(251,146,60,.13); --acc-line:rgba(251,146,60,.40);
+  }
+  .chip{display:inline-block; font-family:var(--mono); font-size:11px; padding:3px 9px; border-radius:999px;
+    border:1px solid var(--rule); margin:0 5px 5px 0; background:var(--paper-3)}
+  .verdict{border:1px solid var(--rule); border-left:3px solid var(--bad); background:var(--paper-2);
+    padding:16px 20px; border-radius:3px; margin-top:16px; font-family:var(--sans); font-size:14.5px; line-height:1.6}
+  .lamgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:12px 16px; margin-top:14px}
+  .lamgrid label{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-3); display:flex; flex-direction:column; gap:4px}
+  .lamgrid label.off{opacity:.32}
+  .lamgrid .v{color:var(--acc); font-size:12.5px; letter-spacing:0; text-transform:none}
+  .bigbar{height:26px; border:1px solid var(--rule); border-radius:3px; background:var(--paper-3);
+    position:relative; overflow:hidden; margin-top:10px}
+  .bigbar i{position:absolute; inset:0 auto 0 0; background:var(--acc); opacity:.6; transition:width .25s}
+  .bigbar b{position:absolute; top:0; bottom:0; width:2px; background:var(--acc-2)}
+  .bigbar span{position:absolute; inset:0; display:grid; place-items:center; font-family:var(--mono); font-size:11px}
+</style>
+
+<script src="glossary-terms.js"></script>
+<script src="notes.js"></script>
+<script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.js"></script>
+<script src="glossary.js"></script>
+
+<div class="progress" id="prog"></div>
+
+<header class="masthead">
+  <div class="mh-mark">II</div>
+  <div class="mh-title">Sieve Theory</div>
+  <div class="mh-vol">Marginalia · Vol. II · Interactive Notes</div>
+  <div class="mh-spacer"></div>
+  <span class="lvlhint" id="lvlHint">click any <span style="border-bottom:1px dashed var(--acc-line)">dotted term</span> for a plain explanation</span>
+  <div class="switch" role="group" aria-label="Reading level">
+    <button data-level-btn="grad" aria-pressed="true" title="Concise: assumes the prerequisites">Graduate</button>
+    <button data-level-btn="beg" aria-pressed="false" title="Adds undergraduate-level explanations throughout">Ground-up</button>
+  </div>
+  <button class="icon-btn" id="themeBtn" title="Toggle theme">☀</button>
+</header>
+
+<div class="shell">
+  <nav class="toc"><h6>Contents</h6><div id="toc"></div></nav>
+  <main class="body">
+
+  <div class="cover">
+    <p class="eyebrow">Volume II · Analytic Number Theory</p>
+    <h1>The method that <em>almost</em> works</h1>
+    <p class="dek">Sieve theory is the study of a technique together with an exact description of why it cannot finish the job. No other area of mathematics knows its own limits this precisely — the parity problem is a theorem about what a whole family of proofs can never do.</p>
+    <dl class="meta-strip">
+      <div><dt>Prerequisites</dt><dd>None assumed — every term is explained on click</dd></div>
+      <div><dt>Interactives</dt><dd>Seven</dd></div>
+      <div><dt>Reading time</dt><dd>~70 min graduate · ~2 hr ground-up</dd></div>
+      <div><dt>Payoff</dt><dd>Knowing exactly where the wall is</dd></div>
+    </dl>
+
+    <div class="howto">
+      <p><b>Written for three readers at once</b> — graduate students who want the argument, undergraduates meeting analytic number theory for the first time, and self-studiers with nobody to ask.</p>
+      <p><span class="k">1</span> <b>Click any dotted term</b> for a plain-English card with a worked example and usually an animation. Cards link to each other, so you can follow a chain back as far as you need.</p>
+      <p><span class="k">2</span> <b>Switch to <i>Ground-up</i></b> in the header for a slower parallel exposition — the same mathematics with the estimates unpacked and the notation explained. Switch back to hide it.</p>
+      <p><span class="k">3</span> <b>Fig. 2 and Fig. 6 are the two that matter.</b> One shows a method dying; the other shows why no method of that kind can live.</p>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <section id="s0">
+    <h2><span class="num">§ 0</span>The one-sentence version</h2>
+
+    <p class="lede">A sieve replaces the question <em>"is this number prime?"</em> — which is about multiplicative structure and is hard — with the question <em>"how many members of my set survive removing all multiples of small primes?"</em> — which is about counting and is easy. The entire theory is the study of the gap between those two questions.</p>
+
+    <p>That trade is fabulously profitable and provably insufficient. Profitable: Brun proved in 1919 that the twin primes have a convergent reciprocal sum, using nothing but clever bookkeeping with inclusion–exclusion. Insufficient: no argument of this shape will ever prove there are infinitely many twin primes, and we can say precisely why.</p>
+
+    <div class="beg">
+      <p><strong>Start with the object everyone knows.</strong> To find the primes up to 100, write out 2, 3, …, 100, then cross out every multiple of 2 (except 2), every multiple of 3 (except 3), every multiple of 5, every multiple of 7. Stop — \(11^2 &gt; 100\), so anything still standing is prime. That's the sieve of Eratosthenes, 2200 years old.</p>
+      <p>Sieve <em>theory</em> asks a quantitative version: don't list the survivors, <em>count</em> them, and get an answer accurate enough to be useful. Crossing out multiples of 2 removes about half. Of the rest, multiples of 3 remove about a third. And so on — the estimate \(x\prod_{p\le z}(1-1/p)\) writes itself.</p>
+      <p>The trouble is the word "about". Every "about" is an error, and there are exponentially many of them. Making that error smaller than the thing you're estimating is the entire subject.</p>
+    </div>
+
+    <div class="box">
+      <span class="lab">Notation, fixed once</span>
+      <ul>
+        <li>\(\mathcal{A}\) — a finite set (or sequence) of integers. For twin primes, \(\mathcal{A} = \{n(n+2) : n \le x\}\).</li>
+        <li>\(\mathcal{P}\) — a set of primes to sift by; \(P(z) = \prod_{p \in \mathcal{P},\, p &lt; z} p\).</li>
+        <li>\(\mathcal{A}_d = \{a \in \mathcal{A} : d \mid a\}\), and \(|\mathcal{A}_d| = X g(d) + r_d\) — the <strong>sieve axiom</strong>: a smooth main term \(Xg(d)\) with \(g\) multiplicative, plus a remainder \(r_d\) you hope is small.</li>
+        <li>\(S(\mathcal{A},\mathcal{P},z) = \#\{a \in \mathcal{A} : \gcd(a, P(z)) = 1\}\) — the <strong>sifting function</strong>, the thing we want.</li>
+      </ul>
+      <p style="margin-top:12px">Everything a sieve is allowed to know is the list of numbers \(|\mathcal{A}_d|\). Hold on to that — §4 turns it into an impossibility theorem.</p>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Eratosthenes of Cyrene<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Eratosthenes.jpg?width=520"
+             alt="Engraving of Eratosthenes" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">c. 240 BC · Alexandria</span>
+        <h4 class="who">Eratosthenes of Cyrene</h4>
+        <figcaption>Chief librarian at Alexandria, and the first person to measure the circumference of the Earth. His sieve is the oldest algorithm still in daily use: write the numbers, strike out the multiples, keep what stands. Everything in this volume is an attempt to answer a question Eratosthenes never asked — not <em>which</em> numbers survive, but <em>how many</em>, to an accuracy you can prove.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Eratosthenes.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s1">
+    <h2><span class="num">§ 1</span>Legendre's sieve, and why it fails</h2>
+
+    <p>Inclusion–exclusion is exact:</p>
+
+    <p>\[ S(\mathcal{A},\mathcal{P},z) = \sum_{d \mid P(z)} \mu(d)\,|\mathcal{A}_d| = X\sum_{d\mid P(z)}\mu(d)g(d) \;+\; \sum_{d \mid P(z)}\mu(d)\,r_d. \]</p>
+
+    <p>For \(\mathcal{A} = \{n \le x\}\) and \(g(d) = 1/d\), the main term is the familiar \(x\prod_{p&lt;z}(1-1/p)\), and by Mertens that's \(\sim x e^{-\gamma}/\log z\).</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 1</span>
+        <span class="t">Eratosthenes, counted rather than listed</span>
+        <span class="pill">Animate</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="eraCanvas"></canvas>
+        <div class="ctl">
+          <button class="btn fixed" id="era-play">▶ Sift</button>
+          <button class="btn fixed" id="era-reset">Reset</button>
+          <label>speed <span class="v" id="era-sv">1.0×</span><input type="range" id="era-s" min="0.25" max="4" step="0.25" value="1"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>sifting by p &lt;</dt><dd id="era-z">—</dd></div>
+          <div><dt>survivors</dt><dd id="era-surv">—</dd></div>
+          <div><dt>x·∏(1−1/p)</dt><dd id="era-pred">—</dd></div>
+          <div><dt>ratio pred/actual</dt><dd id="era-ratio" class="plain">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">Sifting \(\{1,\dots,900\}\). The multiplicative prediction tracks the truth well at first and then drifts — the survivors include 1 and all the sifting primes themselves, and the "independence" assumed by \(\prod(1-1/p)\) is only approximately true. Asymptotically the ratio tends to \(2e^{-\gamma} \approx 1.1229\) when \(z = \sqrt{x}\), but convergence is glacial: at \(x=10^6\) you see only \(1.03\). <strong>Slow asymptotics are a recurring hazard in this subject; numerical experiments mislead more often here than almost anywhere else in mathematics.</strong></figcaption>
+    </figure>
+
+    <h3><span class="num">1.1</span>The error term eats the main term</h3>
+
+    <p>Take \(r_d = |\mathcal{A}_d| - x/d = -\{x/d\}\), so \(|r_d| &lt; 1\). Innocuous, individually. But the sum has one term for <em>every squarefree divisor</em> of \(P(z)\):</p>
+
+    <p>\[ \left|\sum_{d\mid P(z)}\mu(d)r_d\right| \le 2^{\pi(z)}. \]</p>
+
+    <p>Meanwhile the main term is only about \(x e^{-\gamma}/\log z\). So the error dominates as soon as \(2^{\pi(z)} \gtrsim x\), i.e. as soon as \(\pi(z) \gtrsim \log_2 x\), i.e. \(z \gtrsim \log x\log\log x\). Legendre's sieve is exact and completely useless: it can only sift by primes up to about \(\log x\), and survivors of <em>that</em> are not primes, they're just numbers with no small factors.</p>
+
+    <div class="beg" data-t="why an exact formula can be worthless">
+      <h5>The formula is <em>correct</em>. That is not the problem.</h5>
+      <p>Inclusion–exclusion is the rule you already know. To count the people in a room who are neither wearing hats nor glasses: take everyone, subtract the hat-wearers, subtract the glasses-wearers — but now you have subtracted the people wearing <em>both</em> twice, so add them back. With three properties you alternate again, and so on.</p>
+      <p>Applied to sieving, that is exactly Legendre's formula, and it is an <strong>identity</strong>: no approximation anywhere. So why is this section titled "why it fails"?</p>
+
+      <h5>Because of how the errors are counted, not how big they are</h5>
+      <p>The formula has one term for every combination of sifting primes you can form. If you are sifting by the primes below \(z\), there are \(\pi(z)\) of them, and the number of combinations is \(2^{\pi(z)}\) — one for every subset.</p>
+      <p>Each term needs the count \(|\mathcal{A}_d|\), which you only know approximately: \(|\mathcal{A}_d| = x/d + r_d\) where \(|r_d| &lt; 1\). An error of less than 1 is as good as an error can get. But you have \(2^{\pi(z)}\) of them, and they need not cancel.</p>
+
+      <div class="analogy">
+        Imagine measuring a room by adding up a million rulers, each accurate to a millimetre. Every individual measurement is excellent. The total could be off by a kilometre. <strong>The number of error terms matters more than the size of each one</strong> — and this is the single most important habit of mind in the subject.
+      </div>
+
+      <h5>Doing the arithmetic on that</h5>
+      <p>The quantity you are estimating is roughly \(x/\log z\). The error budget is \(2^{\pi(z)}\). The method is useful only while \(2^{\pi(z)}\) stays below \(x\) — that is, while \(\pi(z) \lesssim \log_2 x\), which means \(z\) can be no bigger than about \(\log x\).</p>
+      <p>Now compare that with what you <em>want</em>. To catch primes up to \(x\), you must sift by every prime up to \(\sqrt x\). So you need \(z = \sqrt x\) and you can afford \(z = \log x\).</p>
+      <p>Drag \(x\) in the figure below from \(10^3\) to \(10^{30}\) — a factor of \(10^{27}\) — and watch the usable \(z\) creep from about 20 to about 510, while \(\sqrt x\) climbs to \(10^{15}\). <strong>That is not a gap you close by being more careful.</strong> It needs a different idea, and §2 is that idea.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 2</span>
+        <span class="t">The Legendre catastrophe: main term vs. error budget</span>
+        <span class="pill">The wall</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="legCanvas"></canvas>
+        <div class="ctl">
+          <label>log₁₀ x <span class="v" id="leg-xv">6</span><input type="range" id="leg-x" min="3" max="30" step="1" value="6"></label>
+          <label>sift up to z <span class="v" id="leg-zv">30</span><input type="range" id="leg-z" min="2" max="220" step="1" value="30"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>π(z)</dt><dd id="leg-pz" class="plain">—</dd></div>
+          <div><dt>main term x∏(1−1/p)</dt><dd id="leg-main">—</dd></div>
+          <div><dt>error budget 2^π(z)</dt><dd id="leg-err">—</dd></div>
+          <div><dt>useful?</dt><dd id="leg-ok" class="plain">—</dd></div>
+          <div><dt>largest usable z</dt><dd id="leg-zmax">—</dd></div>
+          <div><dt>…vs √x, which is what we want</dt><dd id="leg-want" class="plain">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">Both axes are logarithmic. The rising line is \(2^{\pi(z)}\), the falling one \(x\prod_{p&lt;z}(1-1/p)\). <strong>Drag \(x\) from \(10^3\) to \(10^{30}\) — a factor of \(10^{27}\) — and the usable range for \(z\) creeps only from about 20 to about 510,</strong> while \(\sqrt{x}\) climbs from 30 to \(10^{15}\). Legendre’s reach grows like \(\log x\); the reach you need for primes is \(\sqrt x\). That is not a gap you close by being careful; it needs a different idea.</figcaption>
+    </figure>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Adrien-Marie Legendre<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Legendre.jpg?width=520"
+             alt="Caricature of Adrien-Marie Legendre" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1808 · Paris</span>
+        <h4 class="who">Adrien-Marie Legendre</h4>
+        <figcaption>The only surviving likeness of Legendre is a caricature — a portrait long captioned as him turned out to be a different man entirely, and the error stood in textbooks for a century. He gave the exact inclusion–exclusion formula for the sifting function, and with it the first serious attempt to <em>count</em> primes rather than list them. The formula is correct and, as §1.1 shows, almost useless: exactness costs one error term per subset of the sifting primes.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Legendre.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s2">
+    <h2><span class="num">§ 2</span>Brun: stop insisting on the truth</h2>
+
+    <p>Brun's idea, in one line: <strong>an identity has exponentially many terms; an inequality does not need them all.</strong></p>
+
+    <div class="box thm">
+      <span class="lab">Bonferroni inequalities</span>
+      <p>For every \(m \ge 0\),
+      \[ \sum_{\substack{d \mid P(z)\\ \omega(d)\le m}}\mu(d)|\mathcal{A}_d| \;\ge\; S(\mathcal{A},\mathcal{P},z) \quad (m \text{ even}), \qquad \le \; S \quad (m \text{ odd}). \]</p>
+    </div>
+
+    <p>Truncating at \(\omega(d)\le m\) leaves only \(\sum_{j\le m}\binom{\pi(z)}{j} \le \pi(z)^m\) terms — <em>polynomial</em> in \(\pi(z)\) rather than exponential. Choosing \(m \asymp \log\log z\) makes the truncation loss a factor \(1+o(1)\) while keeping the error term under control. That single manoeuvre opened the subject.</p>
+
+    <div class="beg">
+      <p><strong>Why does chopping the sum give a bound rather than nonsense?</strong> Fix one element \(a\) with exactly \(\nu\) of the sifting primes dividing it. In the full sum \(\sum_{d\mid \gcd(a,P)}\mu(d)\), it contributes \(\sum_{j=0}^{\nu}\binom{\nu}{j}(-1)^j = (1-1)^\nu\), which is \(1\) if \(\nu = 0\) (i.e. \(a\) survives) and \(0\) otherwise. Perfect detection.</p>
+      <p>If you stop at \(j \le m\), that element contributes the <em>partial</em> alternating sum \(\sum_{j\le m}\binom{\nu}{j}(-1)^j = (-1)^m\binom{\nu-1}{m}\). That is \(\ge 0\) when \(m\) is even and \(\le 0\) when \(m\) is odd — a standard binomial fact. So every single element is counted with the right sign of error, and summing preserves the inequality. The bound is never wrong, only wasteful.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 3</span>
+        <span class="t">The Bonferroni sandwich closing (and the cost of closing it)</span>
+        <span class="pill">Truncate</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="bonCanvas"></canvas>
+        <div class="ctl">
+          <label>x <span class="v" id="bon-xv">100 000</span><input type="range" id="bon-x" min="1000" max="1000000" step="1000" value="100000"></label>
+          <label>sift by p &lt; z, z = <span class="v" id="bon-zv">30</span><input type="range" id="bon-z" min="5" max="53" step="1" value="30"></label>
+          <label>truncation m <span class="v" id="bon-mv">3</span><input type="range" id="bon-m" min="0" max="16" step="1" value="3"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>true S(x,z)</dt><dd id="bon-true" class="plain">—</dd></div>
+          <div><dt>truncated sum T_m</dt><dd id="bon-tm">—</dd></div>
+          <div><dt>bound type</dt><dd id="bon-type" class="plain">—</dd></div>
+          <div><dt>terms used</dt><dd id="bon-terms">—</dd></div>
+          <div><dt>terms if untruncated</dt><dd id="bon-full" class="plain">—</dd></div>
+          <div><dt>relative slack</dt><dd id="bon-slack">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">Bars: \(T_m\) for each \(m\), alternating above and below the true value (the horizontal line). Even \(m\) is always an upper bound, odd \(m\) always a lower bound — <em>including the wildly negative early ones, which are true but worthless</em>. The useful window is where the sandwich has closed but the term count is still small. Raise \(z\) and watch that window shrink; that tension is what Brun's choice \(m \asymp \log\log z\) optimises.</figcaption>
+    </figure>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Viggo Brun<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/ViggoBrun.jpg?width=520"
+             alt="Portrait of Viggo Brun" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1919 · Kristiania (Oslo)</span>
+        <h4 class="who">Viggo Brun</h4>
+        <figcaption>Brun\u2019s move was to give up on being exact. An identity needs every one of its exponentially many terms; an <em>inequality</em> does not. Chop the sum short and, depending on where you stop, you get a guaranteed over-estimate or under-estimate — never a wrong answer, just a wasteful one. With polynomially many terms instead of exponentially many, the error finally stays below the main term. It produced the first theorem ever proved about twin primes, and it opened the subject.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:ViggoBrun.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">2.1</span>Brun's theorem, and what it feels like</h3>
+
+    <p>Brun's sieve gives \(\pi_2(x) \ll x(\log\log x)^2/(\log x)^2\), and hence</p>
+
+    <div class="box thm">
+      <span class="lab">Brun, 1919</span>
+      <p>\(\displaystyle B = \sum_{p,\,p+2 \text{ both prime}}\left(\frac1p + \frac1{p+2}\right) &lt; \infty.\)</p>
+    </div>
+
+    <p>Set against Euler's \(\sum_p 1/p = \infty\), this says the twin primes are a <em>vanishingly thin</em> subset of the primes — thin enough that their reciprocals converge. It is the first theorem ever proved about twin primes, and note what it is <em>not</em>: it does not say there are infinitely many. A convergent sum is compatible with a finite one.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 4</span>
+        <span class="t">One sum diverges, the other doesn't</span>
+        <span class="pill">Brun's constant</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="brunCanvas"></canvas>
+        <div class="ctl">
+          <label>x <span class="v" id="brun-xv">2 000 000</span><input type="range" id="brun-x" min="1000" max="2000000" step="1000" value="2000000"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>π(x)</dt><dd id="brun-pi" class="plain">—</dd></div>
+          <div><dt>Σ 1/p</dt><dd id="brun-s1">—</dd></div>
+          <div><dt>π₂(x)</dt><dd id="brun-pi2" class="plain">—</dd></div>
+          <div><dt>Brun partial sum</dt><dd id="brun-B">—</dd></div>
+          <div><dt>Hardy–Littlewood pred.</dt><dd id="brun-hl" class="plain">—</dd></div>
+          <div><dt>ratio actual/pred</dt><dd id="brun-r">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">Computed live by sieving to two million. \(\sum 1/p\) grows like \(\log\log x\) — unboundedly, but so slowly you could mistake it for convergence. The twin sum genuinely converges, to \(B \approx 1.9022\), and at \(x = 2\times10^6\) we have only reached \(1.72\): <strong>most of Brun's constant lives past where anyone has ever computed.</strong> Meanwhile \(\pi_2(x)\) tracks the Hardy–Littlewood conjecture \(2C_2\int_2^x dt/(\log t)^2\) to within a percent, with \(C_2 = \prod_{p&gt;2}\left(1-\frac{1}{(p-1)^2}\right)\approx 0.6602\) — a conjecture no sieve will ever prove, for reasons in §4.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s3">
+    <h2><span class="num">§ 3</span>Selberg: optimise instead of truncate</h2>
+
+    <p>Brun throws away terms. Selberg (1947) does something cleverer: he keeps all of them but lets the coefficients be <em>free variables</em>, then minimises.</p>
+
+    <p>The trick is one line and is worth memorising. For any real numbers \(\lambda_d\) with \(\lambda_1 = 1\),</p>
+
+    <p>\[ \mathbf{1}[\gcd(a,P(z))=1] \;\le\; \Bigg(\sum_{\substack{d \mid \gcd(a,P(z))\\ d \le D}} \lambda_d\Bigg)^{\!2} \]</p>
+
+    <p>because the left side is 0 or 1, and when it is 1 the only surviving term on the right is \(d=1\), giving \(\lambda_1^2 = 1\). Squares are non-negative, so the inequality is free. Summing over \(a\):</p>
+
+    <p>\[ S(\mathcal{A},\mathcal{P},z) \;\le\; \sum_{d_1,d_2 \le D}\lambda_{d_1}\lambda_{d_2}\,|\mathcal{A}_{[d_1,d_2]}| \;\approx\; X\!\!\sum_{d_1,d_2\le D}\!\!\lambda_{d_1}\lambda_{d_2}\,g([d_1,d_2]). \]</p>
+
+    <p>That is a <strong>quadratic form in the \(\lambda\)</strong>, subject to one linear constraint. Minimising a positive-definite quadratic form under a linear constraint is undergraduate linear algebra; Selberg's contribution was finding the substitution that diagonalises it, giving the closed form</p>
+
+    <p>\[ \min_{\lambda_1=1} Q(\lambda) = \frac{1}{G(D)}, \qquad G(D) = \sum_{\substack{d \le D,\ d\mid P(z)\\ \mu^2(d)=1}}\ \prod_{p\mid d}\frac{g(p)}{1-g(p)}. \]</p>
+
+    <div class="beg" data-t="the one-line trick behind Selberg&#39;s sieve">
+      <h5>Why squaring anything gives you a free inequality</h5>
+      <p>Start from something you cannot argue with: a real number squared is never negative. Selberg's whole sieve is that observation, aimed carefully.</p>
+      <p>Pick any numbers \(\lambda_d\) you like, with the single requirement \(\lambda_1 = 1\). Now look at</p>
+      <p>\[ \left(\sum_{d \mid \gcd(a, P(z)),\ d \le D} \lambda_d\right)^2. \]</p>
+      <p>Ask what this is worth for a particular \(a\). <strong>If \(a\) survived the sieve</strong>, then \(\gcd(a,P(z)) = 1\), so the only divisor in range is \(d=1\), and the sum is just \(\lambda_1 = 1\). Squared: exactly 1. <strong>If \(a\) did not survive</strong>, the sum is some other number — and its square is \(\ge 0\), whatever it happens to be.</p>
+      <p>So this expression is \(1\) on survivors and \(\ge 0\) on everything else. Summing it over all \(a\) therefore gives an <em>upper bound</em> for the number of survivors. The inequality cost nothing and required no cleverness — only the fact that squares are non-negative.</p>
+
+      <div class="analogy">
+        It is the same manoeuvre as bounding a count by \(\sum (\text{something})^2\) in a Cauchy–Schwarz argument: you deliberately overshoot in a way you can control, then spend your effort making the overshoot small.
+      </div>
+
+      <h5>And now it is an optimisation problem, not a guess</h5>
+      <p>Brun had to <em>choose</em> where to truncate, and a bad choice wastes the bound. Selberg's version has no choice to make: expanding the square turns the right-hand side into a <strong>quadratic form</strong> in the \(\lambda\)'s — a sum of terms \(\lambda_{d_1}\lambda_{d_2} \cdot (\text{something})\) — subject to one linear constraint \(\lambda_1 = 1\).</p>
+      <p>Minimising a positive-definite quadratic form under a linear constraint is a standard exercise in linear algebra: there is a unique answer and you can solve for it. Selberg found the change of variables that diagonalises the form, producing the closed expression \(1/G(D)\).</p>
+
+      <h5>The lesson the figure is built to deliver</h5>
+      <p>Set \(D = 30\) in the panel below and press <em>Try \(\lambda = \mu\)</em>. You land exactly on the theoretical optimum, and exactly on the true density. At full level, Selberg's sieve <strong>is</strong> inclusion–exclusion, and it loses nothing at all.</p>
+      <p>So every loss in a real application comes from one place: the restriction \(d \le D\). And that restriction exists only because the error terms \(r_d\) must stay controllable. <strong>You are never limited by the sieve. You are limited by your level of distribution</strong> — which is why Bombieri–Vinogradov and Elliott–Halberstam are the load-bearing theorems of the whole field.</p>
+    </div>
+
+    <p>Take two minutes and be Selberg. Below is the genuine quadratic form for sifting \(\{n\le x\}\) by \(\{2,3,5\}\). Move the sliders; try to beat the machine.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 5</span>
+        <span class="t">Be Selberg: minimise the form by hand</span>
+        <span class="pill">Optimise</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <label class="fixed">level D <select id="sel-D">
+            <option>1</option><option>2</option><option>3</option><option>5</option>
+            <option selected>6</option><option>10</option><option>15</option><option>30</option>
+          </select></label>
+          <button class="btn fixed" id="sel-solve">⚡ Solve it for me</button>
+          <button class="btn fixed" id="sel-mu">Try λ = μ</button>
+          <button class="btn fixed" id="sel-zero">Zero all</button>
+        </div>
+        <div class="lamgrid" id="sel-lams"></div>
+        <div class="bigbar"><i id="sel-fill"></i><b id="sel-opt"></b><span id="sel-lab"></span></div>
+        <dl class="readout">
+          <div><dt>your Q(λ)</dt><dd id="sel-q">—</dd></div>
+          <div><dt>optimum 1/G(D)</dt><dd id="sel-o">—</dd></div>
+          <div><dt>G(D)</dt><dd id="sel-g" class="plain">—</dd></div>
+          <div><dt>true density</dt><dd id="sel-t" class="plain">0.266667</dd></div>
+          <div><dt>your loss</dt><dd id="sel-loss">—</dd></div>
+        </dl>
+        <div id="sel-note" style="font-family:var(--sans);font-size:13.5px;color:var(--ink-2);margin-top:14px"></div>
+      </div>
+      <figcaption class="plate-foot">\(Q(\lambda) = \sum_{d_1,d_2}\lambda_{d_1}\lambda_{d_2}/[d_1,d_2]\) with \(\lambda_1 = 1\) — the honest thing, computed exactly. The teal marker is the theoretical optimum \(1/G(D)\). <strong>Set \(D = 30\) and press "Try λ = μ": you land exactly on the optimum, and exactly on the true density.</strong> That is the whole lesson of this figure — at full level, Selberg's sieve <em>is</em> inclusion–exclusion and loses nothing. Every loss in a real application comes from the level restriction \(d \le D\), which exists only because the error terms \(r_d\) have to stay controllable.</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">Where the level restriction comes from</span>
+      <p>The neglected error is \(\sum_{d_1,d_2\le D}|\lambda_{d_1}\lambda_{d_2}r_{[d_1,d_2]}| \le \max|\lambda|^2\sum_{d\le D^2}3^{\omega(d)}|r_d|\). To keep it below the main term \(X/G(D)\), you need control of \(r_d\) on average up to \(D^2\) — the <strong>level of distribution</strong>. For \(\mathcal{A}=\{n\le x\}\) that is free. For \(\mathcal{A}=\{p-2 : p\le x\}\) it is the Bombieri–Vinogradov theorem, giving level \(x^{1/2-\varepsilon}\); pushing past \(1/2\) is the Elliott–Halberstam conjecture and is exactly what Zhang had to partially achieve. <em>Level of distribution is the currency of the entire field.</em></p>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Atle Selberg<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Atle_Selberg.jpg?width=520"
+             alt="Portrait of Atle Selberg" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1947 · Princeton</span>
+        <h4 class="who">Atle Selberg</h4>
+        <figcaption>Selberg supplied both halves of this volume. The sieve of §3 replaces Brun\u2019s guesswork with an optimisation that can be solved exactly. Then, characteristically, he supplied the proof that the whole family of methods has a ceiling: the parity construction of §4, which exhibits two sets a sieve cannot tell apart and one of which has no primes at all. <strong>Very few fields possess a theorem stating precisely what their own techniques can never do.</strong>
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Atle_Selberg.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s4">
+    <h2><span class="num">§ 4</span>The parity problem</h2>
+
+    <p class="lede">Here is the wall. It is not a gap in our cleverness; it is a theorem about the information a sieve is given.</p>
+
+    <p>Recall the one constraint from §0: <strong>a sieve knows only the numbers \(|\mathcal{A}_d|\).</strong> Whatever bound it produces must be valid for <em>every</em> set with those same counts. So to prove a sieve cannot do something, exhibit two sets with identical counts and wildly different answers.</p>
+
+    <p>Selberg's construction does exactly that, using the Liouville function \(\lambda(n) = (-1)^{\Omega(n)}\), where \(\Omega\) counts prime factors with multiplicity.</p>
+
+    <div class="box thm">
+      <span class="lab">The parity obstruction (Selberg)</span>
+      <p>Let \(\mathcal{A}^{+} = \{n \le x : \Omega(n) \text{ even}\}\) and \(\mathcal{A}^{-} = \{n\le x : \Omega(n)\text{ odd}\}\). For every \(d\),
+      \[ |\mathcal{A}^{\pm}_d| = \frac{1}{2}\frac{x}{d} + O\!\left(\text{small}\right), \]
+      because \(\sum_{n\le x,\ d\mid n}\lambda(n) = o(x/d)\). The two sets are therefore <em>indistinguishable to any sieve</em>. But every prime lies in \(\mathcal{A}^{-}\) (primes have \(\Omega = 1\)) and none in \(\mathcal{A}^{+}\).</p>
+    </div>
+
+    <p>Consequence: a sieve fed the axioms \(X = x/2,\ g(d)=1/d\) must return a lower bound that is valid for \(\mathcal{A}^{+}\) — whose sifted count is essentially zero — and so its lower bound is \(\le 0\). <strong>No sieve of this type can ever prove a sifted set is non-empty.</strong> And its upper bound must accommodate \(\mathcal{A}^{-}\), which is why sieve upper bounds are off by a factor of about 2 (or 4, in dimension 2) and never converge to the truth.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 6</span>
+        <span class="t">Two sets a sieve cannot tell apart</span>
+        <span class="pill">The barrier</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="parCanvas"></canvas>
+        <div class="ctl">
+          <label>x <span class="v" id="par-xv">1 000 000</span><input type="range" id="par-x" min="10000" max="2000000" step="10000" value="1000000"></label>
+        </div>
+        <div class="scroller"><table id="par-table"></table></div>
+        <div class="verdict" id="par-verdict"></div>
+      </div>
+      <figcaption class="plate-foot">The curve is \(L(x) = \sum_{n\le x}\lambda(n)\), the bias between the two sets across <em>all</em> \(n\). It stays microscopic relative to \(x\) — the prime number theorem is equivalent to \(L(x) = o(x)\), and RH is equivalent to \(L(x) \ll x^{1/2+\varepsilon}\). The table shows the same near-perfect balance inside each residue class \(d \mid n\), which is precisely the data a sieve consumes. <strong>Identical inputs, opposite answers: that is the proof of impossibility, and it is this short.</strong></figcaption>
+    </figure>
+
+    <div class="beg">
+      <p><strong>Why isn't this just a failure of imagination?</strong> Because of how the argument is structured. We are not saying "nobody has found a clever enough sieve". We are saying: fix any procedure whatsoever whose <em>only inputs</em> are the numbers \(|\mathcal{A}_d|\) and which always outputs a correct lower bound. Feed it \(\mathcal{A}^{+}\). Correctness forces the output to be \(\le 0\), because the truth for \(\mathcal{A}^{+}\) is \(0\). Now feed it \(\mathcal{A}^{-}\) — but the inputs are (essentially) the same numbers, so the output is the same \(\le 0\). The procedure never learns anything.</p>
+      <p>It's the same shape of argument as an adversary argument in complexity theory, or an information-theoretic lower bound. The escape route is not a better sieve; it is <strong>feeding the method extra information beyond the \(|\mathcal{A}_d|\)</strong>. That's §6.</p>
+    </div>
+
+    <div class="box pit">
+      <span class="lab">What the parity problem does <em>not</em> say</span>
+      <ul>
+        <li>It does not say twin primes are infinite-or-not-provable. It says <em>pure sieve methods</em> cannot decide it.</li>
+        <li>It does not block <strong>upper</strong> bounds — those are fine, just off by a constant factor.</li>
+        <li>It does not block results about numbers with a <strong>bounded number</strong> of prime factors. Chen's theorem (every large even \(N\) is \(p + P_2\)) lives entirely inside the barrier, because \(P_2\) is parity-ambiguous by design.</li>
+        <li>It does not apply once you inject non-sieve input — bilinear (Type II) information, or the equidistribution that Zhang and Maynard exploit.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s5">
+    <h2><span class="num">§ 5</span>Dimension, and how far a sieve reaches</h2>
+
+    <p>Sieves are classified by their <strong>dimension</strong> (or sifting density) \(\kappa\), defined by</p>
+
+    <p>\[ \prod_{w \le p &lt; z}(1-g(p))^{-1} \sim \left(\frac{\log z}{\log w}\right)^{\kappa}. \]</p>
+
+    <p>Sifting the integers by all primes gives \(\kappa = 1\) (the <em>linear</em> sieve). Sifting \(n(n+2)\) removes two residue classes mod \(p\), so \(g(p) = 2/p\) and \(\kappa = 2\). Dimension is destiny: everything about a sieve's strength is a function of \(\kappa\).</p>
+
+    <div class="beg" data-t="what &#39;dimension&#39; is counting">
+      <h5>Dimension = how many residue classes each prime deletes</h5>
+      <p>"Cross out the multiples of \(p\)" is really "delete one residue class modulo \(p\)" — one of the \(p\) possible remainders. That removes a fraction \(1/p\) of everything, and the sieve has <strong>dimension \(\kappa = 1\)</strong>.</p>
+      <p>Now try to sieve for twin primes. You want both \(n\) and \(n+2\) to survive, so you look at the product \(n(n+2)\). For a given prime \(p\), this is divisible by \(p\) when \(n \equiv 0\) <em>or</em> \(n \equiv -2\) modulo \(p\) — <strong>two</strong> classes instead of one. So \(g(p) = 2/p\), and \(\kappa = 2\).</p>
+
+      <div class="analogy">
+        Two different filters over the same stream. A dimension-1 sieve takes out every second car; a dimension-2 sieve takes out every second <em>and</em> every third. Far less gets through, so you know far less about what did — and the sieve's bounds degrade accordingly.
+      </div>
+
+      <h5>Why dimension is the only parameter that matters</h5>
+      <p>Every quantitative feature of a sieve turns out to be a function of \(\kappa\) alone: how strong the upper bound is, how far off it is, and — crucially — at what point a <em>lower</em> bound becomes non-trivial. The factor-of-2 slack in dimension 1 becomes a factor of 4 in dimension 2.</p>
+
+      <h5>Where the parity problem shows up in the formulas</h5>
+      <p>The lemma below gives sandwich bounds with two factors \(F_\kappa\) (above) and \(f_\kappa\) (below). Both approach 1 if you sift gently enough. But look at what \(f_\kappa\) does when you sift hard: it goes to <strong>zero, and then below it</strong>. A "lower bound" that is negative tells you nothing — the count was obviously non-negative already.</p>
+      <p>For \(\kappa = 1\), \(f(2) = 0\) exactly. With Bombieri–Vinogradov giving level \(D = x^{1/2}\), \(s = 2\) corresponds to \(z = x^{1/4}\), so survivors may have up to three prime factors. <strong>That is precisely why classical sieves deliver \(P_3\) and not primes</strong> — and it is the parity problem of §4 reappearing, this time as a number in a table rather than an argument.</p>
+    </div>
+
+    <div class="box thm">
+      <span class="lab">Fundamental lemma of sieve theory</span>
+      <p>With level \(D\) and \(s = \log D/\log z\), there are functions \(F_\kappa \ge 1 \ge f_\kappa\) with
+      \[ X V(z) f_\kappa(s)\,(1+o(1)) \;\le\; S(\mathcal{A},\mathcal{P},z) \;\le\; XV(z)F_\kappa(s)\,(1+o(1)), \qquad V(z)=\prod_{p&lt;z}(1-g(p)), \]
+      and \(F_\kappa(s), f_\kappa(s) \to 1\) rapidly as \(s\to\infty\). Crucially, \(f_\kappa(s) \le 0\) for \(s\) below a threshold \(\beta_\kappa\) — and \(f_\kappa \le 0\) is exactly the parity problem showing up in the formulas.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 7</span>
+        <span class="t">The linear sieve functions \(F\) and \(f\), and where lower bounds switch on</span>
+        <span class="pill">κ = 1</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="fflCanvas"></canvas>
+        <div class="ctl">
+          <label>s = log D / log z <span class="v" id="ffl-sv">3.00</span><input type="range" id="ffl-s" min="1" max="12" step="0.05" value="3"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>F(s) — upper factor</dt><dd id="ffl-F">—</dd></div>
+          <div><dt>f(s) — lower factor</dt><dd id="ffl-f">—</dd></div>
+          <div><dt>lower bound useful?</dt><dd id="ffl-use" class="plain">—</dd></div>
+          <div><dt>sift to z = D^(1/s)</dt><dd id="ffl-z" class="plain">—</dd></div>
+          <div><dt>survivors have ≥</dt><dd id="ffl-p">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">For \(\kappa=1\): \(F(s) = 2e^{\gamma}/s\) on \([1,3]\), \(f(s) = (2e^{\gamma}/s)\log(s-1)\) on \([2,4]\), continued beyond by the delay differential system \((sF)' = f(s-1)\), \((sf)' = F(s-1)\). Note \(f(2) = 0\): <strong>below \(s=2\) the linear sieve gives no lower bound at all.</strong> With Bombieri–Vinogradov level \(D = x^{1/2}\), \(s=2\) means \(z = x^{1/4}\), so survivors can have up to 3 prime factors — this is why classical sieves deliver \(P_3\), and why squeezing to \(P_2\) (Chen) requires an extra, non-sieve switching trick.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s6">
+    <h2><span class="num">§ 6</span>Getting past the wall</h2>
+
+    <h3><span class="num">6.1</span>Bilinear forms</h3>
+
+    <p>The parity obstruction assumes the method sees only \(|\mathcal{A}_d|\). Friedlander and Iwaniec's <em>asymptotic sieve for primes</em> and their theorem that \(x^2+y^4\) is prime infinitely often work because they supply an additional input: control of <strong>Type II (bilinear) sums</strong> \(\sum_{m}\sum_{n}\alpha_m\beta_n\,\mathbf{1}[mn \in \mathcal{A}]\). Such a sum is genuinely sensitive to how a number factors, which is the exact piece of information \(\lambda(n)\) hides. Once you have it, parity stops applying.</p>
+
+    <p>This is the same idea as Vinogradov's method for Goldbach's odd conjecture, and the same idea behind Vaughan's identity and the Type I / Type II decomposition. <strong>Modern analytic number theory is largely the study of how to obtain Type II information for sequences you care about.</strong></p>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Yitang Zhang<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Yitang_Zhang.jpg?width=520"
+             alt="Photograph of Yitang Zhang" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">2013 · New Hampshire</span>
+        <h4 class="who">Yitang Zhang</h4>
+        <figcaption>Zhang was 58, had published almost nothing for a decade, and had worked as an accountant and in a sandwich shop. His paper proved that infinitely often two primes differ by at most 70 000 000. Read what that does <em>not</em> claim: not gap 2, just <em>some</em> bounded gap. The method shows that among \\(k\\) shifted candidates at least two are prime, without ever identifying <em>which</em> — so it never has to tell a prime from a \\(P_2\\) at a named place, and parity never gets a chance to object. Polymath8 and Maynard later drove the bound to 246.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Yitang_Zhang.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">6.2</span>Bounded gaps — how it dodges parity</h3>
+
+    <p>Goldston–Pintz–Yıldırım, then Zhang (2013), then Maynard and Tao independently, proved \(\liminf_n (p_{n+1}-p_n) &lt; \infty\). Note carefully what is proved: <em>some</em> bounded gap occurs infinitely often, not gap 2. That distinction is the parity problem being respected, not broken.</p>
+
+    <p>The mechanism: take an admissible tuple \(\{h_1,\dots,h_k\}\) and a Selberg-type weight \(w_n\). Show \(\sum_n w_n\left(\sum_i \mathbf{1}[n+h_i \text{ prime}] - m\right) &gt; 0\). A positive sum forces <em>some</em> \(n\) with at least \(m+1\) primes among \(n+h_i\) — but tells you nothing about <em>which</em> \(i\). The sieve never has to distinguish a prime from a \(P_2\) at a specified location, so parity is sidestepped rather than defeated. Maynard's improvement was to use a multidimensional weight \(\lambda_{d_1,\dots,d_k}\) instead of a one-dimensional one, which is why his method also gives bounded gaps between \(m\) primes for every \(m\).</p>
+
+    <div class="box">
+      <span class="lab">The state of play</span>
+      <div class="scroller"><table>
+        <tr><th>Result</th><th>Year</th><th>Method</th><th>Parity?</th></tr>
+        <tr><td>Brun: B &lt; ∞</td><td>1919</td><td>Pure sieve (Bonferroni)</td><td>respected</td></tr>
+        <tr><td>Every large even N = P₉ + P₉</td><td>1920</td><td>Brun's sieve</td><td>respected</td></tr>
+        <tr><td>Chen: N = p + P₂</td><td>1973</td><td>Weighted sieve + switching</td><td>respected</td></tr>
+        <tr><td>x² + y⁴ prime i.o.</td><td>1998</td><td>Asymptotic sieve + bilinear</td><td>broken</td></tr>
+        <tr><td>gaps ≤ 70 000 000</td><td>2013</td><td>GPY + Zhang's level</td><td>sidestepped</td></tr>
+        <tr><td>gaps ≤ 246</td><td>2014</td><td>Maynard–Tao + Polymath8b</td><td>sidestepped</td></tr>
+        <tr><td>gaps = 2 (twin primes)</td><td>—</td><td>open</td><td>blocked</td></tr>
+      </table></div>
+      </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s7">
+    <h2><span class="num">§ 7</span>Check yourself</h2>
+    <div class="quiz">
+      <div class="q" data-a="2">
+        <p class="qq">Legendre's sieve is an exact identity. Why is it useless for counting primes up to \(x\)?</p>
+        <button class="opt">Because the Möbius function is hard to compute.</button>
+        <button class="opt">Because \(\prod(1-1/p)\) diverges.</button>
+        <button class="opt">Because it has \(2^{\pi(z)}\) error terms, so it only tolerates \(z \approx \log x\), and survivors of sifting by primes below \(\log x\) are nowhere near prime.</button>
+        <button class="opt">Because inclusion–exclusion requires the set to be finite.</button>
+        <p class="why">Exactness is not the problem — the problem is that exactness costs one error term per squarefree divisor of \(P(z)\), and there are \(2^{\pi(z)}\) of them. The usable range for \(z\) grows like \(\log x\) while you need \(\sqrt x\). Fig. 2 shows the crossing point barely moving as \(x\) goes from \(10^3\) to \(10^{30}\).</p>
+      </div>
+      <div class="q" data-a="1">
+        <p class="qq">In Fig. 5, setting \(D = 30\) and \(\lambda = \mu\) hits the optimum exactly. What does that demonstrate?</p>
+        <button class="opt">That Selberg's sieve is a special case of Brun's.</button>
+        <button class="opt">That at full level the sieve loses nothing — all the loss in real applications comes from the restriction \(d \le D\), which exists only to keep the error terms \(r_d\) controllable.</button>
+        <button class="opt">That the Möbius function is always optimal.</button>
+        <button class="opt">That the quadratic form is degenerate.</button>
+        <p class="why">At full level, \(\left(\sum_{d\mid n}\mu(d)\right)^2 = \mathbf{1}[n=1]\) — the square is an equality, not an inequality, so the bound is exact. Restricting to \(d\le D\) is what introduces slack. This reframes the whole subject: <em>you are not limited by the sieve, you are limited by your level of distribution</em>, which is why Bombieri–Vinogradov and Elliott–Halberstam are the load-bearing theorems.</p>
+      </div>
+      <div class="q" data-a="3">
+        <p class="qq">A colleague claims a new sieve inequality that proves infinitely many twin primes. Before reading it, what do you know?</p>
+        <button class="opt">Nothing — it might work.</button>
+        <button class="opt">It must use the Riemann hypothesis.</button>
+        <button class="opt">It must be a Selberg-type sieve.</button>
+        <button class="opt">If its only inputs are the counts \(|\mathcal{A}_d|\), it is wrong — such a method cannot produce a positive lower bound, since \(\mathcal{A}^{+}\) has the same inputs and no primes.</button>
+        <p class="why">This is the practical value of knowing the parity problem: it is a filter you can apply before investing time. The only way through is extra input — bilinear/Type II information, or a formulation (like bounded gaps) that never requires distinguishing a prime from a \(P_2\) at a named location.</p>
+      </div>
+      <div class="q" data-a="0">
+        <p class="qq">Why did Zhang's theorem give "gaps below 70 million" rather than "twin primes"?</p>
+        <button class="opt">Because the method shows <em>some</em> pair in an admissible tuple is prime, without identifying which — so it never has to beat parity.</button>
+        <button class="opt">Because 70 million was the limit of the computation.</button>
+        <button class="opt">Because the Elliott–Halberstam conjecture is false.</button>
+        <button class="opt">Because Bombieri–Vinogradov only gives level 1/2.</button>
+        <p class="why">The size of the bound is an artefact (Polymath8 later drove it to 246, and to 6 under generalised Elliott–Halberstam); the <em>shape</em> of the result is structural. "At least two of \(n+h_1,\dots,n+h_k\) are prime" is a statement a parity-respecting method can prove; "\(n\) and \(n+2\) are both prime" is not. Even assuming every conjecture in sight, the method reaches gap 6, not 2.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s8">
+    <h2><span class="num">§ 8</span>Where to go next</h2>
+
+    <h4>Primary texts</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://bookstore.ams.org/coll-57" target="_blank" rel="noopener">
+        <span class="k">Book · the standard</span><span class="n">Friedlander &amp; Iwaniec, <em>Opera de Cribro</em></span>
+        <span class="d">The definitive modern account, by the people who broke parity. Dense, beautiful, and honest about what is hard.</span></a>
+      <a class="lnk ext" href="https://store.doverpublications.com/products/9780486320809" target="_blank" rel="noopener">
+        <span class="k">Book · classic</span><span class="n">Halberstam &amp; Richert, <em>Sieve Methods</em></span>
+        <span class="d">The 1974 reference. Exhaustive on the classical sieves, the fundamental lemma, and the \(F_\kappa, f_\kappa\) functions plotted in Fig. 7.</span></a>
+      <a class="lnk ext" href="https://terrytao.wordpress.com/2007/06/05/open-question-the-parity-problem-in-sieve-theory/" target="_blank" rel="noopener">
+        <span class="k">Blog · essential</span><span class="n">Tao, <em>The parity problem in sieve theory</em></span>
+        <span class="d">The clearest exposition anywhere of §4. If you read one external link from this volume, read this one.</span></a>
+      <a class="lnk ext" href="https://www.ams.org/notices/201404/rnoti-p418.pdf" target="_blank" rel="noopener">
+        <span class="k">Survey</span><span class="n">Granville, <em>Primes in intervals of bounded length</em></span>
+        <span class="d">A superbly readable account of GPY → Zhang → Maynard, with the sieve weights written out explicitly.</span></a>
+    </div>
+
+    <h4>The breakthroughs, first-hand</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://annals.math.princeton.edu/2014/179-3/p07" target="_blank" rel="noopener">
+        <span class="k">Paper</span><span class="n">Zhang, <em>Bounded gaps between primes</em> (Annals, 2014)</span>
+        <span class="d">The paper. Most of it is the level-of-distribution estimate; the sieve part is standard GPY.</span></a>
+      <a class="lnk ext" href="https://arxiv.org/abs/1311.4600" target="_blank" rel="noopener">
+        <span class="k">arXiv</span><span class="n">Maynard, <em>Small gaps between primes</em></span>
+        <span class="d">Shorter, more flexible, and needs only Bombieri–Vinogradov. The multidimensional weight is the idea.</span></a>
+      <a class="lnk ext" href="https://annals.math.princeton.edu/1998/148-3/p04" target="_blank" rel="noopener">
+        <span class="k">Paper</span><span class="n">Friedlander &amp; Iwaniec, <em>The polynomial \(x^2+y^4\) captures its primes</em></span>
+        <span class="d">Parity actually broken, by supplying bilinear information. The template for every subsequent escape.</span></a>
+      <a class="lnk ext" href="https://asone.ai/polymath/index.php?title=Bounded_gaps_between_primes" target="_blank" rel="noopener">
+        <span class="k">Project</span><span class="n">Polymath8 wiki</span>
+        <span class="d">The open collaboration that drove 70 000 000 down to 246, with the whole optimisation visible in public.</span></a>
+    </div>
+
+    <h4>Compute</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://oeis.org/A001359" target="_blank" rel="noopener">
+        <span class="k">OEIS</span><span class="n">A001359 — lesser of twin primes</span>
+        <span class="d">Plus A065421 for the decimal expansion of Brun's constant, and the computations that extended it.</span></a>
+      <a class="lnk ext" href="https://www.primegrid.com/" target="_blank" rel="noopener">
+        <span class="k">Data</span><span class="n">PrimeGrid — twin prime search</span>
+        <span class="d">Where the current record twin pairs come from, if you'd like to see the objects rather than the estimates.</span></a>
+      <a class="lnk ext" href="https://doc.sagemath.org/html/en/reference/arithmetic_curves/index.html" target="_blank" rel="noopener">
+        <span class="k">Software</span><span class="n">SageMath / PARI-GP</span>
+        <span class="d"><code>forprime</code> and <code>moebius</code> are enough to reproduce every figure on this page in a dozen lines.</span></a>
+    </div>
+
+    <hr>
+    <p style="font-family:var(--sans);font-size:14px;color:var(--ink-3)">Other volumes — <strong>Vol. I: Modular Forms</strong> (where finiteness is a superpower rather than a wall). <strong>Vol. III: Gödel and the Construction of Mathematical Language</strong> — another subject built around a precisely-located impossibility. <strong>Vol. IV: How Lean Works.</strong></p>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  <nav class="seriesnav">
+    <a href="https://claude.ai/code/artifact/6d579501-40cb-40eb-af02-9acfb874a5ec" target="_blank" rel="noopener"><span class="v">Volume I</span><span class="n">Modular Forms</span><span class="d">Rigidity in, finiteness out</span></a>
+    <a href="#" aria-current="page"><span class="v">Volume II</span><span class="n">Sieve Theory</span><span class="d">A method that knows its own limit</span></a>
+    <a href="https://claude.ai/code/artifact/e2cbb6c5-9f15-4d1a-a9aa-9a97777942b4" target="_blank" rel="noopener"><span class="v">Volume III</span><span class="n">Gödel & Formal Language</span><span class="d">Mathematics as a string of symbols</span></a>
+    <a href="https://claude.ai/code/artifact/c28ec44f-e713-4736-b088-b66859ed44aa" target="_blank" rel="noopener"><span class="v">Volume IV</span><span class="n">How Lean Works</span><span class="d">A proof is a program</span></a>
+  </nav>
+  <div>Marginalia · Volume II · Sieve Theory</div>
+  <div>Every count on this page is sieved live in your browser, to two million.</div>
+</footer>
+
+<script src="vol2.js"></script>
+
+</html>
