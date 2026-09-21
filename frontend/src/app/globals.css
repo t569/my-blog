@@ -12,13 +12,17 @@
    render, so the inactive skin's fonts cost three cheap requests, not files.
 
    cyber-luxury: Space Grotesk · JetBrains Mono · Montserrat
-   garden:       Schibsted Grotesk · Source Serif 4 · IBM Plex Mono */
+   garden:       Schibsted Grotesk · Source Serif 4 · IBM Plex Mono
+   marginalia:   Instrument Serif · Spectral · Archivo · IBM Plex Mono */
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap");
 
 @import "tailwindcss";
 
@@ -32,6 +36,7 @@
    never edits an existing one — add a file, import it below, done. */
 @import "../styles/themes/cyber-luxury.css";
 @import "../styles/themes/garden.css";
+@import "../styles/themes/marginalia.css";
 
 /* ============================================================================
   1. Tailwind Theme — maps design tokens into utility classes
@@ -47,6 +52,10 @@
 	--font-body: var(--font-body-family);
 	--font-mono: var(--font-mono-family);
 	--font-display: var(--font-display-family);
+	/* A fourth slot, for skins that separate interface text from reading text.
+	   Skins that don't declare --font-sans-family fall back to their body face,
+	   so `font-sans` is safe to use anywhere. */
+	--font-sans: var(--font-sans-family, var(--font-body-family));
 
 	/* ── Colors ── */
 	--color-bg-page: var(--color-bg-page);
@@ -317,6 +326,98 @@ body {
 }
 
 /* ============================================================================
+  4b. The reading cover
+
+  A post opens the way a volume does: an eyebrow naming the series, the title
+  set large in the display face, a dek, then a ruled strip of particulars.
+  Written here rather than as utility chains because the strip styles dt/dd
+  descendants, which Tailwind cannot reach from the parent.
+============================================================================ */
+
+.post-eyebrow {
+	margin-bottom: var(--space-5);
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	letter-spacing: 0.19em;
+	text-transform: uppercase;
+	color: var(--color-accent);
+}
+
+.post-cover-title {
+	/* Instrument Serif ships a single weight. Asking for bold here would make
+	   the browser synthesise one by smearing the outline sideways. */
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: clamp(2.75rem, 8.4vw, 6.5rem);
+	line-height: 0.95;
+	letter-spacing: -0.02em;
+	color: var(--color-text-primary);
+	text-wrap: balance;
+	max-width: 18ch;
+	margin-bottom: var(--space-6);
+}
+
+.post-dek {
+	max-width: 58ch;
+	margin-bottom: var(--space-8);
+	font-family: var(--font-body);
+	font-size: clamp(1.05rem, 2.1vw, 1.375rem);
+	line-height: 1.55;
+	color: var(--color-text-secondary);
+}
+
+.post-meta-strip {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	border-block: 1px solid var(--color-border-default);
+}
+
+.post-meta-strip > div {
+	flex: 1 1 150px;
+	padding: 0.8rem 1.125rem 0.8rem 0;
+	border-right: 1px solid var(--color-border-subtle);
+}
+
+.post-meta-strip > div:last-child {
+	border-right: 0;
+}
+
+.post-meta-strip dt {
+	font-family: var(--font-mono);
+	font-size: 0.6rem;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	color: var(--color-text-tertiary);
+}
+
+.post-meta-strip dd {
+	margin: 0.25rem 0 0;
+	font-family: var(--font-sans);
+	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+}
+
+/* The one piece of non-user-triggered motion on the page: the rule under the
+   cover draws itself in, once, on load. Everything else here waits to be
+   asked. Reduced motion is handled by the blanket rule in section 7. */
+.post-cover {
+	position: relative;
+}
+
+.post-cover::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	bottom: -1px;
+	height: 1px;
+	width: 100%;
+	background: var(--color-accent);
+	transform-origin: left;
+	animation: rule-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ============================================================================
   5. Prose / Markdown Body
 ============================================================================ */
 
@@ -564,6 +665,151 @@ body {
 	margin: var(--space-6) 0;
 }
 
+/* ── Gaps ──
+   Tailwind's preflight resets these to inherit and nothing re-stated them, so
+   until now a markdown h4 rendered at body size, <strong> was not bold, and a
+   task list kept its bullets. ── */
+
+.prose h4,
+.prose h5,
+.prose h6 {
+	font-family: var(--font-display);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-snug);
+	color: var(--color-text-primary);
+	margin-top: var(--space-6);
+	margin-bottom: var(--space-2);
+}
+
+.prose h4 {
+	font-size: var(--text-h4);
+}
+
+.prose h5 {
+	font-size: var(--text-body-lg);
+}
+
+.prose h6 {
+	font-size: var(--text-body);
+	color: var(--color-text-secondary);
+}
+
+.prose strong {
+	font-weight: var(--weight-semibold);
+	color: var(--color-text-primary);
+}
+
+.prose em {
+	font-style: italic;
+}
+
+.prose figure {
+	margin: var(--space-6) 0;
+}
+
+.prose figcaption {
+	margin-top: var(--space-2);
+	font-family: var(--font-sans);
+	font-size: var(--text-body-sm);
+	color: var(--color-text-tertiary);
+	text-align: center;
+}
+
+.prose kbd {
+	font-family: var(--font-mono);
+	font-size: 0.85em;
+	padding: 0.15em 0.4em;
+	border: 1px solid var(--color-border-default);
+	border-bottom-width: 2px;
+	border-radius: var(--radius-sm);
+	background: var(--color-bg-elevated);
+	color: var(--color-text-primary);
+}
+
+.prose dl {
+	margin: var(--space-4) 0;
+}
+
+.prose dt {
+	font-family: var(--font-sans);
+	font-weight: var(--weight-semibold);
+	color: var(--color-text-primary);
+	margin-top: var(--space-3);
+}
+
+.prose dd {
+	margin: var(--space-1) 0 0 var(--space-5);
+	color: var(--color-text-secondary);
+}
+
+/* GitHub task lists. remark-gfm emits a checkbox input inside the li, which
+   needs the marker removed or the row reads as bullet-plus-box. */
+.prose li:has(> input[type="checkbox"]) {
+	list-style: none;
+	margin-left: calc(var(--space-5) * -1);
+}
+
+.prose li > input[type="checkbox"] {
+	margin-right: var(--space-2);
+	accent-color: var(--color-accent);
+}
+
+.prose .footnotes {
+	margin-top: var(--space-10);
+	padding-top: var(--space-4);
+	border-top: 1px solid var(--color-border-default);
+	font-size: var(--text-body-sm);
+	color: var(--color-text-secondary);
+}
+
+.prose .footnotes h2 {
+	font-size: var(--text-body);
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	font-family: var(--font-mono);
+	color: var(--color-text-tertiary);
+}
+
+/* ── Callout and sidenote ──
+   Carried over from the notes, where a labelled box holds a definition or a
+   warning and a sidenote holds the aside that would otherwise break the
+   paragraph. Reachable from markdown as <div class="box"> / <span class="sn">.
+   ── */
+
+.prose .box {
+	margin: var(--space-6) 0;
+	padding: var(--space-5) var(--space-6);
+	background: var(--color-bg-surface);
+	border: 1px solid var(--color-border-default);
+	border-left: 2px solid var(--color-accent);
+	border-radius: var(--radius-sm);
+}
+
+.prose .box > .lab {
+	display: block;
+	margin-bottom: var(--space-2);
+	font-family: var(--font-mono);
+	font-size: 0.625rem;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--color-accent);
+}
+
+.prose .box > :last-child {
+	margin-bottom: 0;
+}
+
+.prose .sn {
+	display: block;
+	margin: var(--space-4) 0;
+	padding-left: var(--space-4);
+	border-left: 1px solid var(--color-border-default);
+	font-family: var(--font-sans);
+	font-size: var(--text-body-sm);
+	line-height: var(--leading-normal);
+	color: var(--color-text-tertiary);
+}
+
 /* ── BlockNote Editor — image constraints ── */
 
 .blocknote-wrapper img {
@@ -592,6 +838,15 @@ body {
 /* ============================================================================
   6. Animations & Keyframes
 ============================================================================ */
+
+@keyframes rule-draw {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
 
 @keyframes skeleton-pulse {
 	0%,

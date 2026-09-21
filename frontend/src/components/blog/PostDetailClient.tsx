@@ -2,14 +2,9 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import {
-	Calendar,
-	Clock,
-	ChevronLeft,
-	ChevronRight,
-	Layers,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import type { Post, SeriesResponse } from "@/types";
+import { accentVars } from "@/lib/accent";
 import { useSeriesDetail } from "@/hooks/useApi";
 import MarkdownRenderer from "./MarkdownRenderer";
 import PostToc from "./PostToc";
@@ -25,86 +20,75 @@ export default function PostDetailClient({ post }: PostDetailClientProps) {
 		enabled: !!post.series?.slug,
 	});
 
+	const published = post.published_at ? new Date(post.published_at) : null;
+
 	return (
-		<div className="mx-auto w-full max-w-300 px-4 pb-24 pt-16 lg:px-8">
-			{/* Breadcrumb */}
-			<div className="mb-8 font-mono text-xs uppercase text-text-tertiary">
-				<Link href="/" className="hover:text-accent transition-colors">
-					Home
-				</Link>
-				<span className="mx-2">/</span>
-				<Link href="/" className="hover:text-accent transition-colors">
-					Blog
-				</Link>
-				<span className="mx-2">/</span>
-				<span>{post.category?.name || "Uncategorized"}</span>
-			</div>
+		// Every accent below this point — rules, links, the eyebrow, the TOC's
+		// active marker — resolves from these two custom properties. Set once.
+		<div
+			className="mx-auto w-full max-w-300 px-4 pb-24 lg:px-8"
+			style={accentVars(post.slug)}
+		>
+			{/* ── Cover ──
+			    Full width, above the reading shell, the way a volume opens rather
+			    than the way an article starts. */}
+			<header className="post-cover border-b border-border-default pb-10 pt-14">
+				<p className="post-eyebrow">
+					{post.series
+						? `${post.series.title}${
+								post.series.series_order
+									? ` · Part ${post.series.series_order}`
+									: ""
+							}`
+						: post.category?.name || "Notes"}
+				</p>
 
-			<div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
-				{/* Left content area (max-width 720px) */}
+				<h1 className="post-cover-title">{post.title}</h1>
+
+				{post.excerpt && <p className="post-dek">{post.excerpt}</p>}
+
+				<dl className="post-meta-strip">
+					{published && (
+						<div>
+							<dt>Published</dt>
+							<dd>
+								<time dateTime={post.published_at ?? undefined}>
+									{format(published, "d MMMM yyyy")}
+								</time>
+							</dd>
+						</div>
+					)}
+					<div>
+						<dt>Reading</dt>
+						<dd>{post.reading_time_mins || 5} minutes</dd>
+					</div>
+					{post.category && (
+						<div>
+							<dt>Filed under</dt>
+							<dd>{post.category.name}</dd>
+						</div>
+					)}
+					{post.is_agent_authored && (
+						<div>
+							<dt>Written by</dt>
+							<dd className="text-accent">The agent</dd>
+						</div>
+					)}
+				</dl>
+
+				{post.tags && post.tags.length > 0 && (
+					<div className="mt-6 flex flex-wrap gap-2">
+						{post.tags.map((tag) => (
+							<span key={tag.id} className="tag text-[0.65rem]">
+								#{tag.slug}
+							</span>
+						))}
+					</div>
+				)}
+			</header>
+
+			<div className="flex flex-col gap-12 pt-12 lg:flex-row lg:justify-between">
 				<main className="w-full lg:max-w-180 lg:mx-auto xl:ml-0 xl:mr-auto">
-					{/* Post Hero */}
-					<header className="mb-10">
-						{/* Badge Row */}
-						<div className="mb-4 flex flex-wrap gap-2">
-							{post.category && (
-								<span className="tag uppercase">{post.category.name}</span>
-							)}
-							{post.is_agent_authored && (
-								<span className="badge-agent uppercase">✦ Agent</span>
-							)}
-							{post.series && (
-								<span className="inline-flex items-center gap-1 rounded-md border border-accent-border bg-accent-muted px-2 py-0.5 font-mono text-[0.6rem] text-accent">
-									<Layers size={9} />
-									{post.series.series_order
-										? `Part ${post.series.series_order}`
-										: ""}{" "}
-									of {post.series.title}
-								</span>
-							)}
-						</div>
-
-						{/* Title */}
-						<h1 className="mb-6 font-display text-display font-bold leading-tight text-text-primary">
-							{post.title}
-						</h1>
-
-						{/* Meta Row */}
-						<div className="mb-6 flex flex-wrap items-center gap-4 font-mono text-[0.65rem] uppercase text-text-secondary">
-							{post.published_at && (
-								<div className="flex items-center gap-1.5">
-									<Calendar className="h-3.5 w-3.5" />
-									<time dateTime={post.published_at}>
-										{format(new Date(post.published_at), "MMM d, yyyy")}
-									</time>
-								</div>
-							)}
-							<span>·</span>
-							<div className="flex items-center gap-1.5">
-								<Clock className="h-3.5 w-3.5" />
-								<span>{post.reading_time_mins || 5} min read</span>
-							</div>
-							{post.is_agent_authored && (
-								<>
-									<span>·</span>
-									<span className="text-accent">Written by AI agent</span>
-								</>
-							)}
-						</div>
-
-						{/* Tags */}
-						{post.tags && post.tags.length > 0 && (
-							<div className="flex flex-wrap gap-2">
-								{post.tags.map((tag) => (
-									<span key={tag.id} className="tag text-[0.65rem]">
-										#{tag.slug}
-									</span>
-								))}
-							</div>
-						)}
-
-						<hr className="my-8 border-border-subtle" />
-					</header>
 
 					{/* Markdown Body */}
 					<article>
