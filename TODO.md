@@ -229,10 +229,18 @@ math renders identically with the same engine.
   - **Code was treated as math.** `` ```bash / echo $HOME and $PATH `` had
     `$HOME and $` claimed as a formula, so the editor spliced a rendered KaTeX
     node into a code block while the page showed a shell command. `protect`
-    now masks fenced blocks and code spans first. ```math is excluded, since
-    that fence *is* display math — and the span pattern must forbid backticks
-    inside a span, or it matches the opening ``` as a one-backtick span and
-    silently un-maths every GitHub-style equation.
+    now masks fenced blocks and code spans first. Two traps in that, both found
+    by checking rather than reasoning:
+    - The span pattern must forbid backticks *inside* a span, or it matches an
+      opening ``` as a one-backtick span and silently un-maths every
+      GitHub-style equation.
+    - The ```math fence must be **consumed and then handed back**, not skipped
+      with a lookahead. Skipped, its closing ``` reads as the opening of a new
+      fence and masks everything up to the next one. This only appears when two
+      fences follow one another, so the case-at-a-time check script missed it
+      and the *browser* caught it: the equation, the code block and the prose
+      between them arrived in the editor as one broken formula with the
+      private-use mask tokens rendered inside it. Consume, then decide.
   - **Inline formulas over 80 characters were dropped.** An old length bound
     left anything longer to the markdown parser — the exact damage this module
     exists to prevent: `$\{x\} + a*b*c …$` came back as `${x} + abc …`.
@@ -244,7 +252,27 @@ math renders identically with the same engine.
     `$$` or `\(` no longer downgrades the whole post.
 
       `npm run check:math` grew the regression cases, including one asserting
-      that math sitting next to code is still claimed. The agreement itself was
+      that math sitting next to code is still claimed, one whole-document case
+      with fences in sequence, and one asserting that no private-use character
+      ever reaches the output — the symptom that would have made the fence bug
+      obvious at a glance.
+- [ ] **Two round-trip losses that are BlockNote's parser, not the math bridge.**
+      Found by running a document through the real editor and diffing the
+      export against the source. Everything in the math pipeline came back
+      byte-identical; these two did not:
+  - `costs \$5 and \$10.` exports as `costs $5 and $10.` — the parser unescapes
+    `\$` and the serialiser never puts it back. That one *matters*: the page
+    renders `$5 and $` as math (confirmed against the real chain), so correctly
+    escaped prose becomes a formula after one open-and-save. The same hazard
+    `lib/math.ts` exists for, but for prose rather than formulas, so it needs
+    the token bridge rather than a regex — `protect` unmasks before the parser
+    runs, which is right for code and wrong for this.
+  - An unlabelled ``` fence exports as ```javascript. Cosmetic; BlockNote
+    defaults the language.
+
+      Neither is reachable by `check:math`, which tests
+      `protect → restoreMarkdown` with no parser in between. A check that would
+      catch them has to drive the real editor. The agreement itself was
       checked by running the real chain (remark-math → rehype-katex) over every
       case and diffing "page renders math" against "editor claims math" — 11/11
       agree. That comparison isn't committed: `unified`/`remark-parse`/
