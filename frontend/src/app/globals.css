@@ -344,10 +344,12 @@ body {
 }
 
 .post-cover-title {
-	/* Instrument Serif ships a single weight. Asking for bold here would make
-	   the browser synthesise one by smearing the outline sideways. */
 	font-family: var(--font-display);
-	font-weight: 400;
+	/* Per skin, because display faces disagree about what a title weighs.
+	   Instrument Serif ships a single weight and synthesises a smeared bold if
+	   asked for one; Montserrat and Schibsted Grotesk look underset at 400.
+	   Skins that say nothing get the bold they were designed around. */
+	font-weight: var(--font-display-weight, 700);
 	font-size: clamp(2.75rem, 8.4vw, 6.5rem);
 	line-height: 0.95;
 	letter-spacing: -0.02em;

@@ -41,6 +41,8 @@
 	--font-body-family: "Spectral", Georgia, "Times New Roman", serif;
 	--font-mono-family: "IBM Plex Mono", ui-monospace, monospace;
 	--font-display-family: "Instrument Serif", "Spectral", Georgia, serif;
+	/* Instrument Serif has exactly one weight; anything else is synthesised. */
+	--font-display-weight: 400;
 	--font-sans-family: "Archivo", system-ui, "Helvetica Neue", sans-serif;
 
 	/* ── Backgrounds — ink-dark, warm rather than blue ── */

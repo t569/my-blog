@@ -9,6 +9,7 @@ import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
 import { SITE } from "@/lib/constants";
+import SkinPicker from "./SkinPicker";
 
 // Simple custom hook for debouncing a value.
 function useDebounce<T>(value: T, delay: number): T {
@@ -190,6 +191,8 @@ export default function PublicNavbar() {
 							<Menu className="h-5 w-5" />
 						)}
 					</button>
+
+					<SkinPicker />
 
 					<button
 						onClick={toggleTheme}
