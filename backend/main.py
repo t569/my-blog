@@ -131,7 +131,11 @@ _COMMIT = (
 )
 
 
+# Also mounted under the v1 prefix, because the frontend proxy only forwards
+# /api/v1/* — without this, the one endpoint whose whole job is being reachable
+# is the one endpoint the browser cannot reach.
 @app.get("/health", tags=["Health"])
+@app.get(f"{API_V1}/health", tags=["Health"], include_in_schema=False)
 async def health_check():
     """Basic health check endpoint."""
     # Key omitted rather than reported as "unknown" when running locally, where
