@@ -1,0 +1,63 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Keep the free Render instance awake.
+#
+# A free Render web service spins down after ~15 minutes without a request, and
+# the next visitor pays a 30–60s cold start. This pings /health often enough
+# that the window never closes.
+#
+# The cost is not zero: Render's free allowance is 750 instance-hours per month
+# per *workspace*, shared by every free service in it, and a calendar month is
+# ~730 hours. So an always-awake backend spends essentially the whole budget.
+# Run this only if the backend is the only free service in that workspace.
+#
+# ponytail: GitHub's scheduler is best-effort and skips runs under load, so the
+# instance will still nap occasionally. If that matters, point a real uptime
+# pinger (cron-job.org, UptimeRobot — both free, both more punctual) at the same
+# URL and delete this file; if it stops mattering, move to a host that doesn't
+# sleep on a 15-minute fuse.
+#
+# Set BACKEND_URL under Settings → Secrets and variables → Actions to switch
+# this on. Unset, it no-ops — a fork does not inherit someone else's ping.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Keep-alive
+
+on:
+  schedule:
+    # Every 10 minutes — inside Render's ~15 minute spin-down window, with
+    # enough slack to survive one skipped run.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# A queued ping is a stale ping; only the newest one is worth running.
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Wake the backend
+        env:
+          BASE: ${{ secrets.BACKEND_URL }}
+        run: |
+          if [ -z "$BASE" ]; then
+            echo "::notice::BACKEND_URL is not set — nothing to ping. Add it under" \
+                 "Settings → Secrets and variables → Actions to enable this."
+            exit 0
+          fi
+          # --max-time 90: a cold start is the case this exists for, so waiting
+          # through one is success, not a hang.
+          status=$(curl -sS -o body.txt -w '%{http_code}' --max-time 90 "${BASE%/}/health")
+          echo "health responded $status"
+          cat body.txt
+          # A woken-but-unhealthy instance is still awake, which is this job's
+          # only job. Don't mail the owner 144 times a day over a sick database.
+          case "$status" in
+            2*) ;;
+            *) echo "::warning::/health returned $status — awake, but not well." ;;
+          esac
