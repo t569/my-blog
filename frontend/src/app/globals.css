@@ -425,6 +425,16 @@ body {
 	line-height: 1.7;
 }
 
+/* ── Math (KaTeX) ──
+   No token pass needed: katex.min.css sets `color: currentColor` and nothing
+   else, so formulas already follow the theme. The one thing it leaves open is
+   a display equation wider than the column pushing the whole page sideways. */
+.katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.5em 0;
+}
+
 .prose blockquote {
 	border-left: 3px solid var(--color-accent);
 	padding-left: var(--space-5);

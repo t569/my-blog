@@ -4,8 +4,11 @@ import { useRef, useState } from "react";
 import type { ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
+import "katex/dist/katex.min.css";
 import { Check, Copy } from "lucide-react";
 // Use a dark highlight.js theme that matches Cyber-Luxury well
 import "highlight.js/styles/atom-one-dark.css";
@@ -67,8 +70,8 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
 	return (
 		<div className="prose max-w-none">
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm]}
-				rehypePlugins={[rehypeSlug, rehypeHighlight]}
+				remarkPlugins={[remarkGfm, remarkMath]}
+				rehypePlugins={[rehypeSlug, rehypeHighlight, rehypeKatex]}
 				components={{
 					pre: Pre,
 					ul: ({ children, ...props }: ComponentPropsWithoutRef<"ul">) => (
