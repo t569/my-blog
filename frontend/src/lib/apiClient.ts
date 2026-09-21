@@ -19,9 +19,22 @@ import { getSession, signOut } from "next-auth/react";
   Configuration
 ============================================================================ */
 
-const API_BASE_URL = typeof window !== "undefined"
+const IS_BROWSER = typeof window !== "undefined";
+
+const API_BASE_URL = IS_BROWSER
   ? "/api/proxy"
   : `${process.env.BACKEND_URL ?? "http://localhost:8000"}/api/v1`;
+
+// Two callers, two different things to be patient about.
+//
+// In the browser a person is watching a spinner, so 20s is already generous —
+// past that, failing is kinder than waiting.
+//
+// On the server the caller is a build or a background revalidation, and the
+// backend may be a free instance that spins down when idle and needs the better
+// part of a minute to wake. Nobody is watching that wait, and giving up on it
+// turns a slow cold start into a missing page.
+const TIMEOUT_MS = IS_BROWSER ? 20_000 : 90_000;
 
 /* ============================================================================
   Client Instance
@@ -29,7 +42,7 @@ const API_BASE_URL = typeof window !== "undefined"
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 20_000,
+  timeout: TIMEOUT_MS,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

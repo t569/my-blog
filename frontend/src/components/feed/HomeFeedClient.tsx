@@ -7,11 +7,22 @@ import HeroSection from "./HeroSection";
 import FilterSidebar from "./FilterSidebar";
 import MobileFilterBar from "./MobileFilterBar";
 import PostCard from "./PostCard";
-import type { PostListItem } from "@/types";
+import type { PaginatedResponse, PostListItem } from "@/types";
 import { FileText, FilterX } from "lucide-react";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
-export default function HomeFeedClient() {
+interface HomeFeedClientProps {
+	/**
+	 * The unfiltered first page, fetched on the server so the feed ships inside
+	 * the HTML. Null means the server could not reach the backend, in which case
+	 * this component fetches on mount exactly as it always did.
+	 */
+	initialPosts?: PaginatedResponse<PostListItem> | null;
+}
+
+export default function HomeFeedClient({
+	initialPosts = null,
+}: HomeFeedClientProps) {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 
@@ -20,18 +31,32 @@ export default function HomeFeedClient() {
 	const activeSeries = searchParams.get("series");
 
 	const [page, setPage] = useState(1);
-	const [allPosts, setAllPosts] = useState<PostListItem[]>([]);
+	// Seeded, not empty. The accumulator is what the list actually renders, so
+	// leaving it empty would have the server paint "Nothing here yet" over data
+	// it already holds, then swap it for posts once the effects run.
+	const [allPosts, setAllPosts] = useState<PostListItem[]>(
+		initialPosts?.items ?? [],
+	);
+
+	// The server only fetched the unfiltered first page, so that is the only
+	// query key its data is allowed to answer for. Any filter or later page is
+	// a different key and must still go to the network.
+	const isInitialView =
+		page === 1 && !activeCategory && !activeTag && !activeSeries;
 
 	// isPending, not isLoading: during the persisted-cache restore on the client,
 	// react-query reports isLoading=false while the server rendered isLoading=true
 	// — that gap is a hydration mismatch. isPending ("no data yet") agrees on both.
-	const { data, isPending, isFetching, error } = usePosts({
-		page,
-		limit: 10,
-		category: activeCategory || undefined,
-		tag: activeTag || undefined,
-		series: activeSeries || undefined,
-	});
+	const { data, isPending, isFetching, error } = usePosts(
+		{
+			page,
+			limit: 10,
+			category: activeCategory || undefined,
+			tag: activeTag || undefined,
+			series: activeSeries || undefined,
+		},
+		isInitialView && initialPosts ? { initialData: initialPosts } : undefined,
+	);
 
 	// Reset posts and page when filters change
 	useEffect(() => {

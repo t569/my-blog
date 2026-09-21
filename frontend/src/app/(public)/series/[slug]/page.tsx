@@ -1,11 +1,29 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Layers, ChevronRight, Clock, FileText } from "lucide-react";
-import { getSeriesBySlug } from "@/services/api";
+import { getSeriesBySlug, getPublicSeries } from "@/services/api";
 
 interface PageProps {
 	params: Promise<{ slug: string }>;
+}
+
+// Same reasoning as the post page: prerender, refresh hourly in the background,
+// and keep a sleeping backend off the reader's critical path.
+export const revalidate = 3600;
+
+// axios, not `fetch`, so Next cannot dedupe the metadata and page calls for us.
+const getSeries = cache(getSeriesBySlug);
+
+/** Every published series slug. A failure costs prerendering, not the deploy. */
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+	try {
+		const series = await getPublicSeries();
+		return series.map((s) => ({ slug: s.slug }));
+	} catch {
+		return [];
+	}
 }
 
 export async function generateMetadata({
@@ -14,7 +32,7 @@ export async function generateMetadata({
 	const { slug } = await params;
 
 	try {
-		const series = await getSeriesBySlug(slug);
+		const series = await getSeries(slug);
 		return {
 			title: `${series.title} — Series`,
 			description: series.description || `Browse the ${series.title} series.`,
@@ -50,7 +68,7 @@ export default async function SeriesDetailPage({ params }: PageProps) {
 
 	let series;
 	try {
-		series = await getSeriesBySlug(slug);
+		series = await getSeries(slug);
 	} catch (error: any) {
 		if (error?.status === 404 || error?.response?.status === 404) {
 			notFound();

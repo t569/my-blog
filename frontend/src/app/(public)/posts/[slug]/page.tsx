@@ -1,9 +1,47 @@
+import { cache } from "react";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPostBySlug } from "@/services/api";
+import { getPostBySlug, listPublishedPosts } from "@/services/api";
 import { SITE } from "@/lib/constants";
 import PostDetailClient from "@/components/blog/PostDetailClient";
 import ReadingProgress from "@/components/blog/ReadingProgress";
+
+// Prerender at build time and refresh in the background once an hour.
+//
+// The point is to keep the backend off the reader's critical path. A published
+// post changes rarely, so serving it from the CDN costs nothing in freshness
+// and means a sleeping backend is invisible to visitors — the stale page is
+// served while the revalidation wakes it in the background.
+export const revalidate = 3600;
+
+// `generateMetadata` and the page both want the same post, and this is axios
+// rather than `fetch`, so Next's request deduplication does not apply. Without
+// this every render — including every page at build time — fetches it twice.
+const getPost = cache(getPostBySlug);
+
+/**
+ * Every published slug, so each post is a static file rather than a request.
+ *
+ * Returning fewer than all of them is safe: `dynamicParams` defaults to true,
+ * so anything missing still renders on demand exactly as it does today. That
+ * is also why a failure here is swallowed — a backend that is asleep when the
+ * build runs should cost prerendering, not the whole deploy.
+ */
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+	const slugs: string[] = [];
+
+	try {
+		for (let page = 1; ; page++) {
+			const { items, pages } = await listPublishedPosts({ page, limit: 50 });
+			slugs.push(...items.map((p) => p.slug));
+			if (page >= pages || items.length === 0) break;
+		}
+	} catch {
+		// Fall through with whatever we managed to collect.
+	}
+
+	return slugs.map((slug) => ({ slug }));
+}
 
 // Setup dynamic metadata generation
 export async function generateMetadata({
@@ -14,7 +52,7 @@ export async function generateMetadata({
 	const { slug } = await params;
 
 	try {
-		const post = await getPostBySlug(slug);
+		const post = await getPost(slug);
 
 		return {
 			title: post.title,
@@ -42,7 +80,7 @@ export default async function PostPage({
 	const { slug } = await params;
 
 	try {
-		const post = await getPostBySlug(slug);
+		const post = await getPost(slug);
 
 		return (
 			<>

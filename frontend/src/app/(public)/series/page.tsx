@@ -3,6 +3,11 @@ import Link from "next/link";
 import { Layers, ArrowLeft } from "lucide-react";
 import { getPublicSeries } from "@/services/api";
 
+// This page was already prerendered, but with no revalidation — so a series
+// added after a deploy would never show up until the next one. An hour matches
+// the rest of the public pages.
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
 	title: "Series",
 	description: "Browse all series.",
