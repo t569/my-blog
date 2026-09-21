@@ -639,6 +639,61 @@ Neon, the env tables for each, and a first-deploy checklist.
     container never starts, Render keeps the **old** instance serving, and the
     only external symptom is `commit` not changing. Not an error — a stale
     success.
+- [x] **The admin no longer waits on a sleeping backend.** Readers stopped
+      waiting when the public pages were prerendered; the admin never did,
+      because every save, upload and draft load is a live call and the editor
+      is exactly where you sit still for half an hour before making one. The
+      instance would spin down *under* an open editor, and the first save after
+      it was the one that failed.
+  - `frontend/src/app/admin/layout.tsx` pings `/health` every 10 minutes while
+    any admin page is open. That layout rather than `AdminShell`, because the
+    editor routes live outside the `(dashboard)` group and never render it —
+    and it covers `/admin/login`, so the instance warms while the password is
+    being typed. Signing in never touches the backend (`authorize()` checks env
+    vars and mints the JWT locally), so that head start costs nothing.
+  - Deliberately not `refetchIntervalInBackground`: a forgotten admin tab would
+    otherwise hold the instance awake around the clock, against a free
+    allowance of 750 instance-hours in a ~730-hour month.
+  - **The two timeout ceilings were the actual bug**, and both were tuned for
+    readers. The proxy aborted at 20s and the browser client at 20s, while a
+    measured cold start is **62.9s**. So the admin's first call after a nap did
+    not wait — it 502'd, and a reload "fixed" it. Admin paths and `/health` now
+    get 90s; public traffic keeps the fast failure, because a reader watching a
+    spinner they did not ask for is better served by an error than by a minute
+    of hope.
+  - That rule is enforced twice against one request, in the browser and in the
+    proxy, and the shorter ceiling is the one that bites — so it lives in
+    `frontend/src/lib/coldStart.ts` and both sides import it instead of keeping
+    a copy. `npm run check:timeouts` pins it against both path shapes that
+    reach it, including the near misses the word boundary exists for.
+  - `/health` is mounted under the `/api/v1` prefix as well, because the proxy
+    only forwards `/api/v1/*`. The frontend's `useHealthCheck` hook had existed
+    and 404'd since the day it was written — nothing had ever called it, so
+    nothing had noticed.
+  - A banner says so once the first health check has been outstanding for 2s,
+    long enough that a warm backend never flashes it. Confirmed rendering
+    against a genuinely asleep instance, not just in the bundle.
+- [ ] **The keep-alive workflow has never run once.** Not "ran and no-op'd":
+      `actions/workflows/keepalive.yml/runs` reports `total_count: 0`, while
+      `ci.yml` reports 5 successful runs on the same day, every one of them
+      `event=push`. The workflow is registered, `state=active`, and has been on
+      the default branch since 09:56, so a `*/10` cron owed ~27 runs by early
+      afternoon. Push events fire on this fork; scheduled events do not.
+      That matches GitHub's documented behaviour — scheduled workflows are
+      disabled by default in *forked* repositories — and enabling the Actions
+      tab evidently restored push triggers without restoring `schedule`.
+      Not confirmed from outside, though: the Actions tab would say for
+      certain, and one manual `workflow_dispatch` run would show both whether
+      the job body works and whether `BACKEND_URL` is set at all. Note that an
+      unset secret is *not* the explanation here — that would still produce
+      runs, which no-op with a notice. There are no runs.
+      The fourth silent-trigger failure recorded in this file, with the same
+      tell as the other three: no attempt at all, rather than a failed one.
+      Not urgent, because the heartbeat above covers the admin, which is the
+      only session that needs a warm instance. But readers still hit the
+      backend live for comments, so it is a real decision: fix the trigger,
+      hand the job to a real pinger (cron-job.org, UptimeRobot), or delete the
+      file and accept that the first commenter after a quiet spell waits.
 - [ ] Custom domain, once there's something worth pointing it at.
 
 ---
