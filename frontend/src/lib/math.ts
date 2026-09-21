@@ -106,23 +106,35 @@ const CODE_TOKEN = /\uE002(\d+)\uE003/g;
  * which puts a rendered math node inside a code block and makes the editor
  * disagree with the published page.
  *
- * ```math is excluded, because that fence *is* display math \u2014 see
- * {@link FENCED_MATH}. The span branch forbids backticks *inside* the span,
- * which is what keeps it off that fence: allowing them, it matched the opening
- * ``` as a one-backtick span wrapping a backtick, masked the fence, and every
- * GitHub-style equation silently stopped being an equation.
+ * The pattern matches **every** fence, including ```math, and the decision to
+ * leave that one alone is made in {@link maskCode} rather than here. That is
+ * load-bearing. Excluding it with a lookahead instead means the scanner
+ * declines the fence without *consuming* it, so the fence's closing ``` is read
+ * as the opening of a new one and everything up to the next fence is masked \u2014
+ * which merged a ```math equation, a bash block and the prose between them into
+ * one broken formula with the mask tokens visible in it. Consume, then decide.
+ *
+ * The span branch forbids backticks *inside* a span, which is what keeps it off
+ * a fence: allowing them, it matched an opening ``` as a one-backtick span
+ * wrapping a backtick.
  *
  * ponytail: no 4-space indented code blocks, and no span containing a backtick
  * (`` `a `b` `` ). Fences and plain spans are what the content here uses; those
  * two forms are simply left unmasked, which is the behaviour that shipped.
  */
-const CODE = /```(?!math\b)[\s\S]*?```|~~~[\s\S]*?~~~|(`+)[^`\n]+\1/g;
+const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|(`+)[^`\n]+\1/g;
+
+/** A fence that is really display math, and so must survive masking intact. */
+const MATH_FENCE = /^```math[ \t]*\r?\n/;
 
 /** Hides code from the math patterns, and hands back the key to put it back. */
 function maskCode(markdown: string): { text: string; code: string[] } {
 	const code: string[] = [];
 	// Fresh regex: CODE is a module-level global and `lastIndex` would leak.
 	const text = markdown.replace(new RegExp(CODE.source, CODE.flags), (match) => {
+		// Consumed, so its closing ``` can never be mistaken for an opener, but
+		// handed back unchanged so FENCED_MATH still gets to claim it.
+		if (MATH_FENCE.test(match)) return match;
 		code.push(match);
 		return `\uE002${code.length - 1}\uE003`;
 	});

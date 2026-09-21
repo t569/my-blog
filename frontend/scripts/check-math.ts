@@ -124,6 +124,55 @@ for (const [input, why] of codeCases) {
 	);
 }
 
+{
+	// Fences in sequence, which is where masking gets interesting and where a
+	// case-at-a-time check sees nothing wrong.
+	//
+	// Caught in the browser, not here: excluding ```math from the mask with a
+	// lookahead made the scanner decline that fence without consuming it, so its
+	// *closing* ``` opened a mask that ran to the next fence. The equation, the
+	// bash block and the prose between them arrived in the editor as one broken
+	// formula with the mask tokens rendered inside it.
+	const doc = [
+		"```math",
+		"a^2 + b^2",
+		"```",
+		"",
+		"Prose between.",
+		"",
+		"```bash",
+		"echo $HOME and $PATH",
+		"```",
+		"",
+		"```",
+		"Write $x^2$ for inline math.",
+		"```",
+	].join("\n");
+
+	const { text, items } = protect(doc, ALL);
+	check(
+		items.length === 1 &&
+			items[0].source === "fenced" &&
+			items[0].latex === "a^2 + b^2",
+		`only the math fence is claimed — got ${JSON.stringify(items)}`,
+	);
+	check(
+		text.includes("echo $HOME and $PATH") &&
+			text.includes("Write $x^2$ for inline math.") &&
+			text.includes("Prose between."),
+		`the other fences and the prose survive — got ${JSON.stringify(text)}`,
+	);
+	check(
+		restoreMarkdown(text, items, wrap) === doc,
+		"the whole document round-trips",
+	);
+	// The mask is an implementation detail; none of it may reach the editor.
+	check(
+		!/[-]/.test(restoreMarkdown(text, items, wrap)),
+		"no private-use token survives into the output",
+	);
+}
+
 /* ── No length bound: the page has none either ───────────────────────────── */
 
 console.log("\nlength");
