@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 
 import {
 	DISPLAY_MATH,
+	escapeProseDollars,
 	FENCED_MATH,
 	INLINE_DOUBLE_MATH,
 	INLINE_MATH,
@@ -20,6 +21,7 @@ import {
 	protect,
 	restoreMarkdown,
 	splitMathTokens,
+	token,
 	type MathItem,
 } from "../src/lib/math.ts";
 
@@ -236,6 +238,54 @@ console.log("\nsplitMathTokens");
 	check(
 		text.includes("before") && text.includes("after"),
 		"orphaned token degrades to text rather than vanishing",
+	);
+}
+
+/* ── Prose dollars survive the editor ────────────────────────────────────── */
+
+console.log("\nescapeProseDollars");
+
+{
+	// The export path, as composePlugins runs it: escape while the formulas are
+	// still tokens, then write them back.
+	const exportPath = (serialised: string, items: MathItem[]) =>
+		restoreMarkdown(escapeProseDollars(serialised), items, wrap);
+
+	// BlockNote's parser hands back `$5`, having eaten the author's backslash.
+	check(
+		exportPath("costs $5 and $10.", []) === "costs \\$5 and \\$10.",
+		`a price list stays a price list — got ${JSON.stringify(exportPath("costs $5 and $10.", []))}`,
+	);
+
+	// Already escaped, so it must not become `\\$`.
+	check(
+		exportPath("costs \\$5.", []) === "costs \\$5.",
+		"an escape that survived is not doubled",
+	);
+
+	// The ordering that matters: a formula is a token here, so its delimiters
+	// are written *after* the escaping and stay bare.
+	const items: MathItem[] = [{ source: "inline", latex: "x^2" }];
+	const got = exportPath(`costs $5, and ${token(0)} follows`, items);
+	check(
+		got === "costs \\$5, and $x^2$ follows",
+		`formula delimiters are not escaped — got ${JSON.stringify(got)}`,
+	);
+
+	// A backslash written into a fence is a change to the code, not an escape.
+	const code = "```bash\necho $HOME\n```\n\ncosts $5.";
+	check(
+		exportPath(code, []) === "```bash\necho $HOME\n```\n\ncosts \\$5.",
+		`code is left alone — got ${JSON.stringify(exportPath(code, []))}`,
+	);
+
+	// Round-trip against the load side: what protect leaves for the parser, the
+	// parser unescapes, and the export path must put back.
+	const source = "costs \\$5 and \\$10.";
+	const parserOutput = protect(source, ALL).text.replace(/\\\$/g, "$");
+	check(
+		exportPath(parserOutput, []) === source,
+		`\\$ survives a full open-and-save — got ${JSON.stringify(exportPath(parserOutput, []))}`,
 	);
 }
 

@@ -233,6 +233,29 @@ export function splitMathTokens(text: string, items: MathItem[]): MathSegment[] 
 }
 
 /**
+ * Re-escapes dollars that are prose, not math.
+ *
+ * BlockNote's markdown parser unescapes `\$` to `$` on the way in — that is
+ * correct, the editor should show a dollar sign — but the serialiser does not
+ * put the backslash back on the way out. So `costs \$5 and \$10.` came back as
+ * `costs $5 and $10.`, and remark-math renders *that* as a formula (confirmed
+ * against the real chain). One open-and-save silently turned a price list into
+ * mathematics.
+ *
+ * **Run this while every real formula is still a token**, which is the whole
+ * reason inline math is tokenised for export rather than written as `$…$` by
+ * `toExternalHTML`: once a `$` is back in the text, prose and delimiter are
+ * indistinguishable. `composePlugins` owns that ordering.
+ *
+ * Code is masked, because a backslash written into a fence is a change to the
+ * code, not an escape.
+ */
+export function escapeProseDollars(markdown: string): string {
+	const { text, code } = maskCode(markdown);
+	return unmaskCode(text.replace(/(?<!\\)\$/g, "\\$"), code);
+}
+
+/**
  * Puts formulas back into exported markdown.
  *
  * The mirror of {@link protect}: the serialiser only ever saw tokens, so this

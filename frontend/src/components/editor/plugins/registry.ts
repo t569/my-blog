@@ -1,4 +1,5 @@
 import {
+	escapeProseDollars,
 	protect,
 	restoreMarkdown,
 	splitMathTokens,
@@ -152,11 +153,16 @@ export function composePlugins(plugins: MathPlugin[]) {
 
 		/**
 		 * Blocks → blocks the serialiser can safely handle, plus the formulas it
-		 * must not see. Block-kind nodes become a paragraph carrying a token.
+		 * must not see. Block-kind nodes become a paragraph carrying a token;
+		 * inline-kind nodes become a token inside the text run.
 		 *
-		 * Inline nodes are left alone: they export correctly through
-		 * `toExternalHTML`, verified end to end, and rewriting a working path
-		 * would be churn.
+		 * Inline nodes used to be left alone, exporting as literal `$…$` through
+		 * `toExternalHTML`, which worked. It stopped being enough once prose
+		 * dollars had to be re-escaped: with formulas already written as `$…$`,
+		 * a delimiter and a price are the same character and nothing downstream
+		 * can tell them apart. Tokenising both kinds means every `$` left in the
+		 * serialised markdown is unambiguously prose. `toExternalHTML` stays for
+		 * copying out of the editor as HTML.
 		 */
 		prepareExport(blocks: any[]): { blocks: any[]; items: MathItem[] } {
 			const items: MathItem[] = [];
@@ -175,17 +181,45 @@ export function composePlugins(plugins: MathPlugin[]) {
 							content: [{ type: "text", text: token(items.length - 1), styles: {} }],
 						};
 					}
-					return Array.isArray(block.children) && block.children.length
-						? { ...block, children: walk(block.children) }
+
+					const next = Array.isArray(block.content)
+						? { ...block, content: block.content.map(swapInline) }
 						: block;
+
+					return Array.isArray(block.children) && block.children.length
+						? { ...next, children: walk(block.children) }
+						: next;
 				});
+
+			/** One inline formula → a text node carrying its token. */
+			const swapInline = (item: any) => {
+				const owner = plugins.find(
+					(p) =>
+						p.kind === "inline" &&
+						item?.type &&
+						item.type in (p.inlineContentSpecs ?? {}),
+				);
+				if (!owner) return item;
+				items.push({
+					source: item.props?.form === "double" ? "inline_double" : "inline",
+					latex: item.props?.latex ?? "",
+				});
+				return { type: "text", text: token(items.length - 1), styles: {} };
+			};
 
 			return { blocks: walk(blocks), items };
 		},
 
-		/** Tokens → `$$…$$` (or a fence), after the serialiser has run. */
+		/**
+		 * Tokens → `$$…$$` (or a fence), after the serialiser has run.
+		 *
+		 * Prose dollars are escaped *first*, while the formulas are still tokens
+		 * and cannot be mistaken for them. Getting this order wrong escapes the
+		 * delimiters of every formula in the post, so it lives here rather than
+		 * in the caller — the same reason `protect` owns its pattern order.
+		 */
 		restoreMarkdown: (markdown: string, items: MathItem[]) =>
-			restoreMarkdown(markdown, items, wrap),
+			restoreMarkdown(escapeProseDollars(markdown), items, wrap),
 	};
 }
 

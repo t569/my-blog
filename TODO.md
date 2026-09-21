@@ -256,23 +256,35 @@ math renders identically with the same engine.
       with fences in sequence, and one asserting that no private-use character
       ever reaches the output — the symptom that would have made the fence bug
       obvious at a glance.
-- [ ] **Two round-trip losses that are BlockNote's parser, not the math bridge.**
+- [x] **Two round-trip losses that were BlockNote's, not the math bridge.**
       Found by running a document through the real editor and diffing the
-      export against the source. Everything in the math pipeline came back
-      byte-identical; these two did not:
-  - `costs \$5 and \$10.` exports as `costs $5 and $10.` — the parser unescapes
-    `\$` and the serialiser never puts it back. That one *matters*: the page
-    renders `$5 and $` as math (confirmed against the real chain), so correctly
-    escaped prose becomes a formula after one open-and-save. The same hazard
-    `lib/math.ts` exists for, but for prose rather than formulas, so it needs
-    the token bridge rather than a regex — `protect` unmasks before the parser
-    runs, which is right for code and wrong for this.
-  - An unlabelled ``` fence exports as ```javascript. Cosmetic; BlockNote
-    defaults the language.
+      export against the source — everything in the math pipeline already came
+      back byte-identical; these two did not. Both fixed, and the same document
+      now round-trips byte-identically end to end.
+  - **`costs \$5 and \$10.` exported as `costs $5 and $10.`** The parser
+    unescapes `\$` (correct — the editor should show a dollar) and the
+    serialiser never put the backslash back. That one *mattered*: the page
+    renders `$5 and $` as math, so correctly escaped prose became a formula
+    after one open-and-save. Fixed by re-escaping prose dollars on export,
+    which forced a design change: **inline math now exports through the token
+    bridge** like display math, instead of writing `$…$` via `toExternalHTML`.
+    Once a formula is written as `$…$`, its delimiters are the same character
+    as a price, and nothing downstream can tell them apart. With both kinds
+    tokenised, every `$` left in the serialised markdown is unambiguously
+    prose. Order is load-bearing and owned by `composePlugins`: escape first,
+    write formulas back second — reversed, it escapes the delimiters of every
+    formula in the post.
+  - **An unlabelled ``` fence exported as ```javascript.** `codeBlockOptions`
+    ships `defaultLanguage: "javascript"`, which is a guess applied to every
+    fence that named no language, so plain prose blocks got syntax-highlighted
+    as code on the page. Set to `"text"` (a supported language, "Plain Text"),
+    and the exporter's `” ```text ”` is stripped back to a bare fence so
+    existing posts aren't all rewritten on their first save.
 
-      Neither is reachable by `check:math`, which tests
-      `protect → restoreMarkdown` with no parser in between. A check that would
-      catch them has to drive the real editor. The agreement itself was
+      Neither was reachable by `check:math`, which tests
+      `protect → restoreMarkdown` with no parser in between — the escape cases
+      are asserted there now, but the proof was driving the real editor and
+      diffing. Same lesson as the fence bug above. The agreement itself was
       checked by running the real chain (remark-math → rehype-katex) over every
       case and diffing "page renders math" against "editor claims math" — 11/11
       agree. That comparison isn't committed: `unified`/`remark-parse`/

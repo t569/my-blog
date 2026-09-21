@@ -156,7 +156,15 @@ export default function BlockNoteEditor({
 		uploadFile: handleUpload,
 		schema: BlockNoteSchema.create().extend({
 			blockSpecs: {
-				codeBlock: createCodeBlockSpec(codeBlockOptions),
+				// `defaultLanguage` is "javascript" upstream, which is a guess applied
+				// to every fence that didn't name a language — so a plain ``` block of
+				// prose or console output came back labelled `javascript` and got
+				// syntax-highlighted as code on the published page. "text" is the
+				// honest default, and it is in `supportedLanguages` ("Plain Text").
+				codeBlock: createCodeBlockSpec({
+					...codeBlockOptions,
+					defaultLanguage: "text",
+				}),
 				...math.blockSpecs,
 			},
 			inlineContentSpecs: math.inlineContentSpecs,
@@ -205,7 +213,16 @@ export default function BlockNoteEditor({
 	const handleChange = async () => {
 		const { blocks, items } = math.prepareExport(editor.document);
 		const markdown = await editor.blocksToMarkdownLossy(blocks);
-		onChange(math.restoreMarkdown(markdown, items));
+		// BlockNote has no "this fence had no language" state — every code block
+		// carries one — so an unlabelled fence would come back labelled on the
+		// first save. ```text and ``` render identically on the page, so drop it
+		// again rather than rewriting every plain fence in the post.
+		//
+		// ponytail: a line-wise replace, so a code block whose *content* is the
+		// literal line ```text loses the label too. Writing about markdown in a
+		// fenced block is the only way to hit it; parse the fences properly if
+		// that ever stops being hypothetical.
+		onChange(math.restoreMarkdown(markdown.replace(/^```text$/gm, "```"), items));
 	};
 
 	if (!initialContentLoaded) {

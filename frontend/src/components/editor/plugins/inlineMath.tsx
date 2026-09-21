@@ -15,12 +15,16 @@ import type { MathPlugin } from "./types";
  * never applies text styling to it and the source is exactly what the author
  * typed.
  *
- * Export goes through `toExternalHTML` rather than the token bridge the display
- * plugin uses, and that asymmetry is deliberate. Export runs blocks → HTML →
- * markdown; emitting the plain text `$latex$` comes back as `$latex$`, verified
- * against the real exporter for `$`, `\`, `_`, `{` and `}`. Display math cannot
- * do that because it spans lines and the serialiser collapses them — see
- * displayMath.tsx. Each side uses the mechanism its own constraint allows.
+ * Export goes through the same token bridge the display plugin uses.
+ * `toExternalHTML` below is what the editor copies to the clipboard as HTML,
+ * not what a save writes.
+ *
+ * It *was* what a save wrote — emitting the plain text `$latex$`, which comes
+ * back as `$latex$`, verified against the real exporter for `$`, `\`, `_`, `{`
+ * and `}`. That worked in isolation and had to go anyway: once a formula is
+ * written as `$…$`, its delimiters are the same character as a dollar sign in
+ * prose, and the export pass that re-escapes prose dollars has no way to tell
+ * them apart. See `escapeProseDollars` in src/lib/math.ts.
  *
  * ponytail: no input rule, so typing `$x$` here stays literal until the post is
  * saved and reloaded. The slash menu inserts one and imported markdown arrives
