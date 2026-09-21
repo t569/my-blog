@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { List, X } from "lucide-react";
+import GithubSlugger from "github-slugger";
 
 interface TocItem {
 	id: string;
@@ -18,24 +19,47 @@ export default function PostToc({ content }: PostTocProps) {
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
 	const headings = useMemo(() => {
-		const headingRegex = /^(##|###)\s+(.+)$/gm;
+		// The ids have to match rehype-slug's exactly or a TOC entry scrolls
+		// nowhere, silently. So use the library rehype-slug itself uses, rather
+		// than a lookalike: a hand-rolled slugify diverges on unicode ("über" →
+		// "-ber"), on dots ("1.2" → "1-2" instead of "12"), and on repeated
+		// headings, which the slugger disambiguates with a counter.
+		const slugger = new GithubSlugger();
+
+		// Fenced code first. A "# comment" inside a block is not a heading, and
+		// counting it would both invent an entry and push the slugger's counter
+		// out of step with the one rehype-slug kept while rendering.
+		const prose = content.replace(
+			/^ {0,3}(?:```|~~~)[\s\S]*?^ {0,3}(?:```|~~~)[^\n]*$/gm,
+			"",
+		);
+
+		// Every level, not just h2/h3 — rehype-slug slugs them all, and skipping
+		// some would desync that same counter. Levels are filtered for display
+		// below, after the ids are assigned.
+		const headingRegex = /^(#{1,6})\s+(.+?)#*\s*$/gm;
 		const extracted: TocItem[] = [];
 		let match;
 
-		const slugify = (text: string) =>
-			text
-				.toLowerCase()
-				.replace(/[^a-z0-9]+/g, "-")
-				.replace(/(^-|-$)+/g, "");
+		while ((match = headingRegex.exec(prose)) !== null) {
+			// Slug the rendered text, which is what rehype-slug sees: inline
+			// markdown never reaches the DOM as characters.
+			const text = match[2]
+				.replace(/`([^`]*)`/g, "$1")
+				.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+				.replace(/(\*\*|__|\*|_|~~)/g, "")
+				.trim();
 
-		while ((match = headingRegex.exec(content)) !== null) {
 			extracted.push({
 				level: match[1].length,
-				text: match[2].trim(),
-				id: slugify(match[2].trim()),
+				text,
+				// Called for every heading, in document order, so the counter
+				// advances in lockstep with rehype-slug's.
+				id: slugger.slug(text),
 			});
 		}
-		return extracted;
+
+		return extracted.filter((h) => h.level === 2 || h.level === 3);
 	}, [content]);
 
 	useEffect(() => {
