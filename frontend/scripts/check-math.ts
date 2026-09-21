@@ -89,6 +89,56 @@ console.log("ordering");
 	);
 }
 
+/* ── Code is not math ─────────────────────────────────────────────────────── */
+
+console.log("\ncode");
+
+/* Verified against the real plugin chain: remark-math renders none of these as
+   math. Claiming them splices a rendered formula into a code block, so the
+   editor shows an equation where the published page shows a shell command. */
+const codeCases: [string, string][] = [
+	["```bash\necho $HOME and $PATH\n```", "fence with shell variables"],
+	["run `echo $HOME and $PATH` now", "inline code span"],
+	["```\nUse $x^2$ inline\n```", "a fence showing math source"],
+	["```\n$$\na\n$$\n```", "a fence showing display math"],
+	["a ``$x$ and $y$`` b", "double-backtick span"],
+	["~~~python\nprint(f\"$x$\")\n~~~", "tilde fence"],
+];
+
+for (const [input, why] of codeCases) {
+	const { text, items } = protect(input, ALL);
+	check(
+		items.length === 0 && text === input,
+		`${why} — claimed ${items.length}, ${JSON.stringify(text)}`,
+	);
+}
+
+{
+	// Masking code must not cost us the math around it.
+	const { items } = protect("`$VAR` then $x^2$ then\n\n$$\na\n$$", ALL);
+	check(
+		items.length === 2 &&
+			items.some((i) => i.source === "inline" && i.latex === "x^2") &&
+			items.some((i) => i.source === "display" && i.latex === "a"),
+		`math beside code still claimed — got ${JSON.stringify(items)}`,
+	);
+}
+
+/* ── No length bound: the page has none either ───────────────────────────── */
+
+console.log("\nlength");
+
+{
+	// An 80-character cap used to live in INLINE_MATH. Anything longer was left
+	// to the markdown parser, which ate the backslashes and italicised `a*b*c`.
+	const latex = "\\{x\\} + a*b*c + ".repeat(8) + "z";
+	const { items } = protect(`$${latex}$`, ALL);
+	check(
+		items.length === 1 && items[0].latex === latex,
+		`a ${latex.length}-character formula is still claimed — got ${JSON.stringify(items)}`,
+	);
+}
+
 /* ── Round-trip: protect → restore must be byte-identical ────────────────── */
 
 console.log("\nround-trip");
@@ -107,6 +157,8 @@ const roundTrip = [
 	["costs \\$5 and \\$10", "escaped dollars stay prose"],
 	["it costs $5 and $10", "unescaped prices are not math"],
 	["plain prose", "nothing to do"],
+	["```bash\necho $HOME and $PATH\n```", "a fence survives byte-identical"],
+	["`$x$` beside $y$", "code span beside a real formula"],
 ];
 
 for (const [input, why] of roundTrip) {
@@ -147,6 +199,19 @@ const rawCases: [string, string[], boolean, string][] = [
 	["$$\na\n$$", ["display_math"], false, "display with the plugin on"],
 	["```math\nx\n```", ["display_math"], false, "fence with the plugin on"],
 	["before $$a$$ after", ["display_math"], false, "single-line with it on"],
+	[
+		"before $$a$$ after",
+		[],
+		false,
+		"single-line with it off — inline_math claims it and is always on",
+	],
+	[
+		"```bash\necho $$ and $HOME\n```",
+		[],
+		false,
+		"a fence is a code sample, not a reason to downgrade the post",
+	],
+	["```text\nwrite \\(y\\) like this\n```", [], false, "same for \\( in a fence"],
 	["text $x$ text", [], false, "inline is always safe"],
 	["\\(y\\)", ["display_math"], true, "no plugin renders these, ever"],
 	["\\[z\\]", ["display_math"], true, "same"],

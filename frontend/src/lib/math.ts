@@ -70,14 +70,21 @@ export const INLINE_DOUBLE_MATH = /(?<!\\)\$\$([^\n]+?)(?<!\\)\$\$/g;
  * - `(?!\d)` after the opener keeps "$5 and $10" from pairing into a formula.
  *   Not airtight — remark-math renders that as math too, so prose written that
  *   way is already wrong on the page and wants `\$`.
- * - The length bound stops a stray `$` pairing with one paragraphs away.
+ * - `[^$\n]` keeps a stray `$` from pairing with one a paragraph away.
+ *
+ * There is deliberately **no length bound**. One was here, capped at 80
+ * characters, and it was a silent formula-shredder: remark-math has no such
+ * limit, so a longer formula rendered fine on the page while the editor left it
+ * to the markdown parser, which is exactly the damage this module exists to
+ * prevent — `$\{x\} … a*b*c … $` came back as `${x} … abc …`. The editor must
+ * claim precisely what the page renders, no less.
  *
  * **Never run this before {@link DISPLAY_MATH}.** On `"$$a$$ and $b$"` it
  * matches `a` and then `" and "`, pairing across the display block and
  * scrambling both. {@link protect} owns that ordering so no caller has to
  * remember it.
  */
-export const INLINE_MATH = /(?<!\\)\$(?!\d)([^$\n]{1,80}?)(?<!\\)\$/g;
+export const INLINE_MATH = /(?<!\\)\$(?!\d)([^$\n]+?)(?<!\\)\$/g;
 
 /* Private-use characters. Nothing types these and no markdown parser has rules
    for them, which is the entire point. */
@@ -85,6 +92,45 @@ const OPEN = "\uE000";
 const CLOSE = "\uE001";
 const TOKEN = /\uE000(\d+)\uE001/;
 const TOKEN_GLOBAL = /\uE000(\d+)\uE001/g;
+
+/* A second, private token space for code. Separate from the math one so the two
+   passes can never collide on an index. */
+const CODE_TOKEN = /\uE002(\d+)\uE003/g;
+
+/**
+ * Fenced blocks and inline code spans.
+ *
+ * remark-math never looks inside either \u2014 confirmed against the real plugin
+ * chain, where a ```bash fence containing `echo $HOME and $PATH` renders as
+ * code \u2014 so neither may we. Unmasked, `$HOME and $` was claimed as a formula,
+ * which puts a rendered math node inside a code block and makes the editor
+ * disagree with the published page.
+ *
+ * ```math is excluded, because that fence *is* display math \u2014 see
+ * {@link FENCED_MATH}. The span branch forbids backticks *inside* the span,
+ * which is what keeps it off that fence: allowing them, it matched the opening
+ * ``` as a one-backtick span wrapping a backtick, masked the fence, and every
+ * GitHub-style equation silently stopped being an equation.
+ *
+ * ponytail: no 4-space indented code blocks, and no span containing a backtick
+ * (`` `a `b` `` ). Fences and plain spans are what the content here uses; those
+ * two forms are simply left unmasked, which is the behaviour that shipped.
+ */
+const CODE = /```(?!math\b)[\s\S]*?```|~~~[\s\S]*?~~~|(`+)[^`\n]+\1/g;
+
+/** Hides code from the math patterns, and hands back the key to put it back. */
+function maskCode(markdown: string): { text: string; code: string[] } {
+	const code: string[] = [];
+	// Fresh regex: CODE is a module-level global and `lastIndex` would leak.
+	const text = markdown.replace(new RegExp(CODE.source, CODE.flags), (match) => {
+		code.push(match);
+		return `\uE002${code.length - 1}\uE003`;
+	});
+	return { text, code };
+}
+
+const unmaskCode = (text: string, code: string[]) =>
+	text.replace(CODE_TOKEN, (match, digits: string) => code[Number(digits)] ?? match);
 
 /** One extracted formula: which pattern found it, and its source. */
 export interface MathItem {
@@ -114,13 +160,17 @@ export const token = (index: number) => `${OPEN}${index}${CLOSE}`;
  *
  * The counter is owned here rather than per pattern, so two patterns can never
  * mint the same token.
+ *
+ * Code is masked for the duration, so no pattern can claim a `$` inside a fence
+ * or a code span — see {@link CODE}.
  */
 export function protect(
 	markdown: string,
 	patterns: readonly MathPattern[],
 ): { text: string; items: MathItem[] } {
 	const items: MathItem[] = [];
-	let text = markdown;
+	const { text: masked, code } = maskCode(markdown);
+	let text = masked;
 
 	for (const { id, pattern } of patterns) {
 		// Fresh regex per pass: these are module-level globals, and `lastIndex`
@@ -132,7 +182,9 @@ export function protect(
 		});
 	}
 
-	return { text, items };
+	// Code goes back before the markdown parser sees the text — it was only ever
+	// hidden from the math patterns, not from the parser, which handles it fine.
+	return { text: unmaskCode(text, code), items };
 }
 
 /**
@@ -197,12 +249,20 @@ export function needsRawEditor(
 	markdown: string,
 	activePluginIds: readonly string[],
 ): boolean {
-	if (UNSUPPORTED_MATH.test(markdown)) return true;
+	// Code first: a fence *showing* `$$` or `\(` is a code sample, and it must
+	// not downgrade the whole post to a textarea any more than it should be
+	// claimed as a formula.
+	const { text } = maskCode(markdown);
+
+	if (UNSUPPORTED_MATH.test(text)) return true;
 	if (activePluginIds.includes("display_math")) return false;
 	// Anything the display plugin would have claimed still forces the textarea
-	// while it is switched off. Rebuilt per call because these are global
-	// regexes and `lastIndex` persists across `.test()`.
-	return [DISPLAY_MATH, FENCED_MATH, INLINE_DOUBLE_MATH].some((re) =>
-		new RegExp(re.source, re.flags).test(markdown),
+	// while it is switched off. INLINE_DOUBLE_MATH is deliberately not in this
+	// list: single-line `$$…$$` is claimed by `inline_math`, which is always on,
+	// so gating on it downgraded posts the rich editor handles perfectly well.
+	// Rebuilt per call because these are global regexes and `lastIndex` persists
+	// across `.test()`.
+	return [DISPLAY_MATH, FENCED_MATH].some((re) =>
+		new RegExp(re.source, re.flags).test(text),
 	);
 }

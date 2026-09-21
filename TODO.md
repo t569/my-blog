@@ -221,6 +221,35 @@ math renders identically with the same engine.
       remounts BlockNote with `data.content`, not `initialData.content`, so raw
       edits survive instead of being overwritten by its first `onChange`.
       No custom BlockNote LaTeX block — a textarea was the whole fix.
+- [x] **The editor claimed things the page doesn't render, and skipped things it
+      does.** Three bugs, all the same shape — `src/lib/math.ts` swept raw
+      markdown with regexes while the page runs remark-math, which has different
+      rules. Fixed by making the sweep match the renderer, verified by running
+      both and comparing:
+  - **Code was treated as math.** `` ```bash / echo $HOME and $PATH `` had
+    `$HOME and $` claimed as a formula, so the editor spliced a rendered KaTeX
+    node into a code block while the page showed a shell command. `protect`
+    now masks fenced blocks and code spans first. ```math is excluded, since
+    that fence *is* display math — and the span pattern must forbid backticks
+    inside a span, or it matches the opening ``` as a one-backtick span and
+    silently un-maths every GitHub-style equation.
+  - **Inline formulas over 80 characters were dropped.** An old length bound
+    left anything longer to the markdown parser — the exact damage this module
+    exists to prevent: `$\{x\} + a*b*c …$` came back as `${x} + abc …`.
+    remark-math has no such bound, so neither do we. `[^$\n]` was already doing
+    the real work of stopping a runaway pair.
+  - **`$$a$$` on one line forced the textarea** whenever `display_math` was
+    off, though `inline_math` — which is always on — claims it. Dropped from
+    `needsRawEditor`'s gate, which now also ignores code, so a fence *showing*
+    `$$` or `\(` no longer downgrades the whole post.
+
+      `npm run check:math` grew the regression cases, including one asserting
+      that math sitting next to code is still claimed. The agreement itself was
+      checked by running the real chain (remark-math → rehype-katex) over every
+      case and diffing "page renders math" against "editor claims math" — 11/11
+      agree. That comparison isn't committed: `unified`/`remark-parse`/
+      `remark-rehype` are transitive deps here, and making them direct ones to
+      keep a probe would churn the lockfile for little.
 
 ### 3. Content migration
 Content lives in **Postgres** here, not files — so this is an import script,
