@@ -16,6 +16,8 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { timeoutFor } from "@/lib/coldStart";
+
 const BACKEND_URL =
   process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -52,10 +54,13 @@ async function proxyRequest(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // 20s timeout - apparently, cold-starts can take ~7s.
-    // need to get my sub up.
+    // Public traffic fails fast; admin calls and the heartbeat wait out a cold
+    // start. The rule is shared with the browser-side client in lib/coldStart.ts
+    // because both ceilings apply to the same request and the shorter one wins.
+    const timeoutMs = timeoutFor(targetPath);
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20_000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const backendResponse = await fetch(targetUrl, {
       ...init,

@@ -13,6 +13,11 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import type { ApiError } from "@/types";
+import {
+  COLD_START_MS,
+  PUBLIC_TIMEOUT_MS,
+  mayWaitForColdStart,
+} from "@/lib/coldStart";
 import { getSession, signOut } from "next-auth/react";
 
 /* ============================================================================
@@ -34,7 +39,7 @@ const API_BASE_URL = IS_BROWSER
 // backend may be a free instance that spins down when idle and needs the better
 // part of a minute to wake. Nobody is watching that wait, and giving up on it
 // turns a slow cold start into a missing page.
-const TIMEOUT_MS = IS_BROWSER ? 20_000 : 90_000;
+const TIMEOUT_MS = IS_BROWSER ? PUBLIC_TIMEOUT_MS : COLD_START_MS;
 
 /* ============================================================================
   Client Instance
@@ -56,6 +61,10 @@ const apiClient: AxiosInstance = axios.create({
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    if (mayWaitForColdStart(config.url)) {
+      config.timeout = COLD_START_MS;
+    }
+
     // Retrieve the NextAuth session which contains our custom HS256 accessToken
     if (typeof window !== "undefined") {
       const session = await getSession();
