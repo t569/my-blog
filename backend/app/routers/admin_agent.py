@@ -1,17 +1,21 @@
 """Admin agent endpoints — authentication required."""
 
+import json
 import math
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_admin
 from app.config import settings
 from app.db.base import get_db
+from app.devspace_agents.pipeline import events as pipeline_events
 from app.devspace_agents.pipeline.runner import run_agent_pipeline
 from app.devspace_agents.scheduler import reschedule as scheduler_reschedule
 from app.models.agent import AgentRun
@@ -52,7 +56,7 @@ async def trigger_pipeline(
         triggered_by="manual",
         status="running",
         started_at=datetime.now(),
-        model_used="llama-3.3-70b-versatile",
+        model_used=settings.GROQ_MODEL,
     )
     db.add(run)
     await db.flush()
@@ -63,6 +67,9 @@ async def trigger_pipeline(
         run_agent_pipeline,
         owner_id=admin.id,
         triggered_by="manual",
+        # The row just created — not a second one. The id returned below is
+        # the one the run is recorded (and watched) under.
+        run_id=run_id,
     )
 
     return AgentTriggerResponse(run_id=run_id)
@@ -100,6 +107,42 @@ async def get_run(
             detail="Agent run not found.",
         )
     return run
+
+
+@router.get("/runs/{run_id}/events")
+async def run_events(
+    run_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[Owner, Depends(get_current_admin)],
+) -> StreamingResponse:
+    """Server-sent events for one run: every agent's state, replayed then live.
+
+    Reconnect as often as you like — each connection replays the full log, so
+    the client's state comes out the same. A run this process has no log for
+    (it finished before a restart, or long ago) is answered from its row: one
+    terminal event, so the client stops rather than reconnecting for ever.
+    """
+    run = await agent_run_service.get_agent_run(db, run_id, admin.id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent run not found.")
+
+    def frame(event: dict) -> str:
+        return f"data: {json.dumps(event)}\n\n"
+
+    async def stream() -> AsyncIterator[str]:
+        if not pipeline_events.is_known(run_id):
+            final = "done" if run.status == "completed" else "failed" if run.status == "failed" else "unknown"
+            yield frame({"threadId": str(run_id), "node": None, "actionStatus": final, "state": {}})
+            return
+        async for event in pipeline_events.follow(run_id):
+            # A comment line: keeps proxies from timing out an idle stream.
+            yield frame(event) if event else ": keep-alive\n\n"
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/schedule", response_model=AgentScheduleResponse)

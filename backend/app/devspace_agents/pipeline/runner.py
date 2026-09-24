@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db.base import async_session_factory
 from app.devspace_agents.langfuse.client import langfuse
+from app.devspace_agents.pipeline import events
 from app.devspace_agents.pipeline.graph import pipeline
 from app.models.agent import AgentRun
 from app.schemas.post import PostCreate
@@ -23,19 +24,33 @@ logger = logging.getLogger(__name__)
 async def run_agent_pipeline(
     owner_id: uuid.UUID,
     triggered_by: str,
+    run_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
-    async with async_session_factory() as session:
-        run = AgentRun(
-            owner_id=owner_id,
-            triggered_by=triggered_by,
-            status="running",
-            started_at=datetime.now(),
-            model_used=settings.GROQ_MODEL,
-        )
-        session.add(run)
-        await session.flush()
-        run_id = run.id
-        await session.commit()
+    """Run the pipeline, recording it as ``run_id`` when the caller already
+    created that row (the manual trigger does, to return its id), else a new one.
+
+    Before ``run_id`` was accepted, a manual trigger made a row, returned its id,
+    and the runner made a second row and ran under that — so the id the admin
+    got back pointed at a run that never ran, stuck at "running" for ever.
+    """
+    if run_id is None:
+        async with async_session_factory() as session:
+            run = AgentRun(
+                owner_id=owner_id,
+                triggered_by=triggered_by,
+                status="running",
+                started_at=datetime.now(),
+                model_used=settings.GROQ_MODEL,
+            )
+            session.add(run)
+            await session.flush()
+            run_id = run.id
+            await session.commit()
+
+    # Live progress for the admin swarm view. Edges come from the compiled
+    # graph, so adding a node there needs nothing here.
+    tracker = events.Tracker(run_id, [(e.source, e.target) for e in pipeline.get_graph().edges])
+    tracker.start()
 
     root_span = langfuse.start_observation(
         trace_context={
@@ -80,10 +95,20 @@ async def run_agent_pipeline(
 
     try:
         async with async_session_factory() as session:
-            result_state = await pipeline.ainvoke(
+            # `astream` instead of `ainvoke`: the same run, but it reports each
+            # node as it finishes. "values" carries the accumulated state, whose
+            # last value is exactly what `ainvoke` would have returned.
+            result_state: dict = {}
+            async for mode, chunk in pipeline.astream(
                 initial_state,
                 config={"configurable": {"db": session}},
-            )
+                stream_mode=["updates", "values"],
+            ):
+                if mode == "updates":
+                    for node in chunk:
+                        tracker.finished(node)
+                else:
+                    result_state = chunk
 
             resolved_tag_ids = []
             for tag_name in result_state.get("draft_tags", []):
@@ -124,6 +149,7 @@ async def run_agent_pipeline(
                 run_log=run_log,
             )
             await session.commit()
+        tracker.complete()
 
         root_span.update(
             output={
@@ -135,6 +161,7 @@ async def run_agent_pipeline(
 
     except Exception as exc:
         logger.exception("Agent pipeline failed for run %s", run_id)
+        tracker.failed()
         async with async_session_factory() as session:
             await _update_agent_run(
                 session, run_id,
