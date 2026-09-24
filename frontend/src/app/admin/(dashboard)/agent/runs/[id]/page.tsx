@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAdminAgentRun } from "@/hooks/useApi";
+import SwarmStage from "@/components/assistant/SwarmStage";
 import { ChevronLeft, ExternalLink, Loader2 } from "lucide-react";
 
 function formatDuration(start: string, end: string | null): string {
@@ -102,6 +103,11 @@ export default function AgentRunDetailPage() {
 				<ChevronLeft size={14} />
 				Back to Run Log
 			</Link>
+
+			{/* The run as its agents — live while it runs, the final picture after. */}
+			<div className="mb-8">
+				<SwarmStage runId={run.id} />
+			</div>
 
 			{/* Header row */}
 			<div className="flex items-center justify-between mb-8">

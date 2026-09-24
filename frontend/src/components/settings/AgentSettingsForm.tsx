@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
 	useAdminAgentSchedule,
@@ -75,6 +76,7 @@ export default function AgentSettingsForm() {
 		useAdminAgentSchedule();
 	const updateSchedule = useAdminUpdateAgentSchedule();
 	const triggerAgent = useAdminTriggerAgent();
+	const router = useRouter();
 	const { data: runsData } = useAdminAgentRuns({ limit: 1 });
 
 	// The page's controls are all downstream of the agent feature: with it off,
@@ -139,6 +141,8 @@ export default function AgentSettingsForm() {
 		try {
 			const result = await triggerAgent.mutateAsync();
 			toast.success(`Pipeline started (${result.run_id.slice(0, 8)}...)`);
+			// Straight to the run, where the agents can be watched working.
+			router.push(`/admin/agent/runs/${result.run_id}`);
 		} catch (err: any) {
 			toast.error(err?.detail || "Failed to trigger agent run");
 		}
