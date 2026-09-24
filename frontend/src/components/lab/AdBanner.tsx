@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { parseScene, type SceneSpec } from "@t569/scene-engine";
-import { prefersReducedMotion, themeColors, useThemeKey } from "@/lib/sceneTheme";
+import { prefersReducedMotion, runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
 
 /**
  * A campaign banner that is only data.
@@ -49,8 +49,11 @@ export default function AdBanner() {
 		if (!host) return;
 		const scene = parseScene(bannerSpec(themeColors(host)), host);
 		if (prefersReducedMotion()) scene.seek(2); // mid-loop: everything on screen, nothing moving
-		else scene.start();
-		return () => scene.destroy();
+		const stop = runWhileVisible(host, scene);
+		return () => {
+			stop();
+			scene.destroy();
+		};
 	}, [themeKey]);
 
 	// Shown verbatim beside the banner: the point is that this is all there is.

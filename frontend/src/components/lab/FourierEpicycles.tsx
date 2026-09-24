@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BaseObject, Scene, SVG_NS, localTime } from "@t569/scene-engine";
-import { prefersReducedMotion, themeColors, useThemeKey } from "@/lib/sceneTheme";
+import { prefersReducedMotion, runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
 
 /**
  * Circles riding on circles, drawing a closed curve.
@@ -138,13 +138,12 @@ export default function FourierEpicycles() {
 		const scene = new Scene({ width: W, height: H }, host);
 		const node = new Epicycles(k, themeColors(host), W / 2, H / 2);
 		scene.add(node);
-		if (prefersReducedMotion()) {
-			scene.seek(PERIOD * 0.999); // the whole curve, still
-		} else {
-			scene.seek(0);
-			scene.start();
-		}
-		return () => scene.destroy();
+		scene.seek(prefersReducedMotion() ? PERIOD * 0.999 : 0); // reduced motion: the whole curve, still
+		const stop = runWhileVisible(host, scene);
+		return () => {
+			stop();
+			scene.destroy();
+		};
 	}, [k, themeKey]);
 
 	return (

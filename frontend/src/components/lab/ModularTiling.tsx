@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { parseScene, type NodeSpec, type Scene } from "@t569/scene-engine";
-import { prefersReducedMotion, themeColors, useThemeKey } from "@/lib/sceneTheme";
+import { prefersReducedMotion, runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
 
 /**
  * The modular group tiling the upper half-plane.
@@ -153,16 +153,19 @@ export default function ModularTiling() {
 			scene.seek(DURATION); // the finished picture, no construction
 		} else {
 			scene.seek(0);
-			scene.start();
+			// Builds itself when scrolled to, not on page load.
+			const stopWatching = runWhileVisible(host, scene);
 			// Keep the slider in step while it plays, then hand time over to it.
 			const tick = setInterval(() => {
 				setT(Math.min(DURATION, scene.elapsed));
 				if (scene.elapsed >= DURATION) {
+					stopWatching();
 					scene.stop();
 					clearInterval(tick);
 				}
 			}, 100);
 			return () => {
+				stopWatching();
 				clearInterval(tick);
 				scene.destroy();
 				sceneRef.current = null;
@@ -188,6 +191,7 @@ export default function ModularTiling() {
 					onChange={(e) => {
 						const v = Number(e.target.value);
 						setT(v);
+						// Scrubbing takes time over from the clock for good.
 						sceneRef.current?.stop();
 						sceneRef.current?.seek(v);
 					}}
