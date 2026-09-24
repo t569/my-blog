@@ -44,7 +44,7 @@ decide which kind of change this is:
 | | Feature (shared) | Personalisation (mine) |
 |---|---|---|
 | Test | Would upstream want it? | Is it my name/face/taste? |
-| Examples | KaTeX math, markdown import script, theme-aware code blocks, the constellation component, a raw-markdown editor toggle | `.env.local` values, `garden.css`, the Kerbal icon, my bio |
+| Examples | KaTeX math, markdown import script, theme-aware code blocks, the constellation component, a raw-markdown editor toggle, the chat assistant and swarm view, the scene-engine / ai-assistant packages | `.env.local` values, `garden.css`, the Kerbal icon, my bio, Karlsefni's name, persona and contact line, the chosen faces |
 | Lives in | Normal code, generic, no personal strings | Env vars and additive files only |
 | Committed? | Yes | Env values never; additive files only when a clean CI build needs them (`content/about.md`, the Kerbal icon) |
 | Goes upstream | Yes — branch off `upstream/main`, PR it | Never |

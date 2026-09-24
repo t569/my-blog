@@ -696,6 +696,63 @@ Neon, the env tables for each, and a first-deploy checklist.
       file and accept that the first commenter after a quiet spell waits.
 - [ ] Custom domain, once there's something worth pointing it at.
 
+### 7. Karlsefni, the agent swarm, and the scene engine
+
+Extracted from Quickuder into their own repos, pulled back in as subtrees
+under `frontend/packages/` (see CLAUDE.md → "Packages are subtrees"):
+
+- `@t569/scene-engine` (`D:/Repos/scene-engine`) — SVG scene graph, one clock,
+  JSON specs. 0.2 added the Manim layer: `animate` keyframes as a pure function
+  of time, `scene.seek`, Manim's rate functions (`smooth` default) + Blender's
+  CONSTANT as `step`, `path`/`polyline`/`tex`/`space3d` nodes, a `character`
+  plugin, and spec limits. **Four uses, none primary: advertising (it began as
+  Quickuder's campaign heroes), characters, explanations, generated pages.**
+  Manim code adapted with attribution (MIT); Blender is concepts only (GPL).
+- `@t569/ai-assistant` (`D:/Repos/ai-assistant`) — 0.2 added domain-free
+  `useAssistantStream`, `useSwarm` and `createStatusResolver` *beside* the
+  commerce provider, so Quickuder still imports everything from the root. Its
+  README has the Quickuder migration steps.
+
+Done:
+- [x] **Karlsefni** — public streaming chat (`POST /assistant/chat`), a
+      draggable character whose mood is derived (sleeping while the backend
+      wakes, listening, thinking, speaking at reading pace, happy, error).
+- [x] **Token savers** — author-only questions answered with
+      `ASSISTANT_CONTACT` and small talk canned, both with no model call; a
+      first-turn answer cache; last 6 turns only; `ASSISTANT_MODEL` for a
+      cheaper chat model. Rate limits (per IP + global) only guard model calls.
+- [x] **Characters page** (Admin → Settings → Characters) — DiceBear style +
+      seed, or an uploaded photo, for Karlsefni and each agent, every emotion
+      previewed live. Stored in `owners.characters`.
+- [x] **Swarm view** — a run drawn as its agents on the run detail page,
+      from `GET /admin/agent/runs/{id}/events` (replayed on reconnect).
+- [x] **Klein bottle in 3D** on /about, beside the static one (which still
+      renders with no JS / reduced motion).
+- [x] **/lab** — modular-group tiling, Fourier epicycles, an ad as data.
+- [x] Fixed on the way (generic, PR-able): the proxy buffered SSE; rate limits
+      keyed on Vercel's address instead of the reader's; a manual agent trigger
+      ran under a second, orphaned run row; `resolveAvatarStatus` found
+      `Object.prototype` members for untrusted input; a scene font reference
+      could inject CSS into the host page.
+
+To do:
+- [ ] **Run the migration**: `alembic upgrade head` in `backend/` (adds
+      `owners.characters`). Render does it on deploy (Dockerfile CMD); the local
+      backend points at Neon, so it is a manual step there. Until then the
+      Characters page previews but can't save.
+- [ ] **Set `GROQ_MODEL` on Render.** The code default `llama-3.3-70b-versatile`
+      is retired by Groq — the agent pipeline fails with `model_not_found` until
+      it is set. Worth a PR upstream too: his default is broken for him as well.
+- [ ] Set the new `ASSISTANT_*` / `NEXT_PUBLIC_ASSISTANT_*` / `NEXT_PUBLIC_SITE_LAB`
+      values on Render and Vercel (see both `.env.example` files).
+- [ ] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub and push the
+      local repos (`gh` isn't installed here: `winget install GitHub.cli`).
+- [ ] Watch a real pipeline run in the swarm view — only tested against a
+      scripted stream so far, to avoid writing a draft into the production DB.
+- [ ] Quickuder: switch to the new repos (steps in the ai-assistant README).
+- [ ] Later, on evidence: Karlsefni running the swarm himself (tool calling);
+      the scene engine's visual editor and export (see its ROADMAP.md).
+
 ---
 
 ## Explicitly skipped
