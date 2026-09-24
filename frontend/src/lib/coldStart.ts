@@ -16,8 +16,19 @@
  * would drift, and the symptom of the drift is a 502 nobody can explain.
  */
 
-/** Long enough for a measured ~75s cold start, with room to spare. */
-export const COLD_START_MS = 90_000;
+/**
+ * As long as a serverless function is allowed to live, less a few seconds.
+ *
+ * It was 90s, chosen for a measured ~75s cold start — but the proxy runs as a
+ * Vercel function capped at 60s on Hobby, so the platform killed the request
+ * first and the admin got a bodiless 504 that no log here explained. A wait
+ * that outlives its own host is not patience, it is a hidden failure mode.
+ *
+ * A backend that needs longer than this to wake is not saved by waiting; it is
+ * saved by the retry, which now starts 35s sooner and meets an instance that
+ * has been booting all along.
+ */
+export const COLD_START_MS = 55_000;
 
 /** A person is watching. Past this, failing beats waiting. */
 export const PUBLIC_TIMEOUT_MS = 20_000;
