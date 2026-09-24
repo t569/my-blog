@@ -527,3 +527,37 @@ export async function adminUpdateCharacters(
   const { data } = await apiClient.put<CharactersState>("/admin/characters", updates);
   return data;
 }
+
+/* ============================================================================
+  Site index — what the assistant can search
+============================================================================ */
+
+export interface SiteIndexStatus {
+  site_url: string | null;
+  /** kind → number of passages indexed */
+  passages: Record<string, number>;
+  running: boolean;
+  last_rebuild: {
+    pages: number;
+    changed: number;
+    unchanged: number;
+    removed: number;
+    chunks: number;
+    embedded: number;
+    crawled: boolean;
+    finished_at: string | null;
+    error: string | null;
+  } | null;
+}
+
+/** (Admin) What is indexed, and how the last rebuild went. */
+export async function adminGetSiteIndex(): Promise<SiteIndexStatus> {
+  const { data } = await apiClient.get<SiteIndexStatus>("/admin/site-index");
+  return data;
+}
+
+/** (Admin) Start a rebuild in the background. */
+export async function adminRebuildSiteIndex(): Promise<{ started: boolean }> {
+  const { data } = await apiClient.post<{ started: boolean }>("/admin/site-index/rebuild");
+  return data;
+}

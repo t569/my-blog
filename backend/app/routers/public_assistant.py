@@ -27,7 +27,7 @@ from app.db.base import get_db
 from app.middleware.rate_limit import RateLimiter
 from app.models.post import Post
 from app.models.series import Series
-from app.services import character_service, search_service
+from app.services import character_service, search_service, site_index
 from app.services.assistant_shortcuts import answer_cache, answer_without_model, normalize
 
 logger = logging.getLogger(__name__)
@@ -126,20 +126,27 @@ async def _passages(db: AsyncSession, question: str) -> str:
     gets a deadline, and anything that goes wrong means answering from the
     site map alone rather than not answering.
     """
+    # (title, link, text) triples, from the site-wide index when it has
+    # anything, else from the posts-only search the search bar uses.
+    found: list[tuple[str, str, str]] = []
     try:
-        results = await asyncio.wait_for(
-            search_service.semantic_search(db, question, limit=4), timeout=_RETRIEVAL_TIMEOUT
-        )
+        hits = await asyncio.wait_for(site_index.search(db, question, limit=5), timeout=_RETRIEVAL_TIMEOUT)
+        found = [(f"{h.title} — {h.heading}" if h.heading else h.title, h.url, h.text) for h in hits]
+        if not found:
+            results = await asyncio.wait_for(
+                search_service.semantic_search(db, question, limit=4), timeout=_RETRIEVAL_TIMEOUT
+            )
+            found = [(r.post.title, f"/posts/{r.post.slug}", r.matched_chunk or "") for r in results]
     except Exception:
         logger.warning("[assistant] retrieval unavailable; answering without passages", exc_info=True)
         return ""
     out: list[str] = []
     used = 0
-    for r in results:
-        chunk = " ".join((r.matched_chunk or "").split())[:_PASSAGE_MAX]
+    for title, link, body in found:
+        chunk = " ".join(body.split())[:_PASSAGE_MAX]
         if not chunk:
             continue
-        entry = f'From "{r.post.title}" (/posts/{r.post.slug}):\n{chunk}'
+        entry = f'From "{title}" ({link}):\n{chunk}'
         if used + len(entry) > _PASSAGES_MAX:
             break
         out.append(entry)

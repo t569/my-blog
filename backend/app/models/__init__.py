@@ -12,6 +12,7 @@ from app.models.comment import Comment
 from app.models.owner import Owner
 from app.models.post import Post, PostTag, Tag
 from app.models.series import Series
+from app.models.site_chunk import SiteChunk
 from app.models.user_context import UserContext
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "PostFeedback",
     "PostTag",
     "Series",
+    "SiteChunk",
     "Tag",
     "UserContext",
 ]

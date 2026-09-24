@@ -16,7 +16,7 @@ import {
 	Network,
 	SlidersHorizontal,
 	TerminalSquare,
-	Tag, Smile } from "lucide-react";
+	Tag, Smile, Brain } from "lucide-react";
 import { useAdminStats } from "@/hooks/useApi";
 
 export default function AdminShell({
@@ -60,6 +60,7 @@ export default function AdminShell({
 					icon: SlidersHorizontal,
 				},
 				{ href: "/admin/settings/characters", label: "Characters", icon: Smile },
+				{ href: "/admin/settings/knowledge", label: "Knowledge", icon: Brain },
 			],
 		},
 		{

@@ -156,6 +156,13 @@ class Settings(BaseSettings):
     # inflate every paid request. Empty = posts and series only.
     ASSISTANT_SITE_GUIDE: str = ""
 
+    # --- Site index ---
+    # The public site's address, e.g. https://example.com. When set, a
+    # site-index rebuild crawls it (from the home page, following its own
+    # links) so pages that only exist on the frontend — static notes, a lab —
+    # are searchable too. Empty = index posts only, from the database.
+    SITE_URL: str = ""
+
     @property
     def agent_ready(self) -> bool:
         """Whether the agent pipeline may run — switch on and key present."""

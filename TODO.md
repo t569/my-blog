@@ -752,6 +752,19 @@ Done:
       could inject CSS into the host page.
 
 To do:
+- [x] **Site-wide index** (`site_chunks`, HNSW): every reachable page —
+      posts from the database, everything else crawled from `SITE_URL` —
+      split along headings into ~150-word passages (the embedding model reads
+      only ~200 words; the posts index's 750-word chunks are three-quarters
+      invisible to it), each linking to its exact section. Unchanged pages
+      cost nothing on rebuild. Admin → Knowledge shows it and rebuilds it.
+      Karlsefni searches it. Check: `python -m scripts.check_site_index`.
+- [ ] Set `SITE_URL` on Render, deploy (migration `5d1b7c9e2a31` runs), then
+      Admin → Knowledge → Rebuild.
+- [ ] The constellation: a 2D, Obsidian-style physical graph of the index
+      (links + nearest-by-meaning), as a scene-engine plugin, on /constellation.
+- [ ] The posts index's 750-word chunks (search bar) have the same truncation
+      problem — upstream's code; worth a PR: ~150 words and a re-backfill.
 - [ ] **Run the migration**: `alembic upgrade head` in `backend/` (adds
       `owners.characters`). Render does it on deploy (Dockerfile CMD); the local
       backend points at Neon, so it is a manual step there. Until then the

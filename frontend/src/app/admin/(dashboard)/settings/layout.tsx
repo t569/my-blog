@@ -7,6 +7,7 @@ const SETTINGS_TABS = [
 	{ href: "/admin/settings/context", label: "My Context" },
 	{ href: "/admin/settings/features", label: "Features" },
 	{ href: "/admin/settings/characters", label: "Characters" },
+	{ href: "/admin/settings/knowledge", label: "Knowledge" },
 	{ href: "/admin/settings/agent", label: "Agent Settings" },
 ];
 

@@ -19,6 +19,7 @@ from app.routers import (
     admin_features,
     admin_posts,
     admin_series,
+    admin_site_index,
     admin_tags,
     admin_uploads,
     debug,
@@ -112,6 +113,7 @@ app.include_router(admin_context.router, prefix=API_V1)
 app.include_router(admin_agent.router, prefix=API_V1)
 app.include_router(admin_features.router, prefix=API_V1)
 app.include_router(admin_characters.router, prefix=API_V1)
+app.include_router(admin_site_index.router, prefix=API_V1)
 app.include_router(debug.router)
 
 

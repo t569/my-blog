@@ -243,3 +243,14 @@ async def generate_embeddings_background(post_id: uuid.UUID) -> None:
             logger.exception(
                 "Background embedding generation failed for post %s", post_id
             )
+
+    # The site-wide index (the assistant's) follows the post too. Separate
+    # session and failure: a problem there must not undo the search bar's.
+    from app.services import site_index  # imported here: it imports this module
+
+    async with async_session_factory() as session:
+        try:
+            await site_index.index_post(session, post_id)
+        except Exception:
+            await session.rollback()
+            logger.exception("Site-index update failed for post %s", post_id)
