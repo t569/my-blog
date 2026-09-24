@@ -157,6 +157,8 @@ export interface Post extends PostListItem {
 
 export interface PostCreate {
   title: string;
+  /** Omit to derive it from the title. */
+  slug?: string;
   content: string;
   category_id: string;
   tags?: string[];

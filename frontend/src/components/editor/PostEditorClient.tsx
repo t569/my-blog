@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -20,7 +20,7 @@ import {
 	useAdminSeries,
 	useAdminCreateSeries,
 } from "@/hooks/useApi";
-import type { PostStatus } from "@/types";
+import type { ApiError, PostStatus } from "@/types";
 import TagSelector from "./TagSelector";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { useToast } from "@/hooks/useToast";
@@ -49,11 +49,32 @@ interface EditorData {
 	status: PostStatus;
 }
 
+/**
+ * What the server stored, when it differs from what was sent.
+ *
+ * A slug is slugified and de-duplicated on the way in, so "My Post!" comes back
+ * as "my-post" and a collision comes back as "my-post-1". Without this the box
+ * keeps showing what was typed and the save looks like it did nothing.
+ */
+type SavedPost = { slug?: string } | void;
+
 interface PostEditorClientProps {
 	initialData: Partial<EditorData> & { is_agent_authored?: boolean };
 	isNew?: boolean;
-	onSave: (data: EditorData) => Promise<void>;
-	onPublish?: (data: EditorData) => Promise<void>;
+	onSave: (data: EditorData) => Promise<SavedPost>;
+	onPublish?: (data: EditorData) => Promise<SavedPost>;
+}
+
+/**
+ * The server's own words, when it gave any.
+ *
+ * "Slug 'x' is already in use." and "Backend service unavailable." are two very
+ * different problems, and a save that reports both as "Failed to save draft."
+ * leaves the only person who can fix either one guessing.
+ */
+function reasonFor(error: unknown, fallback: string): string {
+	const detail = (error as ApiError | undefined)?.detail;
+	return typeof detail === "string" && detail ? detail : fallback;
 }
 
 export default function PostEditorClient({
@@ -82,6 +103,11 @@ export default function PostEditorClient({
 
 	const toast = useToast();
 
+	// One key for the local backup, computed once. It was spelled out at four
+	// call sites, which is four chances for them to disagree about which draft
+	// they mean.
+	const draftKey = isNew ? "draft-new" : `draft-${initialData.slug || "edit"}`;
+
 	const { data: categories } = useAdminCategories();
 	const { data: seriesList } = useAdminSeries();
 	const createSeriesMutation = useAdminCreateSeries();
@@ -97,46 +123,59 @@ export default function PostEditorClient({
 		}
 	}, [data.title, isNew, hasUnsavedChanges]);
 
-	// Auto-save to localStorage
+	// Offer the local draft back, once, on mount.
 	useEffect(() => {
-		const DRAFT_KEY = isNew
-			? "draft-new"
-			: `draft-${initialData.slug || "edit"}`;
-
-		// Load draft on mount
-		if (!hasUnsavedChanges && typeof window !== "undefined") {
-			const savedDraft = localStorage.getItem(DRAFT_KEY);
-			if (savedDraft) {
-				try {
-					const parsed = JSON.parse(savedDraft);
-					if (
-						window.confirm(
-							`You have unsaved local changes from ${new Date(parsed.timestamp).toLocaleString()}. Restore them?`,
-						)
-					) {
-						setData(parsed.data);
-						setHasUnsavedChanges(true);
-					} else {
-						localStorage.removeItem(DRAFT_KEY);
-					}
-				} catch (e) {
-					console.error("Failed to parse local draft", e);
-				}
+		if (typeof window === "undefined") return;
+		const savedDraft = localStorage.getItem(draftKey);
+		if (!savedDraft) return;
+		try {
+			const parsed = JSON.parse(savedDraft);
+			if (
+				window.confirm(
+					`You have unsaved local changes from ${new Date(parsed.timestamp).toLocaleString()}. Restore them?`,
+				)
+			) {
+				setData(parsed.data);
+				setHasUnsavedChanges(true);
+			} else {
+				localStorage.removeItem(draftKey);
 			}
+		} catch (e) {
+			console.error("Failed to parse local draft", e);
 		}
+		// Mount only. This asks a question, and a question that re-asks itself
+		// on a dependency change is a dialog you cannot type past.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
-		// Interval to save draft every 30 seconds
+	// Auto-save to localStorage every 30s.
+	//
+	// The editor state is read through a ref rather than closed over, because
+	// this timer used to depend on `data` — so every keystroke tore the interval
+	// down and started a fresh 30s. Typing steadily for an hour never reached a
+	// single save, which is precisely the hour worth not losing. The ref keeps
+	// one timer alive for the life of the editor and lets it see the latest
+	// state when it fires.
+	const latest = useRef({ data, hasUnsavedChanges });
+	latest.current = { data, hasUnsavedChanges };
+
+	useEffect(() => {
 		const interval = setInterval(() => {
-			if (hasUnsavedChanges) {
+			if (!latest.current.hasUnsavedChanges) return;
+			try {
 				localStorage.setItem(
-					DRAFT_KEY,
-					JSON.stringify({ data, timestamp: Date.now() }),
+					draftKey,
+					JSON.stringify({ data: latest.current.data, timestamp: Date.now() }),
 				);
+			} catch (e) {
+				// Private mode, or a quota a large post can genuinely exceed.
+				// The server save is the real one; this is a safety net.
+				console.error("Failed to store local draft", e);
 			}
 		}, 30000);
 
 		return () => clearInterval(interval);
-	}, [hasUnsavedChanges, data, isNew, initialData.slug]);
+	}, [draftKey]);
 
 	const handleChange = (field: keyof EditorData, value: any) => {
 		setData((prev) => ({ ...prev, [field]: value }));
@@ -165,19 +204,24 @@ export default function PostEditorClient({
 		}
 	};
 
+	/** Show what the server stored, not what was typed at it. */
+	const applySaved = (saved: SavedPost) => {
+		if (saved?.slug && saved.slug !== data.slug) {
+			setData((prev) => ({ ...prev, slug: saved.slug as string }));
+		}
+	};
+
 	const handleSaveDraft = async () => {
 		setIsSaving(true);
 		try {
-			await onSave({ ...data, status: "draft" });
+			const saved = await onSave({ ...data, status: "draft" });
+			applySaved(saved);
 			setHasUnsavedChanges(false);
-			const DRAFT_KEY = isNew
-				? "draft-new"
-				: `draft-${initialData.slug || "edit"}`;
-			localStorage.removeItem(DRAFT_KEY);
+			localStorage.removeItem(draftKey);
 			toast.success("Draft saved successfully");
 		} catch (error) {
 			console.error("Save failed", error);
-			toast.error("Failed to save draft.");
+			toast.error(reasonFor(error, "Failed to save draft."));
 		} finally {
 			setIsSaving(false);
 		}
@@ -190,16 +234,13 @@ export default function PostEditorClient({
 	const confirmPublish = async () => {
 		setIsSaving(true);
 		try {
-			if (onPublish) {
-				await onPublish({ ...data, status: "published" });
-			} else {
-				await onSave({ ...data, status: "published" });
-			}
+			const saved = await (onPublish ?? onSave)({
+				...data,
+				status: "published",
+			});
+			applySaved(saved);
 			setHasUnsavedChanges(false);
-			const DRAFT_KEY = isNew
-				? "draft-new"
-				: `draft-${initialData.slug || "edit"}`;
-			localStorage.removeItem(DRAFT_KEY);
+			localStorage.removeItem(draftKey);
 			toast.success(
 				data.status === "published"
 					? "Post updated successfully"
@@ -207,7 +248,7 @@ export default function PostEditorClient({
 			);
 		} catch (error) {
 			console.error("Publish failed", error);
-			toast.error("Failed to publish post.");
+			toast.error(reasonFor(error, "Failed to publish post."));
 		} finally {
 			setIsSaving(false);
 		}

@@ -13,6 +13,10 @@ export default function NewPostPage() {
 			const newPost = await createPostMutation.mutateAsync({
 				title: data.title || "Untitled",
 				content: data.content,
+				// Omitted rather than blank, so the backend derives it from the
+				// title. Sent, it is the author's choice and the editor shows
+				// whatever the server settled on.
+				slug: data.slug?.trim() || undefined,
 				category_id: data.category_id || undefined,
 				series_id: data.series_id || null,
 				series_order: data.series_order || null,
