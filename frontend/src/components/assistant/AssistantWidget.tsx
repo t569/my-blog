@@ -52,10 +52,16 @@ const DOING: Record<string, string> = {
 	error: "couldn't answer that",
 };
 
-/** `**bold**`, `/posts/slug` and https links — all the Markdown a short reply needs. */
+/** Paths on this site a reply may point to: /lab, /notes/vol1-….html, /posts/slug, /series/slug. */
+const SITE_PATH = /^\/(posts|series|notes|lab|about)(\/[\w.-]*[\w-])?/;
+
+/** `**bold**`, `*italic*`, site paths and https links — all the Markdown a short reply needs. */
 function format(text: string): ReactNode[] {
-	return text.split(/(\*\*[^*]+\*\*|\/posts\/[a-z0-9-]+|https:\/\/[^\s)]+[^\s).,])/g).map((part, i) => {
+	// Models wrap paths in backticks despite being asked not to; a link reads better.
+	const clean = text.replace(/`(\/[^`\s]+)`/g, "$1");
+	return clean.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|\/(?:posts|series|notes|lab|about)(?:\/[\w.-]*[\w-])?|https:\/\/[^\s)]+[^\s).,])/g).map((part, i) => {
 		if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
+		if (part.length > 2 && part.startsWith("*") && part.endsWith("*")) return <em key={i}>{part.slice(1, -1)}</em>;
 		if (part.startsWith("https://")) {
 			return (
 				<a key={i} href={part} target="_blank" rel="noopener noreferrer" className="break-all text-accent underline underline-offset-2">
@@ -63,8 +69,13 @@ function format(text: string): ReactNode[] {
 				</a>
 			);
 		}
-		if (part.startsWith("/posts/")) {
-			return (
+		if (SITE_PATH.test(part)) {
+			// The notes volumes are static files, not app routes: a plain link, not client routing.
+			return part.endsWith(".html") ? (
+				<a key={i} href={part} className="text-accent underline underline-offset-2">
+					{part}
+				</a>
+			) : (
 				<Link key={i} href={part} className="text-accent underline underline-offset-2">
 					{part}
 				</Link>

@@ -26,7 +26,8 @@ from app.config import settings
 from app.db.base import get_db
 from app.middleware.rate_limit import RateLimiter
 from app.models.post import Post
-from app.services import character_service
+from app.models.series import Series
+from app.services import character_service, search_service
 from app.services.assistant_shortcuts import answer_cache, answer_without_model, normalize
 
 logger = logging.getLogger(__name__)
@@ -58,43 +59,115 @@ class ChatRequest(BaseModel):
 
 
 # ponytail: a module-level cache; per-process, which is what one Render
-# instance has. Ten minutes is plenty for a list of post titles.
+# instance has. Ten minutes is plenty for a list of titles.
 _catalogue: tuple[float, str] = (0.0, "")
 _CATALOGUE_TTL = 600
 
+#: Caps on what a single model call carries, in characters. The prompt is paid
+#: for on every message, so each part is bounded rather than trusted to stay small.
+_GUIDE_MAX = 4000
+_PASSAGE_MAX = 700
+_PASSAGES_MAX = 2400
+_RETRIEVAL_TIMEOUT = 6.0
 
-async def _post_catalogue(db: AsyncSession) -> str:
-    """Recent published posts, one line each, so answers can point at them."""
+
+async def _site_context(db: AsyncSession) -> str:
+    """Everything about the site the database can say: pages, series, posts."""
     global _catalogue
     stamp, text = _catalogue
     if text and time.time() - stamp < _CATALOGUE_TTL:
         return text
 
-    rows = await db.execute(
-        select(Post.title, Post.slug, Post.excerpt)
-        .where(Post.status == "published", Post.deleted_at.is_(None))
-        .order_by(Post.published_at.desc())
-        .limit(30)
-    )
-    lines = [
-        f"- {title} (/posts/{slug}): {(excerpt or '').strip()[:160]}"
-        for title, slug, excerpt in rows.all()
+    posts = (
+        await db.execute(
+            select(Post.title, Post.slug, Post.excerpt, Post.series_id, Post.series_order)
+            .where(Post.status == "published", Post.deleted_at.is_(None))
+            .order_by(Post.published_at.desc())
+            .limit(40)
+        )
+    ).all()
+    series = (
+        await db.execute(
+            select(Series.id, Series.title, Series.slug, Series.description).where(Series.status == "published")
+        )
+    ).all()
+
+    post_lines = [
+        f"- {title} (/posts/{slug}): {(excerpt or '').strip()[:160]}" for title, slug, excerpt, _, _ in posts
     ]
-    text = "\n".join(lines) or "(no posts yet)"
+    series_lines = []
+    for sid, title, slug, description in series:
+        parts = sorted((order or 0, t) for t, _, _, s_id, order in posts if s_id == sid)
+        listing = "; ".join(f"{i}. {t}" for i, (_, t) in enumerate(parts, 1)) or "no published parts yet"
+        about = f" — {description.strip()[:160]}" if description else ""
+        series_lines.append(f"- {title} (/series/{slug}){about}. Parts: {listing}")
+
+    text = (
+        "Pages: / (home: the feed of posts), /series (posts grouped into series), "
+        "/about (the author), /posts/<slug> (a post).\n\n"
+        "Series:\n" + ("\n".join(series_lines) or "(none yet)") + "\n\n"
+        "Posts, newest first:\n" + ("\n".join(post_lines) or "(no posts yet)")
+    )
     _catalogue = (time.time(), text)
     return text
 
 
-def _system_prompt(catalogue: str) -> str:
-    return (
+def _site_guide() -> str:
+    """The owner's own description of the site, from config. Bounded."""
+    guide = settings.ASSISTANT_SITE_GUIDE.replace("\\n", "\n").strip()
+    return guide[:_GUIDE_MAX]
+
+
+async def _passages(db: AsyncSession, question: str) -> str:
+    """The post passages most relevant to the question, from the site's own
+    hybrid search (meaning + keywords, over post chunks).
+
+    Best-effort by design: the embedding call is a network round trip, so it
+    gets a deadline, and anything that goes wrong means answering from the
+    site map alone rather than not answering.
+    """
+    try:
+        results = await asyncio.wait_for(
+            search_service.semantic_search(db, question, limit=4), timeout=_RETRIEVAL_TIMEOUT
+        )
+    except Exception:
+        logger.warning("[assistant] retrieval unavailable; answering without passages", exc_info=True)
+        return ""
+    out: list[str] = []
+    used = 0
+    for r in results:
+        chunk = " ".join((r.matched_chunk or "").split())[:_PASSAGE_MAX]
+        if not chunk:
+            continue
+        entry = f'From "{r.post.title}" (/posts/{r.post.slug}):\n{chunk}'
+        if used + len(entry) > _PASSAGES_MAX:
+            break
+        out.append(entry)
+        used += len(entry)
+    return "\n\n".join(out)
+
+
+def _system_prompt(site: str, guide: str, passages: str) -> str:
+    parts = [
         f"You are {settings.ASSISTANT_NAME}, {settings.ASSISTANT_PERSONA}. "
         "You live on a personal blog and talk with its readers. Be warm, brief "
-        "and concrete: a few sentences unless asked for more. When a post below "
-        "is relevant, name it and give its link path. If you don't know "
-        "something about the author or the blog, say so rather than invent it. "
-        "Plain text or light Markdown only.\n\n"
-        f"Posts on the blog, newest first:\n{catalogue}"
-    )
+        "and concrete: a few sentences unless asked for more. Point readers to "
+        "the right page or post by its link path. Answer from what is below; "
+        "if it isn't there, say so rather than invent it. You are the site's "
+        "guide, not its author: the posts, notes, lab and software are the "
+        "author's work, never yours. Write short paragraphs or a plain '- ' "
+        "list; **bold** is fine; never use tables, headings or code formatting "
+        "(write paths like /notes plainly) — the chat window can't show them.",
+        f"About this site:\n{site}",
+    ]
+    if guide:
+        parts.append(f"From the author, about the site:\n{guide}")
+    if passages:
+        parts.append(
+            "Passages from posts that match the reader's question — prefer these "
+            f"when answering, and name the post you draw on:\n{passages}"
+        )
+    return "\n\n".join(parts)
 
 
 def _frame(action_status: str, delta: str | None = None) -> str:
@@ -163,9 +236,10 @@ async def chat(
 
     # Read before streaming: the session dependency closes once the handler
     # returns, which is before the generator below finishes.
-    catalogue = await _post_catalogue(db)
+    site = await _site_context(db)
+    passages = await _passages(db, data.message)
     messages = [
-        {"role": "system", "content": _system_prompt(catalogue)},
+        {"role": "system", "content": _system_prompt(site, _site_guide(), passages)},
         # The last few turns are plenty for a chat about blog posts, and every
         # turn sent is paid for again on every message.
         *({"role": t.role, "content": t.content} for t in data.messages[-_HISTORY_TURNS:]),

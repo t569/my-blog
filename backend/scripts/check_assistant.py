@@ -132,6 +132,17 @@ for k in ("a", "b", "c"):
     tiny.put(k, k.upper())
 check(tiny.get("a") is None and tiny.get("c") == "C", "the cache evicts its oldest entry")
 
+# ── the site guide: the owner's words, bounded ──
+from app.routers import public_assistant as pa  # noqa: E402
+
+settings.ASSISTANT_SITE_GUIDE = r"Line one\nLine two"  # a literal backslash-n, as typed into a host's env form
+check(pa._site_guide() == "Line one\nLine two", r"a written \n in the guide becomes a line break")
+settings.ASSISTANT_SITE_GUIDE = "x" * 10_000
+check(len(pa._site_guide()) == pa._GUIDE_MAX, "an over-long guide is capped, not sent whole")
+prompt = pa._system_prompt("SITE", "GUIDE", "PASSAGES")
+check(all(p in prompt for p in ("SITE", "GUIDE", "PASSAGES")), "site map, guide and passages all reach the prompt")
+check("GUIDE" not in pa._system_prompt("SITE", "", ""), "an empty guide adds nothing")
+
 # ── characters: what may be stored ──
 from app.services.character_service import clean  # noqa: E402
 

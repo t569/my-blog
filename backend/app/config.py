@@ -149,6 +149,12 @@ class Settings(BaseSettings):
     # Comma-separated names readers might use for the author, so "is <name>
     # available?" is recognised as a question for them.
     ASSISTANT_AUTHOR_NAMES: str = ""
+    # What the assistant should know about the site beyond its posts and
+    # series (which it reads from the database): pages the backend can't see,
+    # like a notes collection or a lab, and who the author is. Plain text;
+    # write "\n" for a line break. Capped when used, so it can't silently
+    # inflate every paid request. Empty = posts and series only.
+    ASSISTANT_SITE_GUIDE: str = ""
 
     @property
     def agent_ready(self) -> bool:
