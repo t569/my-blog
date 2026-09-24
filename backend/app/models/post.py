@@ -1,5 +1,6 @@
 """Post and Tag models with many-to-many association."""
 
+import re
 import uuid
 from datetime import datetime
 
@@ -56,6 +57,12 @@ class Tag(Base):
         back_populates="tags",
         lazy="noload",  # Loaded via post queries, not when fetching tags
     )
+
+
+_FIRST_IMAGE = re.compile(
+    r"!\[[^\]]*\]\((https://[^\s)]+)|<img[^>]+src=[\"'](https://[^\"']+)[\"']",
+    re.IGNORECASE,
+)
 
 
 class Post(Base):
@@ -136,3 +143,15 @@ class Post(Base):
         back_populates="post",
         lazy="noload",  # Only load when explicitly needed (post detail page)
     )
+
+    @property
+    def cover_image(self) -> str | None:
+        """The post's first https image — a cover for feed cards, found not stored.
+
+        Markdown ``![alt](url)`` or an HTML ``<img src>``, whichever comes
+        first. https only: it is rendered on public pages. Read from content,
+        so there is no column to keep in sync and no migration.
+        """
+        match = _FIRST_IMAGE.search(self.content or "")
+        return match.group(1) or match.group(2) if match else None
+

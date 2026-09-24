@@ -149,6 +149,8 @@ export interface PostListItem {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  /** The post's first https image, if it has one. */
+  cover_image?: string | null;
 }
 
 export interface Post extends PostListItem {

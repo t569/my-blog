@@ -80,6 +80,8 @@ class PostResponse(BaseModel):
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    #: First https image in the content, if any (Post.cover_image).
+    cover_image: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

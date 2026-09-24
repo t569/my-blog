@@ -62,6 +62,13 @@ export const SITE = {
    * so upstream gets neither the page nor a navbar link.
    */
   lab: process.env.NEXT_PUBLIC_SITE_LAB === "true",
+  /**
+   * Home feed layout. "list" is upstream's single column, and the default.
+   * "panels" lays posts out like a newspaper page or a comic: the lead story
+   * across the top, posts with a picture as tall panels, text posts packed
+   * into the gaps around them.
+   */
+  feed: (process.env.NEXT_PUBLIC_SITE_FEED ?? "list") as "list" | "panels",
 } as const;
 
 /**

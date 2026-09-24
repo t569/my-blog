@@ -8,7 +8,17 @@ import { useSearchParams, useRouter } from "next/navigation";
 import HeroSection from "./HeroSection";
 import FilterSidebar from "./FilterSidebar";
 import MobileFilterBar from "./MobileFilterBar";
-import PostCard from "./PostCard";
+import PostCard, { type CardVariant } from "./PostCard";
+import { SITE } from "@/lib/constants";
+
+const panels = SITE.feed === "panels";
+
+/** The newest post leads the page; the rest are panels by whether they have a picture. */
+function variantFor(post: PostListItem, index: number): CardVariant {
+	if (!panels) return "list";
+	if (index === 0) return "lead";
+	return post.cover_image ? "image" : "text";
+}
 import type { PaginatedResponse, PostListItem } from "@/types";
 import { FileText, FilterX } from "lucide-react";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
@@ -269,13 +279,22 @@ export default function HomeFeedClient({
 						</p>
 					</div>
 				) : (
-					<div className="flex flex-col gap-5" ref={listRef}>
-						{allPosts.map((post) => (
-							<PostCard key={post.id} post={post} />
+					<div
+						ref={listRef}
+						className={
+							panels
+								? // Newspaper / comic page: dense flow lets short text panels
+									// fill the holes beside tall picture panels.
+									"grid grid-cols-1 gap-5 md:grid-flow-row-dense md:grid-cols-2 xl:grid-cols-3"
+								: "flex flex-col gap-5"
+						}
+					>
+						{allPosts.map((post, i) => (
+							<PostCard key={post.id} post={post} variant={variantFor(post, i)} />
 						))}
 
 						{hasMore && (
-							<div className="mt-8 flex justify-center">
+							<div className="col-span-full mt-8 flex justify-center">
 								<button
 									onClick={() => setPage((p) => p + 1)}
 									disabled={isFetching}
