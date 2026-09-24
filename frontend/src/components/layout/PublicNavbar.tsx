@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Loader2, Layers, User, Menu, X } from "lucide-react";
+import { Search, Moon, Sun, Loader2, Layers, User, Menu, X, FlaskConical } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
@@ -221,6 +221,16 @@ export default function PublicNavbar() {
 						About
 					</Link>
 
+					{SITE.lab && (
+						<Link
+							href="/lab"
+							className="hidden md:inline-flex items-center gap-1.5 rounded border border-border-default px-3 py-1.5 font-mono text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors"
+						>
+							<FlaskConical size={12} />
+							Lab
+						</Link>
+					)}
+
 					<a
 						href={SITE.repo}
 						target="_blank"
@@ -255,6 +265,16 @@ export default function PublicNavbar() {
 							<User size={12} />
 							About
 						</Link>
+						{SITE.lab && (
+							<Link
+								href="/lab"
+								className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								<FlaskConical size={12} />
+								Lab
+							</Link>
+						)}
 						<a
 							href={SITE.repo}
 							target="_blank"

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Scene, Space3D, itemFromSpec, type SurfaceItem } from "@t569/scene-engine";
+import { prefersReducedMotion, themeColors, useThemeKey } from "@/lib/sceneTheme";
 import styles from "./about.module.css";
 
 /**
@@ -26,36 +27,20 @@ function scrollProgress(): number {
 	return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
 }
 
-/** The theme's own colours, resolved: SVG attributes can't take `var()`. */
-function themeColors(el: Element) {
-	const css = getComputedStyle(el);
-	return {
-		line: css.getPropertyValue("--color-text-primary").trim() || "currentColor",
-		accent: css.getPropertyValue("--color-accent").trim() || "currentColor",
-	};
-}
-
 export default function KleinScene() {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const [live, setLive] = useState(false);
-	// Bumped when the theme or skin changes, to rebuild with the new colours.
-	const [themeKey, setThemeKey] = useState(0);
-
-	useEffect(() => {
-		const html = document.documentElement;
-		const mo = new MutationObserver(() => setThemeKey((k) => k + 1));
-		mo.observe(html, { attributes: true, attributeFilter: ["class", "data-theme", "data-skin", "style"] });
-		return () => mo.disconnect();
-	}, []);
+	// Changes with the theme or skin, to rebuild with the new colours.
+	const themeKey = useThemeKey();
 
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
 		// Reduced motion keeps the static figure: it already tells the story
 		// through scroll alone, with nothing turning on its own.
-		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+		if (prefersReducedMotion()) return;
 
-		const { line, accent } = themeColors(host);
+		const { text: line, accent } = themeColors(host);
 		const scene = new Scene({ width: W, height: H }, host);
 		const space = new Space3D({
 			x: W / 2,

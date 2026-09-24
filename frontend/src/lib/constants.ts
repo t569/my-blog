@@ -57,6 +57,11 @@ export const SITE = {
    * choice in localStorage).
    */
   theme: process.env.NEXT_PUBLIC_SITE_THEME ?? "system",
+  /**
+   * The /lab page of interactive scenes (scene-engine demos). Off by default,
+   * so upstream gets neither the page nor a navbar link.
+   */
+  lab: process.env.NEXT_PUBLIC_SITE_LAB === "true",
 } as const;
 
 /**
