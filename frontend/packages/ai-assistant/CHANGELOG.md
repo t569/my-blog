@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- `useAssistantStream(endpoint, { onEvent })`: every raw stream event, for whatever a host
+  wants beyond the conversation — e.g. which sources an answer used.
+
 ## 0.2.0: generic assistants
 
 Additive: every 0.1 export is unchanged and still at the root.

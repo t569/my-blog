@@ -45,6 +45,11 @@ export interface UseAssistantStreamOptions {
   /** How many prior turns to send with each message, for a backend that keeps no thread. */
   history?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * Every raw event, as it arrives — for whatever a host wants from the stream
+   * beyond the conversation (which sources an answer drew on, say).
+   */
+  onEvent?: (event: ChatStreamEvent) => void;
 }
 
 export interface AssistantStream extends ChatState {
@@ -56,7 +61,7 @@ export interface AssistantStream extends ChatState {
 
 export function useAssistantStream(
   endpoint: string,
-  { history = 12, fetchImpl }: UseAssistantStreamOptions = {},
+  { history = 12, fetchImpl, onEvent }: UseAssistantStreamOptions = {},
 ): AssistantStream {
   const runtime = useMemo(
     () => createLangGraphRuntime<ChatStreamEvent>(endpoint, fetchImpl),
@@ -69,6 +74,9 @@ export function useAssistantStream(
   const messagesRef = useRef(state.messages);
   messagesRef.current = state.messages;
   const abortRef = useRef<AbortController | null>(null);
+  // Read through a ref so a new callback each render doesn't restart anything.
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
   useEffect(() => stop, [stop]);
@@ -85,7 +93,10 @@ export function useAssistantStream(
       try {
         await runtime.invoke(
           { threadId: threadId.current, message, messages: prior },
-          (event) => setState((s) => applyChatEvent(s, event)),
+          (event) => {
+            onEventRef.current?.(event);
+            setState((s) => applyChatEvent(s, event));
+          },
           controller.signal,
         );
       } catch (err) {
