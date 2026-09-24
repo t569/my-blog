@@ -9,6 +9,8 @@
 		"lint": "eslint",
 		"check:math": "node --experimental-strip-types --no-warnings scripts/check-math.ts",
 		"check:timeouts": "node --experimental-strip-types --no-warnings scripts/check-timeouts.ts",
+		"check:accent": "node --experimental-strip-types --no-warnings scripts/check-accent.ts",
+		"check:flip": "node --experimental-strip-types --no-warnings scripts/check-flip.ts",
 		"check:slug": "node --experimental-strip-types --no-warnings scripts/check-slug.ts"
 	},
 	"dependencies": {
@@ -24,6 +26,7 @@
 		"@tanstack/react-query-persist-client": "^5.100.8",
 		"axios": "^1.15.2",
 		"date-fns": "^4.1.0",
+		"github-slugger": "2.0.0",
 		"highlight.js": "^11.11.1",
 		"jsonwebtoken": "^9.0.3",
 		"katex": "^0.18.7",

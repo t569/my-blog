@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { measure, play, reset, type Positions } from "@/lib/flip";
+import { prefersReducedMotion } from "@/lib/scene";
 import { usePosts } from "@/hooks/useApi";
 import { useSearchParams, useRouter } from "next/navigation";
 import HeroSection from "./HeroSection";
@@ -101,6 +103,42 @@ export default function HomeFeedClient({
 	const hasActiveFilters = activeCategory || activeTag || activeSeries;
 
 	// Track if we've completed at least one load to avoid full-page reloads on filter changes
+	/* ── Filtering, animated ──
+	   Without this the list is replaced in a single frame: cards that survive
+	   the filter jump to new positions and cards that arrive simply appear.
+	   Measuring the difference and playing it turns that into a narrowing you
+	   can follow. See lib/flip.ts. */
+	const listRef = useRef<HTMLDivElement>(null);
+	const lastPositions = useRef<Positions | null>(null);
+	const previousKeys = useRef<string>("");
+
+	// The ids, in order. Changing identity or order is what filtering does;
+	// re-rendering the same list unchanged is not worth animating.
+	const listKey = allPosts.map((p) => p.id).join(",");
+
+	// No dependency array on purpose. FLIP needs the geometry from *before* the
+	// update, and by the time any effect runs the DOM already holds the new
+	// layout — so instead of trying to measure early (which would mean reading
+	// a ref during render, and React 19 rightly refuses), this records the
+	// positions after every commit. The previous commit's record is the "first"
+	// the next change plays from.
+	useLayoutEffect(() => {
+		const container = listRef.current;
+		const changed = previousKeys.current !== listKey;
+		const first = lastPositions.current;
+
+		// Read the settled layout before play() starts applying transforms.
+		const settled = measure(container);
+
+		if (changed && first) {
+			reset(container);
+			play(container, first, { reducedMotion: prefersReducedMotion() });
+		}
+
+		previousKeys.current = listKey;
+		lastPositions.current = settled;
+	});
+
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	useEffect(() => {
 		if (data) setHasLoadedOnce(true);
@@ -231,7 +269,7 @@ export default function HomeFeedClient({
 						</p>
 					</div>
 				) : (
-					<div className="flex flex-col gap-5">
+					<div className="flex flex-col gap-5" ref={listRef}>
 						{allPosts.map((post) => (
 							<PostCard key={post.id} post={post} />
 						))}

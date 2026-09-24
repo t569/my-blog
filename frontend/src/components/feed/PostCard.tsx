@@ -16,9 +16,12 @@ interface PostCardProps {
 // now that the post page is prerendered that fetches the finished HTML instead.
 export default function PostCard({ post }: PostCardProps) {
 	return (
+		// data-flip-key lets the feed animate this card between filter states
+		// rather than replacing it. Must be stable across renders — see lib/flip.ts.
 		<Link
 			href={`/posts/${post.slug}`}
-			className="group flex flex-col gap-4 rounded-xl border border-border-subtle bg-bg-surface p-6 transition-all duration-300 hover:-translate-y-1 hover:border-border-default hover:shadow-lg"
+			data-flip-key={post.id}
+			className="post-card group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border-subtle bg-bg-surface p-6 transition-colors duration-300 hover:border-border-default"
 		>
 			{/* Top Row: Badges & Date */}
 			<div className="flex items-start justify-between gap-4">

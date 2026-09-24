@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/lib/providers";
 import { SITE } from "@/lib/constants";
+import { skinScript } from "@/lib/skins";
 
 export const metadata: Metadata = {
 	title: {
@@ -30,6 +31,14 @@ export default function RootLayout({
 			data-scroll-behavior="smooth"
 			data-skin={SITE.skin}
 		>
+			<head>
+				{/* Applies the remembered skin before first paint. Without it the
+				    server's default paints first and is swapped on hydration, which
+				    reads as a flash of the wrong palette. */}
+				<script
+					dangerouslySetInnerHTML={{ __html: skinScript() }}
+				/>
+			</head>
 			<body className="min-h-screen bg-bg-page text-text-primary font-body antialiased">
 				<Providers>{children}</Providers>
 			</body>

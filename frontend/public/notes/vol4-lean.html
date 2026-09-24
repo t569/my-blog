@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>How Lean Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="notes.css">
+<style>
+  :root{
+    --acc:#15803d; --acc-2:#7c3aed;
+    --acc-soft:rgba(21,128,61,.10); --acc-line:rgba(21,128,61,.34);
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --acc:#4ade80; --acc-2:#c4b5fd;
+    --acc-soft:rgba(74,222,128,.12); --acc-line:rgba(74,222,128,.38);
+  }}
+  :root[data-theme="dark"]{
+    --acc:#4ade80; --acc-2:#c4b5fd;
+    --acc-soft:rgba(74,222,128,.12); --acc-line:rgba(74,222,128,.38);
+  }
+  .fml{font-family:var(--mono); font-size:15px; width:100%; padding:11px 13px; border-radius:5px;
+    border:1px solid var(--rule); background:var(--paper-3); color:var(--ink)}
+  .tok{font-family:var(--mono); font-size:12px; padding:5px 9px; border-radius:4px; border:1px solid var(--rule);
+    background:var(--paper-3); color:var(--ink); cursor:pointer; margin:0 4px 4px 0}
+  .tok:hover{border-color:var(--acc-line); color:var(--acc)}
+  .tok.dash{border-style:dashed}
+  /* pipeline */
+  .pipe{display:flex; flex-wrap:wrap; align-items:stretch; gap:0; margin:6px 0 4px}
+  .pbox{flex:1 1 110px; min-width:104px; padding:12px 10px; border:1px solid var(--rule); border-radius:5px;
+    background:var(--paper-3); cursor:pointer; text-align:center; transition:.18s}
+  .pbox:hover{border-color:var(--acc-line)}
+  .pbox.on{border-color:var(--acc); background:var(--acc-soft)}
+  .pbox.trusted{border-color:var(--acc-2); border-width:2px}
+  .pbox .n{font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4); display:block}
+  .pbox .t{font-family:var(--sans); font-size:13.5px; font-weight:600; display:block; margin-top:5px}
+  .parrow{flex:0 0 22px; display:grid; place-items:center; color:var(--ink-4); font-family:var(--mono)}
+  .pdetail{border:1px solid var(--rule); border-left:3px solid var(--acc); border-radius:3px;
+    background:var(--paper-2); padding:16px 20px; margin-top:14px; font-family:var(--sans); font-size:14.5px; line-height:1.6}
+  .pdetail h6{font-family:var(--mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--acc); margin:14px 0 6px} .pdetail h6:first-child{margin-top:0}
+  /* term / goal displays */
+  .term{font-family:var(--mono); font-size:14.5px; line-height:1.85; background:var(--paper-3);
+    border:1px solid var(--rule); border-radius:5px; padding:14px 16px; overflow-x:auto; white-space:pre-wrap}
+  .term .hot{background:var(--acc-soft); outline:1px solid var(--acc-line); border-radius:3px; padding:1px 2px}
+  .goalbox{font-family:var(--mono); font-size:14px; line-height:1.9; background:var(--paper-3);
+    border:1px solid var(--rule); border-radius:5px; padding:14px 16px; white-space:pre-wrap; overflow-x:auto; min-height:110px}
+  .goalbox .hyp{color:var(--ink-2)}
+  .goalbox .bar{color:var(--ink-4)}
+  .goalbox .tgt{color:var(--acc); font-weight:600}
+  .goalbox .done{color:var(--ok)}
+  .rulechip{display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    padding:3px 9px; border-radius:999px; border:1px solid var(--acc-line); color:var(--acc); margin-left:8px}
+  .steplist{font-family:var(--mono); font-size:12.5px; line-height:1.7; max-height:230px; overflow:auto;
+    border:1px solid var(--rule); border-radius:5px; padding:12px 14px; background:var(--paper-2); margin-top:12px}
+  .steplist div{padding:2px 0; border-bottom:1px solid var(--rule-soft)}
+  .steplist div:last-child{border:0}
+  .steplist .r{color:var(--acc-2); font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; float:right}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:760px){ .cols{grid-template-columns:1fr} }
+  .m-motive{color:var(--acc-2); font-weight:600}
+  .m-minor{color:var(--acc)}
+  .m-major{color:var(--warn)}
+  .legend{font-family:var(--mono); font-size:10.5px; color:var(--ink-3); margin-top:10px}
+</style>
+
+<script src="glossary-terms.js"></script>
+<script src="notes.js"></script>
+<script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.js"></script>
+<script src="glossary.js"></script>
+
+<div class="progress" id="prog"></div>
+
+<header class="masthead">
+  <div class="mh-mark">IV</div>
+  <div class="mh-title">How Lean Works</div>
+  <div class="mh-vol">Marginalia · Vol. IV · Interactive Notes</div>
+  <div class="mh-spacer"></div>
+  <span class="lvlhint" id="lvlHint">click any <span style="border-bottom:1px dashed var(--acc-line)">dotted term</span> for a plain explanation</span>
+  <div class="switch" role="group" aria-label="Reading level">
+    <button data-level-btn="grad" aria-pressed="true" title="Concise: assumes the prerequisites">Graduate</button>
+    <button data-level-btn="beg" aria-pressed="false" title="Adds undergraduate-level explanations throughout">Ground-up</button>
+  </div>
+  <button class="icon-btn" id="themeBtn" title="Toggle theme">☀</button>
+</header>
+
+<div class="shell">
+  <nav class="toc"><h6>Contents</h6><div id="toc"></div></nav>
+  <main class="body">
+
+  <div class="cover">
+    <p class="eyebrow">Volume IV · Type Theory &amp; Proof Assistants</p>
+    <h1>A proof is a <em>program</em></h1>
+    <p class="dek">Lean is a dependently-typed programming language in which propositions are types and proofs are terms. Everything you type — tactics, automation, elaboration — is untrusted machinery whose only job is to construct a term that a small, boring kernel will then re-check from scratch.</p>
+    <dl class="meta-strip">
+      <div><dt>Prerequisites</dt><dd>None assumed — every term is explained on click</dd></div>
+      <div><dt>Interactives</dt><dd>Seven</dd></div>
+      <div><dt>Reading time</dt><dd>~75 min graduate · ~2 hr ground-up</dd></div>
+      <div><dt>Payoff</dt><dd>Knowing what you are trusting</dd></div>
+    </dl>
+
+    <div class="howto">
+      <p><b>Written for three readers at once</b> — graduate students who want the architecture, undergraduates meeting type theory for the first time, and self-studiers with nobody to ask.</p>
+      <p><span class="k">1</span> <b>Click any dotted term</b> for a plain-English card with a worked example and usually an animation. Type theory has a dense vocabulary that all arrives at once; the cards mean you never have to hold more than one new word at a time.</p>
+      <p><span class="k">2</span> <b>Switch to <i>Ground-up</i></b> in the header for a slower parallel exposition, aimed at someone who has written a program but never seen a dependent type.</p>
+      <p><span class="k">3</span> <b>Fig. 7 is the one to sit with.</b> It draws the proof term being built as you apply tactics — which is the single claim this whole volume rests on.</p>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <section id="s0">
+    <h2><span class="num">§ 0</span>The one-sentence version</h2>
+
+    <p class="lede">Lean's kernel does exactly one thing — decide whether a given term has a given type — and every other part of the system exists to produce terms for it to check. If you understand type-checking and definitional equality, you understand Lean; the rest is ergonomics.</p>
+
+    <p>That architecture is called the <strong>de Bruijn criterion</strong>: a proof assistant should have a small, independently checkable core. Lean's elaborator is roughly 100 000 lines of subtle, heuristic, occasionally buggy code. Its kernel is a few thousand lines and is what you are actually trusting. A bug in the elaborator produces a term that fails to check; a bug in the kernel is a crisis.</p>
+
+    <div class="beg">
+      <p><strong>What does "a proof is a program" actually mean?</strong> Take the statement "if A then B". A proof of it is a method for converting any proof of A into a proof of B — which is to say, a <em>function</em> from proofs-of-A to proofs-of-B.</p>
+      <p>So if we write <code>A</code> for the type "proofs of A", then "A implies B" is the function type <code>A → B</code>, and a proof of it is literally a function. Modus ponens — from A and A → B, conclude B — becomes function application. This is not an analogy; the two are the same mathematical object, a coincidence discovered independently several times and known as the <strong>Curry–Howard correspondence</strong>.</p>
+      <p>The whole design of Lean follows from taking that identification completely seriously: if proofs are programs, then a proof checker is a type checker, and you already know how to write one of those.</p>
+    </div>
+
+    <div class="box">
+      <span class="lab">The dictionary</span>
+      <div class="scroller"><table>
+        <tr><th>Logic</th><th>Type theory</th><th>Lean</th></tr>
+        <tr><td>proposition</td><td>type</td><td><code>P : Prop</code></td></tr>
+        <tr><td>proof</td><td>term</td><td><code>h : P</code></td></tr>
+        <tr><td>A → B</td><td>function type</td><td><code>A → B</code></td></tr>
+        <tr><td>→-introduction</td><td>lambda abstraction</td><td><code>fun a => …</code></td></tr>
+        <tr><td>modus ponens</td><td>application</td><td><code>f a</code></td></tr>
+        <tr><td>A ∧ B</td><td>product</td><td><code>And A B</code>, <code>⟨ha, hb⟩</code></td></tr>
+        <tr><td>A ∨ B</td><td>sum</td><td><code>Or A B</code>, <code>Or.inl ha</code></td></tr>
+        <tr><td>∀ x : α, P x</td><td>dependent function (Π)</td><td><code>(x : α) → P x</code></td></tr>
+        <tr><td>∃ x : α, P x</td><td>dependent pair (Σ)</td><td><code>⟨a, ha⟩</code></td></tr>
+        <tr><td>False</td><td>empty type</td><td><code>False</code></td></tr>
+        <tr><td>proof checking</td><td>type checking</td><td>the kernel</td></tr>
+      </table></div>
+      </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s1">
+    <h2><span class="num">§ 1</span>Curry–Howard, by writing programs</h2>
+
+    <div class="beg" data-t="the dictionary, slowly">
+      <h5>Start with what a proof of "if A then B" has to <em>be</em></h5>
+      <p>Forget types for a moment. Suppose I claim to have proved "if A then B". What have I actually got?</p>
+      <p>I have a <strong>method</strong>: hand me any proof of A, and I will hand you back a proof of B. That is what the claim means. If I cannot do that, I have not proved it.</p>
+      <p>Now notice the shape of that sentence. "Give me an X, I give you back a Y" is the definition of a <strong>function</strong> from X to Y.</p>
+
+      <div class="analogy">
+        A recipe for pastry is not pastry. It is a procedure that turns flour and butter into pastry. A proof of "A implies B" is likewise not a proof of B — it is a procedure that turns any proof of A into one.
+      </div>
+
+      <h5>So write it down</h5>
+      <p>Write <code>A</code> for "the collection of proofs of A". Then:</p>
+      <ul>
+        <li>"A implies B" is the function type <code>A → B</code>, and a proof of it is <em>literally a function</em>.</li>
+        <li><strong>Modus ponens</strong> — from A and A→B conclude B — is <em>function application</em>: you have <code>a : A</code> and <code>f : A → B</code>, so you write <code>f a</code>.</li>
+        <li>"A and B" is a <strong>pair</strong>: to have both, you must have one of each.</li>
+        <li>"A or B" is a <strong>tagged union</strong>: you have one of them, plus a tag saying which.</li>
+        <li><strong>False</strong> is the <strong>empty type</strong>: a type with no elements at all, because there is no proof of a falsehood.</li>
+      </ul>
+      <p>Every line of that list was forced. Nothing was chosen for elegance.</p>
+
+      <h5>Why this is a discovery rather than a notation</h5>
+      <p>It would be unremarkable if someone had merely <em>decided</em> to write logic this way. What happened is stranger: logicians and computer scientists developed these two subjects separately, for unrelated reasons, and the structures turned out to be <em>the same objects</em>. Curry noticed part of it in the 1930s, Howard wrote it up in 1969, and it has since been found again in category theory and in topology.</p>
+      <p>Two consequences follow immediately, and Lean is built on both. <strong>A proof checker is a type checker</strong> — and we already know how to write those. And <strong>ex falso quodlibet is not an axiom</strong>: it is what you get by asking "how do I write a function out of the empty type?", to which the answer is "there are no cases to handle, so you are already done".</p>
+
+      <h5>The bridge back to Volume III</h5>
+      <p>Type <code>fun x =&gt; fun y =&gt; x</code> into the panel below. You get <code>α → β → α</code> — which is <strong>axiom A1</strong> of the Hilbert system you drove by hand in Vol. III. Type <code>fun f =&gt; fun g =&gt; fun x =&gt; f x (g x)</code> and you get <strong>axiom A2</strong>.</p>
+      <p>And the five-line Hilbert derivation of \(p \to p\) that took genuine bookkeeping? On this side of the mirror it is the program <code>fun x =&gt; x</code>. <em>Lean is what you get when you decide to work on the program side.</em></p>
+    </div>
+
+    <p>The fastest way to believe the dictionary is to write a program and read off the theorem it proves. The panel below is a real type inferencer for the simply-typed lambda calculus — unification, occurs check and all. Write a function; get a tautology.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 1</span>
+        <span class="t">Write a program, read a theorem</span>
+        <span class="pill">Type inference</span>
+      </div>
+      <div class="plate-body">
+        <input class="fml" id="ch-in" spellcheck="false" value="fun f => fun g => fun x => f x (g x)">
+        <div style="margin-top:10px" id="ch-presets"></div>
+        <h4>Inferred type — which is the proposition you proved</h4>
+        <div class="term" id="ch-type">—</div>
+        <dl class="readout">
+          <div><dt>status</dt><dd id="ch-status" class="plain">—</dd></div>
+          <div><dt>type variables</dt><dd id="ch-tv">—</dd></div>
+          <div><dt>λ-abstractions</dt><dd id="ch-lam">—</dd></div>
+          <div><dt>applications</dt><dd id="ch-app">—</dd></div>
+        </dl>
+        <div id="ch-note" style="font-family:var(--sans);font-size:14.5px;color:var(--ink-2);margin-top:14px;line-height:1.6"></div>
+      </div>
+      <figcaption class="plate-foot">Syntax: <code>fun x =&gt; e</code>, application by juxtaposition, parentheses. Every λ you write is an implication-introduction; every application is a modus ponens. <strong>Try <code>fun x =&gt; x x</code>:</strong> it fails the occurs check — "cannot construct the infinite type α = α → β". That failure is the type system refusing a self-application, and it is exactly the same move that stops Russell's paradox. Untyped lambda calculus <em>does</em> admit <code>x x</code>, and is correspondingly inconsistent as a logic: every proposition has a "proof", namely a non-terminating one.</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">The connection back to Volume III</span>
+      <p>Type <code>fun x =&gt; fun y =&gt; x</code> and you get <code>α → β → α</code>. That is <strong>axiom A1</strong> of the Hilbert system in Vol. III §1.3. Type <code>fun f =&gt; fun g =&gt; fun x =&gt; f x (g x)</code> and you get <code>(α → β → γ) → (α → β) → α → γ</code> — <strong>axiom A2</strong>. These are the combinators <strong>K</strong> and <strong>S</strong>, and it is a theorem that every tautology of implicational intuitionistic logic is the type of some closed λ-term. The five-line Hilbert derivation of \(p\to p\) you drove by hand in Vol. III is, on this side of the mirror, the one-line program <code>fun x =&gt; x</code>. <em>Lean is what you get when you decide to work on the program side.</em></p>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Nicolaas Govert de Bruijn<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Nicolaas_de_Bruijn.jpg?width=460"
+             alt="Portrait of Nicolaas Govert de Bruijn" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1967 · Eindhoven</span>
+        <h4 class="who">Nicolaas Govert de Bruijn</h4>
+        <figcaption>De Bruijn built AUTOMATH, the first system for machine-checked mathematics, and formulated the principle that now bears his name: a proof assistant should produce proofs checkable by a <em>small, independent</em> program. Lean\u2019s elaborator is around 100 000 lines of heuristic code; its kernel is a few thousand. A bug in the first produces a term that fails to check. Only a bug in the second would be a crisis. <strong>That asymmetry is the entire architecture of §2.</strong>
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Nicolaas_de_Bruijn.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s2">
+    <h2><span class="num">§ 2</span>The kernel, and what you are trusting</h2>
+
+    <p>When you write a Lean proof, this is what happens to it. Click any stage.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 2</span>
+        <span class="t">The pipeline, and where the trust boundary sits</span>
+        <span class="pill">Click a stage</span>
+      </div>
+      <div class="plate-body">
+        <div class="pipe" id="pipe"></div>
+        <div class="legend">Purple outline = inside the trusted computing base. Everything else can be arbitrarily wrong without producing a false theorem.</div>
+        <div class="pdetail" id="pipe-detail"></div>
+      </div>
+      <figcaption class="plate-foot">The asymmetry is the whole design. Tactics, <code>simp</code>, <code>omega</code>, <code>decide</code>, type-class resolution, unification heuristics, the macro system — all untrusted. Each merely <em>proposes</em> a term. The kernel then re-derives the typing from the axioms with no memory of how the term was produced. This is why Mathlib can contain a hundred thousand theorems proved by machinery nobody has fully audited, and still be believable.</figcaption>
+    </figure>
+
+    <h3><span class="num">2.1</span>The three axioms</h3>
+
+    <p>Lean's kernel implements the Calculus of Inductive Constructions. On top of it, Mathlib uses exactly three axioms, and <code>#print axioms myTheorem</code> tells you which ones a result depends on:</p>
+
+    <pre><code><span class="kw">axiom</span> propext : ∀ {a b : Prop}, (a ↔ b) → a = b
+<span class="kw">axiom</span> Classical.choice : {α : <span class="ty">Sort</span> u} → Nonempty α → α
+<span class="kw">axiom</span> Quot.sound : ∀ {α} {r : α → α → Prop} (a b : α), r a b → Quot.mk r a = Quot.mk r b</code></pre>
+
+    <p><code>Classical.choice</code> gives excluded middle (via Diaconescu's theorem), <code>propext</code> gives propositional extensionality, and <code>Quot.sound</code> makes quotient types work. A proof printing <code>'theorem' depends on axioms: []</code> is fully constructive; one listing <code>Classical.choice</code> is classical. <strong>The system makes your logical commitments machine-checkable, which is a genuinely new thing in mathematics.</strong></p>
+
+    <div class="box warn">
+      <span class="lab">What is actually being trusted</span>
+      <ul>
+        <li><strong>The kernel's correctness.</strong> A few thousand lines of C++. Independent re-implementations exist (<code>lean4checker</code>, Trepplein, and others) and can re-verify an entire compiled environment.</li>
+        <li><strong>The axioms' consistency.</strong> Carneiro showed Lean's type theory is consistent relative to ZFC plus countably many inaccessible cardinals.</li>
+        <li><strong>That the statement says what you think.</strong> The unglamorous failure mode, and by far the most common one in practice. A vacuously-true hypothesis or a subtly-wrong definition is checked just as happily as a correct one.</li>
+        <li><strong>Escape hatches.</strong> <code>sorry</code> leaves a hole (Lean warns loudly). <code>native_decide</code> trusts the compiler and its runtime, considerably widening the trusted base — which is why Mathlib does not permit it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s3">
+    <h2><span class="num">§ 3</span>Type checking is computation</h2>
+
+    <p>The kernel's central question is not "are these two terms equal?" but "are they <strong>definitionally equal</strong>?" — do they reduce to the same normal form? Definitional equality is decided by running five reduction rules:</p>
+
+    <div class="box">
+      <span class="lab">The reduction rules</span>
+      <ul>
+        <li><strong>β</strong> — apply a lambda: <code>(fun x =&gt; e) a ⟶ e[x := a]</code></li>
+        <li><strong>δ</strong> — unfold a definition: <code>Nat.add ⟶ fun m n =&gt; …</code></li>
+        <li><strong>ι</strong> — a recursor meets a constructor: <code>Nat.rec z s (Nat.succ n) ⟶ s n (Nat.rec z s n)</code></li>
+        <li><strong>ζ</strong> — expand a let: <code>let x := a; e ⟶ e[x := a]</code></li>
+        <li><strong>η</strong> — functions with the same behaviour are equal: <code>fun x =&gt; f x ⟶ f</code></li>
+      </ul>
+    </div>
+
+    <p>The consequence is startling the first time: <code>example : 2 + 2 = 4 := rfl</code> works, and it works by <em>computing</em>, not by searching for a proof. <code>rfl : a = a</code> is accepted for a goal <code>a = b</code> precisely when the kernel can reduce <code>a</code> and <code>b</code> to the same term. Drive the machine yourself.</p>
+
+    <div class="beg" data-t="equality that is settled by running">
+      <h5>Two different things called "equal"</h5>
+      <p>Ordinary mathematics has one notion of equality. Lean has two, and confusing them is the source of most early frustration.</p>
+      <p><strong>Propositional equality</strong> is the statement <code>a = b</code>. It is a proposition, so it is a type, so proving it means producing a term. That is the normal kind: you prove it with an argument.</p>
+      <p><strong>Definitional equality</strong> is different. Two terms are definitionally equal if they <em>compute to the same thing</em>. This is not proved — it is <em>checked</em>, by running both sides until neither can be reduced further and comparing the results.</p>
+
+      <div class="analogy">
+        Compare <code>2 + 2</code> and <code>4</code> in a calculator. You do not <em>argue</em> that they are equal; you evaluate and observe. Now compare <code>x + y</code> and <code>y + x</code>: evaluation gets you nowhere, because there is nothing to evaluate until you know what <code>x</code> and <code>y</code> are. That is exactly the line between the two notions.
+      </div>
+
+      <h5>Which is why <code>rfl</code> can prove arithmetic</h5>
+      <p><code>rfl</code> is the proof that a thing equals itself — that is its <em>only</em> content. It is accepted for a goal <code>a = b</code> exactly when the kernel can reduce both sides to the same normal form. So <code>example : 2 + 2 = 4 := rfl</code> compiles, and the "proof" is the single word <code>rfl</code>. The work was done by <em>computing</em>, not by searching.</p>
+      <p>This gives you <strong>proof by evaluation</strong>. The <code>decide</code> tactic takes a decidable proposition, computes a boolean, and if it is <code>true</code> the whole proof is a <code>rfl</code>. You can prove "there are 25 primes below 100" by running a program, and the kernel confirms it by running the same program.</p>
+
+      <h5>The asymmetry that trips up everyone</h5>
+      <p><code>n + 0 = n</code> is provable by <code>rfl</code>. <code>0 + n = n</code> is <strong>not</strong>. Both are true. Why the difference?</p>
+      <p>Because of how <code>Nat.add</code> was defined: it recurses on its <em>second</em> argument. In <code>n + 0</code>, the second argument is the literal constructor <code>zero</code>, so the ι-rule fires immediately and the whole thing collapses to <code>n</code>. In <code>0 + n</code>, the second argument is a free variable — nothing is known about it, no rule can fire, and the term is stuck.</p>
+      <p>So this is a fact about <em>the definition</em>, not about arithmetic. Had <code>Nat.add</code> recursed on its first argument, the asymmetry would point the other way. <strong>Both statements are true; only one is true by computation</strong> — and that is the first moment most people feel that dependent types are genuinely a different animal.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 3</span>
+        <span class="t">The reduction machine</span>
+        <span class="pill">Step it</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="rd-pick"></div>
+        </div>
+        <div class="ctl">
+          <button class="btn fixed" id="rd-step">Step →</button>
+          <button class="btn fixed" id="rd-run">▶ Normalise</button>
+          <button class="btn fixed" id="rd-reset">Reset</button>
+          <button class="btn fixed" id="rd-num">Show numerals</button>
+        </div>
+        <h4>Current term<span class="rulechip" id="rd-rule">—</span></h4>
+        <div class="term" id="rd-term">—</div>
+        <dl class="readout">
+          <div><dt>steps taken</dt><dd id="rd-n">0</dd></div>
+          <div><dt>next rule</dt><dd id="rd-next" class="plain">—</dd></div>
+          <div><dt>normal form?</dt><dd id="rd-nf" class="plain">—</dd></div>
+          <div><dt>term size</dt><dd id="rd-size">—</dd></div>
+        </dl>
+        <div class="steplist" id="rd-log"></div>
+        <div id="rd-note" style="font-family:var(--sans);font-size:14px;color:var(--ink-2);margin-top:14px;line-height:1.6"></div>
+      </div>
+      <figcaption class="plate-foot">This is a genuine evaluator, not a recording: the terms are real data structures and each step fires an actual rule. Note that <code>Nat.add</code> is not primitive — it is <em>defined</em> by <code>Nat.rec</code>, so arithmetic is literally structural recursion unfolding. (Lean's kernel additionally special-cases <code>Nat</code> with GMP arithmetic for speed, but the definitional content is exactly what you see here, and the special-casing is one of the few places the kernel is bigger than it looks.)</figcaption>
+    </figure>
+
+    <div class="beg">
+      <p><strong>Why is this a big deal?</strong> In ordinary mathematics, "2 + 2 = 4" is a theorem you prove. In Lean, it is a <em>computation</em> the checker performs, and the proof term is the single word <code>rfl</code> — "it's the same thing".</p>
+      <p>That gives you proof by evaluation. <code>decide</code> works this way: it takes a decidable proposition, computes the boolean, and if the answer is <code>true</code> the whole proof is a <code>rfl</code>. You can prove "there are 25 primes below 100" by running a program, and the kernel verifies it by running the program itself.</p>
+      <p>It also explains a common frustration. Two things that are <em>provably</em> equal need not be <em>definitionally</em> equal. <code>n + 0</code> reduces to <code>n</code> (the recursion is on the second argument, so it fires immediately), but <code>0 + n</code> does not — it is stuck on a variable. So <code>rfl</code> proves <code>n + 0 = n</code> and fails on <code>0 + n = n</code>, which needs an induction. The asymmetry is an artefact of how <code>Nat.add</code> was defined, and it is every beginner's first real surprise.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s4">
+    <h2><span class="num">§ 4</span>Inductive types and their recursors</h2>
+
+    <p>Almost everything in Lean is an inductive type. You declare constructors; Lean <em>derives</em> the elimination principle automatically, by a fixed schema. Understanding that schema is understanding the foundations.</p>
+
+    <div class="box">
+      <span class="lab">The schema</span>
+      <p>Given <code>inductive I</code> with constructors \(c_1,\dots,c_n\), Lean generates <code>I.rec</code> taking:</p>
+      <ul>
+        <li>a <span class="m-motive">motive</span> — what you want to produce for each element of <code>I</code>;</li>
+        <li>one <span class="m-minor">minor premise</span> per constructor — how to build the result in that case, <em>given the results for the recursive arguments</em> (the induction hypotheses);</li>
+        <li>a <span class="m-major">major premise</span> — the actual element you are eliminating.</li>
+      </ul>
+      <p>plus one ι-reduction rule per constructor, saying what happens when the recursor meets that constructor.</p>
+    </div>
+
+    <div class="beg" data-t="what a recursor is, without jargon">
+      <h5>Three words, then the idea</h5>
+      <p>The schema above uses three terms that sound like more than they are.</p>
+      <p><strong>Motive</strong> — what you want to produce, for each element of the type. If you are computing a number, the motive is "a number". If you are proving a statement about every \(n\), the motive is "a proof of that statement for \(n\)".</p>
+      <p><strong>Minor premise</strong> — one per constructor, saying how to handle that case. For <code>Nat</code> there are two: what to do for <code>zero</code>, and what to do for <code>succ n</code> <em>given that you already have the answer for \(n\)</em>.</p>
+      <p><strong>Major premise</strong> — the actual element you are taking apart.</p>
+
+      <div class="analogy">
+        It is a <code>switch</code> statement with a recursive call built in. "Given a number: if it is zero, do this; if it is one-more-than-\(m\), do that, and you may use the answer for \(m\)." Any programmer has written this a hundred times.
+      </div>
+
+      <h5>The observation worth stopping for</h5>
+      <p>Write that out for <code>Nat</code> and compare it, line by line, with the principle of mathematical induction: prove it for zero; prove that \(n\) implies \(n+1\); conclude it for all \(n\).</p>
+      <p>They are not similar. <strong>They are the same term.</strong> <code>Nat.rec</code> <em>is</em> recursion when the motive lands in <code>Type</code>, and <em>is</em> induction when the motive lands in <code>Prop</code>. Curry–Howard again, at the level of the elimination rule rather than the introduction rule.</p>
+      <p>This is why Vol. III §1.2 kept insisting on "the smallest set closed under these rules". That phrase is precisely what makes the recursor exist.</p>
+
+      <h5>Ex falso, for free</h5>
+      <p>Now apply the schema to <code>False</code>, which is declared with <em>no constructors at all</em>. One minor premise per constructor means <strong>zero</strong> minor premises. So <code>False.rec</code> takes a motive and a major premise and produces… anything you asked for.</p>
+      <p>Read what just happened. "From a contradiction, anything follows" was not postulated. It is what the general schema degenerates to when the list of cases is empty. <strong>You do not have to handle any cases, because there are none.</strong> The same schema, applied to <code>Nat</code>, gives you induction. One rule, two of the most-used principles in mathematics.</p>
+    </div>
+
+    <p>Pick a type and watch the recursor be derived.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 4</span>
+        <span class="t">The recursor generator</span>
+        <span class="pill">Derive it</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl"><div class="seg fixed" id="rc-pick"></div></div>
+        <div class="cols">
+          <div>
+            <h4>You write</h4>
+            <div class="term" id="rc-decl">—</div>
+          </div>
+          <div>
+            <h4>Lean generates</h4>
+            <div class="term" id="rc-rec">—</div>
+          </div>
+        </div>
+        <div class="legend"><span class="m-motive">■ motive</span> &nbsp; <span class="m-minor">■ minor premises (one per constructor)</span> &nbsp; <span class="m-major">■ major premise</span></div>
+        <h4>ι-reduction rules</h4>
+        <div class="term" id="rc-iota">—</div>
+        <div class="pdetail" id="rc-note"></div>
+      </div>
+      <figcaption class="plate-foot">Four observations worth sitting with. <strong>(1)</strong> <code>Nat.rec</code> is simultaneously the induction principle and the definition of recursion — same term, and that is Curry–Howard again. <strong>(2)</strong> <code>False</code> has no constructors, so <code>False.rec</code> has no minor premises and hands you anything at all: <em>ex falso quodlibet</em> is not an axiom, it is the empty case of a schema. <strong>(3)</strong> <code>Eq.rec</code> is the only thing Lean knows about equality; every <code>rw</code>, <code>subst</code> and <code>congr</code> in Mathlib elaborates down to it. <strong>(4)</strong> <code>Acc.rec</code> is how non-structural recursion is justified — you recurse on the proof of accessibility instead of on the data.</figcaption>
+    </figure>
+
+    <h3><span class="num">4.1</span>Why recursion has to terminate</h3>
+
+    <p>Every definition must be seen to terminate, or the logic dies: a non-terminating <code>f : False</code> would prove everything. Lean accepts three routes — <strong>structural recursion</strong> (compiled to <code>rec</code>), <strong>well-founded recursion</strong> (compiled to <code>Acc.rec</code> with a decreasing measure), and <strong>partial functions</strong> marked <code>partial</code>, which are excluded from the logic and usable only for programming.</p>
+
+    <p>The strict-positivity condition on inductive declarations is the other half of this. Lean rejects</p>
+
+    <pre><code><span class="kw">inductive</span> <span class="ty">Bad</span> <span class="kw">where</span>
+  | mk : (<span class="ty">Bad</span> → <span class="ty">Bad</span>) → <span class="ty">Bad</span>   <span class="cm">-- ✗ Bad occurs to the left of an arrow</span></code></pre>
+
+    <p>because such a type would let you embed the untyped lambda calculus, recover <code>fun x =&gt; x x</code>, and build a non-terminating term of type <code>False</code>. The occurs-check failure you saw in Fig. 1 and this rejection are the same guard, at two different levels.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s5">
+    <h2><span class="num">§ 5</span>Universes, and why <code>Prop</code> is special</h2>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Bertrand Russell<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Bertrand_Russell_photo.jpg?width=460"
+             alt="Photograph of Bertrand Russell" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1901 · Cambridge</span>
+        <h4 class="who">Bertrand Russell</h4>
+        <figcaption>Russell asked whether the set of all sets that do not contain themselves contains itself, and either answer contradicts the other. His own fix was a <em>theory of types</em>: arrange objects in levels so that nothing can refer to its own level. Girard later showed the same diagonal goes through in a type theory with <code>Type : Type</code>, producing a term of type <code>False</code>. <strong>The universe tower in §5 is Russell’s answer, still load-bearing a century later.</strong>
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Bertrand_Russell_photo.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <p>There is no type of all types — <code>Type : Type</code> makes the system inconsistent (Girard's paradox, a typed version of Russell). So Lean has a hierarchy:</p>
+
+    <p>\[ \mathtt{Prop} = \mathtt{Sort}\,0, \qquad \mathtt{Type}\ u = \mathtt{Sort}\,(u+1), \qquad \mathtt{Sort}\,u : \mathtt{Sort}\,(u+1). \]</p>
+
+    <div class="beg" data-t="why there is a tower at all">
+      <h5>The problem being solved</h5>
+      <p>It would be convenient if there were a type containing all types, so that <code>Type : Type</code>. There is not, and the reason is Russell's paradox wearing type-theoretic clothes.</p>
+      <p>Russell: consider the set of all sets that do not contain themselves. Does it contain itself? Either answer contradicts the other. Girard showed the same diagonal argument goes through in a type theory with <code>Type : Type</code>, producing a term of type <code>False</code> — which would make every statement provable and end mathematics.</p>
+      <p>The fix is a <strong>tower</strong>. <code>Type 0 : Type 1 : Type 2 : …</code>, forever. Every type lives one floor below the thing that contains it, so nothing ever contains itself, and the diagonal has no floor to stand on.</p>
+
+      <div class="analogy">
+        A library catalogue can list every book, but it cannot be one of the books it lists — so you put it on a different shelf. Then a catalogue of catalogues goes on a third shelf. The tower is that, made a rule.
+      </div>
+
+      <h5>The one place the rule is deliberately broken — safely</h5>
+      <p>At the very bottom sits <code>Prop</code>, and it gets a special dispensation. A proposition may quantify over <em>all</em> propositions, including itself, and remain a proposition: <code>∀ p : Prop, p → p</code> is itself a <code>Prop</code>. That is <strong>impredicativity</strong>, and one floor up it would be fatal.</p>
+      <p>Why is it safe here? Because <code>Prop</code> also has <strong>proof irrelevance</strong>: any two proofs of the same proposition are definitionally equal. That flattens <code>Prop</code> completely. An element of <code>p : Prop</code> carries exactly one bit of information — whether it exists at all. Girard's diagonalisation needs to <em>distinguish</em> elements of a type in order to build its contradiction, and here there is nothing to distinguish.</p>
+
+      <h5>What the split pays for, and what it costs</h5>
+      <p><strong>Pays:</strong> proofs carry no computational content, so the compiler deletes them entirely — a verified program runs at the speed of an unverified one. And classical axioms like excluded middle are safe in <code>Prop</code> precisely because they destroy no computation; there was none to destroy.</p>
+      <p><strong>Costs:</strong> you cannot generally get data back out of a proof. From <code>∃ x, P x</code> you may not extract the witness to compute with, because that would leak the information proof irrelevance just erased. This is why Mathlib carefully distinguishes <code>∃</code> from <code>Σ</code>, and why <code>Classical.choice</code> has to be an axiom rather than a theorem.</p>
+    </div>
+
+    <p>The formation rule for function types is where it gets interesting:</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 5</span>
+        <span class="t">Universe calculator</span>
+        <span class="pill">Impredicativity</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <label>domain <span class="v" id="uv-av">Type 0</span><input type="range" id="uv-a" min="0" max="4" step="1" value="1"></label>
+          <label>codomain <span class="v" id="uv-bv">Type 0</span><input type="range" id="uv-b" min="0" max="4" step="1" value="1"></label>
+        </div>
+        <div class="term" id="uv-out">—</div>
+        <div class="pdetail" id="uv-note"></div>
+      </div>
+      <figcaption class="plate-foot">The rule: <code>(x : A) → B</code> lives in <code>Sort (imax u v)</code>, where <code>imax u 0 = 0</code> and otherwise <code>imax u v = max u v</code>. That special case is <strong>impredicativity of <code>Prop</code></strong>: a proposition may quantify over <em>all</em> propositions — even over itself — and stay a proposition. <code>∀ p : Prop, p → p</code> is itself a <code>Prop</code>. Doing the same one level up (<code>Type : Type</code>) is fatal; doing it in <code>Prop</code> is safe, because <code>Prop</code> also has <strong>proof irrelevance</strong> — any two proofs of the same proposition are definitionally equal, so there is no information in a proof to diagonalise against.</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">Why the Prop / Type split earns its keep</span>
+      <ul>
+        <li><strong>Erasure.</strong> Proofs carry no computational content, so the compiler deletes them. A verified program runs at the speed of the unverified one.</li>
+        <li><strong>Proof irrelevance.</strong> <code>h₁ = h₂</code> definitionally for any two proofs of the same <code>Prop</code>. This makes dependent types involving proofs far more usable.</li>
+        <li><strong>Safety of classical axioms.</strong> Excluded middle in <code>Prop</code> destroys no computation, because there was none to destroy. In <code>Type</code> it would.</li>
+        <li><strong>The price:</strong> restricted elimination. You cannot generally eliminate a <code>Prop</code> into <code>Type</code> — you cannot extract a witness from <code>∃ x, P x</code> to compute with. (Singleton elimination is the carefully-carved exception that lets <code>Eq</code> and <code>And</code> work.) This is why Mathlib distinguishes <code>∃</code> from <code>Σ</code>, and why <code>Classical.choice</code> has to be an axiom rather than a theorem.</li>
+      </ul>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Per Martin-L&#246;f<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Per_Martin-Lof_May_2007_(cropped).jpg?width=460"
+             alt="Photograph of Per Martin-Löf" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1972 · Stockholm</span>
+        <h4 class="who">Per Martin-L&#246;f</h4>
+        <figcaption>Martin-L\u00f6f\u2019s intuitionistic type theory made dependent types into a foundation for mathematics rather than a tool for programming — and put the Curry\u2013Howard correspondence at the centre rather than treating it as a curiosity. Lean\u2019s Calculus of Inductive Constructions descends from it, as do Agda, Coq/Rocq, and the homotopy type theory programme. <strong>Every inductive type and recursor in §4 is his schema.</strong>
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Per_Martin-Lof_May_2007_(cropped).jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s6">
+    <h2><span class="num">§ 6</span>Tactics: the part you actually type</h2>
+
+    <p>Writing raw terms is unpleasant past a certain size. Tactic mode gives you a <strong>goal state</strong> — a metavariable with a local context — and tactics are programs that refine it. When the script finishes, the metavariable has been assigned a term, and <em>that</em> is what the kernel sees.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 6</span>
+        <span class="t">Tactic sandbox</span>
+        <span class="pill">Prove it</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl"><div class="seg fixed" id="tc-pick"></div></div>
+        <div class="cols">
+          <div>
+            <h4>Goal state</h4>
+            <div class="goalbox" id="tc-goal">—</div>
+          </div>
+          <div>
+            <h4>Your script</h4>
+            <div class="term" id="tc-script" style="min-height:110px">—</div>
+          </div>
+        </div>
+        <h4>Available tactics</h4>
+        <div id="tc-tactics"></div>
+        <div class="ctl">
+          <button class="btn fixed" id="tc-undo">← Undo</button>
+          <button class="btn fixed" id="tc-reset">Reset</button>
+          <button class="btn fixed" id="tc-solve">⚡ Solve it</button>
+        </div>
+        <div class="pdetail" id="tc-note"></div>
+      </div>
+      <figcaption class="plate-foot">A faithful simulation, not a live Lean: running the real thing in a browser needs a WebAssembly build of the whole toolchain. The goal transitions and the resulting terms are what Lean actually does. <strong>The point to take away is the last line of each proof:</strong> the term. Your tactic script is a <em>program that writes that term</em>, and once it has, the script is thrown away. Nothing about <code>simp</code>'s correctness is ever trusted — only the term it happened to produce.</figcaption>
+    </figure>
+
+    <p>That last claim is the one everything rests on, and it is easier to believe when you can watch it. Below, the proof term is drawn as a tree. Each tactic you apply <strong>grows the tree</strong>; then the kernel walks the finished tree from the leaves up, re-deriving every type from the axioms with no memory of which tactic put which node there.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 7</span>
+        <span class="t">Watch the tactic script build the term, then watch the kernel re-check it</span>
+        <span class="pill">The trust boundary</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl"><div class="seg fixed" id="pt-pick"></div></div>
+        <div class="ctl">
+          <button class="btn fixed" id="pt-step">Apply next tactic →</button>
+          <button class="btn fixed" id="pt-run">▶ Run whole script</button>
+          <button class="btn fixed" id="pt-check">✓ Hand it to the kernel</button>
+          <button class="btn fixed" id="pt-reset">Reset</button>
+        </div>
+        <canvas id="ptCanvas"></canvas>
+        <dl class="readout">
+          <div><dt>tactics applied</dt><dd id="pt-n">0</dd></div>
+          <div><dt>nodes in the term</dt><dd id="pt-size">0</dd></div>
+          <div><dt>last tactic</dt><dd id="pt-last" class="plain">—</dd></div>
+          <div><dt>it emitted</dt><dd id="pt-emit" class="plain">—</dd></div>
+          <div><dt>kernel status</dt><dd id="pt-status" class="plain">nothing to check yet</dd></div>
+        </dl>
+        <h4>The finished term — the only thing the kernel ever sees</h4>
+        <div class="term" id="pt-term">—</div>
+        <div class="pdetail" id="pt-note"></div>
+      </div>
+      <figcaption class="plate-foot">Purple nodes are λ-abstractions (each one an →/∀-introduction), green are applications (each a modus ponens), orange are recursors (induction), grey are variables and constants. <strong>Press "Hand it to the kernel" and notice what is <em>not</em> consulted:</strong> the tactic list disappears. The kernel re-derives each node's type from its children and the axioms alone. That is why a bug in <code>simp</code> cannot manufacture a false theorem — the worst it can do is emit a tree that fails this sweep.</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">Tactics worth knowing, and what they really do</span>
+      <div class="scroller"><table>
+        <tr><th>Tactic</th><th>Term it builds</th><th>Note</th></tr>
+        <tr><td><code>intro h</code></td><td><code>fun h => ?goal</code></td><td>→/∀-introduction</td></tr>
+        <tr><td><code>exact e</code></td><td><code>e</code></td><td>closes the goal outright</td></tr>
+        <tr><td><code>apply f</code></td><td><code>f ?a ?b …</code></td><td>backward reasoning; new goals for the arguments</td></tr>
+        <tr><td><code>rfl</code></td><td><code>rfl</code></td><td>succeeds iff the two sides are <em>definitionally</em> equal (§3)</td></tr>
+        <tr><td><code>rw [h]</code></td><td><code>Eq.mpr (congrArg …) …</code></td><td>ultimately <code>Eq.rec</code></td></tr>
+        <tr><td><code>induction n</code></td><td><code>Nat.rec …</code></td><td>literally the recursor from §4</td></tr>
+        <tr><td><code>simp</code></td><td>a chain of rewrites</td><td>untrusted search; the output term is checked</td></tr>
+        <tr><td><code>decide</code></td><td><code>of_decide_eq_true rfl</code></td><td>proof by evaluation (§3)</td></tr>
+        <tr><td><code>omega</code></td><td>a certificate for linear arithmetic</td><td>decision procedure that emits a checkable proof</td></tr>
+      </table></div>
+      </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s7">
+    <h2><span class="num">§ 7</span>Lean meets Gödel</h2>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Kurt Gödel<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Kurt_g%C3%B6del.jpg?width=460"
+             alt="Portrait of Kurt Gödel" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1931 · Vienna</span>
+        <h4 class="who">Kurt Gödel</h4>
+        <figcaption>Everything in Volume III applies to Lean directly and without romance. Lean’s kernel is a mechanically checkable proof system interpreting arithmetic, so: there is a sentence Lean can state and cannot prove; Lean cannot prove <code>Con(Lean)</code>; and trusting a Lean proof means trusting the consistency of CIC plus three axioms, on grounds the machine cannot supply. <strong>That is not a defect of the machine.</strong> It is the same limit that applies to us.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Kurt_g%C3%B6del.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <p>Lean's kernel is a computably checkable proof system that interprets arithmetic. Volume III therefore applies to it directly and without romance:</p>
+
+    <ul>
+      <li>There is a sentence of arithmetic that Lean can state and cannot prove, assuming Lean is consistent.</li>
+      <li>Lean cannot prove <code>Con(Lean)</code>. You can formalise <code>Con(PA)</code> in Lean and prove it, because Lean is stronger than PA — but no system reaches its own consistency.</li>
+      <li>Trusting a Lean proof means trusting the consistency of CIC plus those three axioms, on external grounds. The machine cannot supply that, and it is not a defect of the machine.</li>
+    </ul>
+
+    <p>What formalisation <em>does</em> deliver is different from certainty and arguably more useful: it collapses the cost of checking. A referee's month becomes a CPU-minute, the exact axioms are printed on request, and every hypothesis is forced into the open. The Liquid Tensor Experiment, the formalisation of the sphere eversion, and the Fermat's Last Theorem project are all bets on that trade.</p>
+
+    <div class="beg" data-t="what a machine-checked proof is worth">
+      <h5>Formalisation does not give you certainty</h5>
+      <p>It is tempting to think a kernel-checked theorem is <em>certainly</em> true. It is not, and being clear about why is more useful than the slogan.</p>
+      <p>Three things are still being trusted. <strong>The kernel is correct</strong> — a few thousand lines of C++, re-implemented independently by <code>lean4checker</code> and Trepplein, which can re-verify an entire compiled environment. <strong>The axioms are consistent</strong> — Carneiro showed Lean\u2019s type theory is consistent relative to ZFC plus countably many inaccessible cardinals, which is itself an unproved assumption. And by Vol. III, no system can establish its own consistency, so this is not a gap that better engineering closes.</p>
+      <p><strong>And the statement says what you think it says.</strong> This is the unglamorous one, and in practice by far the most common failure.</p>
+
+      <div class="analogy">
+        A spellchecker guarantees every word is a word. It has nothing to say about whether you wrote what you meant. A proof checker guarantees every inference is valid, and has nothing to say about whether the theorem is the one you wanted.
+      </div>
+
+      <h5>What it <em>does</em> give you, which is different and arguably better</h5>
+      <p><strong>The cost of checking collapses.</strong> A referee\u2019s month becomes a CPU-minute. That changes what mathematics is practical, not just what is certain.</p>
+      <p><strong>Hypotheses cannot hide.</strong> A condition quietly assumed in a paper proof has to be written down or the proof does not compile.</p>
+      <p><strong>Logical commitments become machine-checkable.</strong> <code>#print axioms myTheorem</code> tells you whether a result used choice. That was previously a matter of scholarly argument.</p>
+      <p>So the honest summary is this: formalisation does not make mathematics certain. It makes mathematics <em>auditable</em>, and it makes the audit cheap. Mathlib\u2019s real achievement is less its theorem count than its accumulated, argued-over library of <em>definitions</em> that behave well together — and choosing those is still entirely human work.</p>
+    </div>
+
+    <div class="box">
+      <span class="lab">The honest failure mode</span>
+      <p>Formalisation does not protect you from proving the wrong thing. A theorem with a hypothesis that is secretly unsatisfiable is checked with enthusiasm. A definition that does not capture the intended concept yields true theorems about the wrong object. <strong>In practice the hard part of formalisation is not the proofs, it is the definitions</strong> — and that part is still entirely human. Mathlib's real achievement is less its theorem count than its accumulated, argued-over library of definitions that behave well together.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s8">
+    <h2><span class="num">§ 8</span>Check yourself</h2>
+    <div class="quiz">
+      <div class="q" data-a="1">
+        <p class="qq">A bug is found in Lean's <code>simp</code> tactic that makes it rewrite incorrectly. What is the consequence for existing Mathlib theorems?</p>
+        <button class="opt">Every theorem proved with <code>simp</code> becomes suspect.</button>
+        <button class="opt">None — <code>simp</code> only proposes a term, and the kernel already re-checked it from the axioms. A buggy <code>simp</code> produces terms that fail to check, not false theorems.</button>
+        <button class="opt">Only theorems in <code>Prop</code> are affected.</button>
+        <button class="opt">The axioms would have to be changed.</button>
+        <p class="why">This is the entire payoff of the de Bruijn criterion. The trusted computing base is the kernel and the axioms; a tactic is just a term-generator, and a wrong term is rejected. The realistic bad outcome from a <code>simp</code> bug is that proofs stop compiling — annoying, not epistemically alarming. A <em>kernel</em> bug would be the serious case, which is why independent re-checkers like <code>lean4checker</code> exist.</p>
+      </div>
+      <div class="q" data-a="3">
+        <p class="qq"><code>example : n + 0 = n := rfl</code> compiles, but <code>example : 0 + n = n := rfl</code> does not. Why?</p>
+        <button class="opt">Addition is not commutative in Lean.</button>
+        <button class="opt">The second needs <code>Classical.choice</code>.</button>
+        <button class="opt">A bug in the elaborator.</button>
+        <button class="opt"><code>Nat.add</code> recurses on its second argument, so <code>n + 0</code> ι-reduces to <code>n</code> immediately, while <code>0 + n</code> is stuck on the variable <code>n</code> and needs an induction.</button>
+        <p class="why">Definitional equality is decided by reduction, and reduction on a recursor needs a constructor in head position. In <code>n + 0</code> the second argument is the literal <code>Nat.zero</code>, so ι fires. In <code>0 + n</code> the second argument is a free variable and nothing can fire. Both statements are true and provable; only one is true <em>by computation</em>. This asymmetry is a fact about the definition, not about arithmetic — and it is the first thing that makes people say dependent types are weird.</p>
+      </div>
+      <div class="q" data-a="0">
+        <p class="qq"><code>False.rec</code> has no minor premises and produces a term of any type. Where does that come from?</p>
+        <button class="opt">From the recursor schema applied to a type with zero constructors — one minor premise per constructor means none at all, so ex falso is a special case of a general rule, not an axiom.</button>
+        <button class="opt">From <code>Classical.choice</code>.</button>
+        <button class="opt">It is a primitive axiom of the kernel.</button>
+        <button class="opt">From proof irrelevance.</button>
+        <p class="why">One of the quiet elegances of inductive type theory. You do not postulate "from a contradiction, anything"; you declare a type with no way to build an element, and the automatically-generated eliminator says: to map out of <code>False</code>, supply a case for each constructor — and there are none, so you are already done. The principle drops out of the schema. The same schema, applied to <code>Nat</code>, gives induction.</p>
+      </div>
+      <div class="q" data-a="2">
+        <p class="qq">Why is it safe for <code>Prop</code> to be impredicative when <code>Type : Type</code> is fatal?</p>
+        <button class="opt">Because <code>Prop</code> is smaller.</button>
+        <button class="opt">Because <code>Prop</code> contains no infinite types.</button>
+        <button class="opt">Because <code>Prop</code> has proof irrelevance: all proofs of a proposition are definitionally equal, so there is no information inside a proof for Girard's diagonal argument to get hold of.</button>
+        <button class="opt">Because classical axioms are assumed in <code>Prop</code>.</button>
+        <p class="why">Girard's paradox needs to build a type-level structure that distinguishes its own elements and then diagonalise. Proof irrelevance flattens <code>Prop</code>: an element of <code>p : Prop</code> carries exactly one bit — whether it exists — so the diagonalisation has nothing to bite on. This is also why proofs can be erased at compile time, and why <code>Prop</code>'s restricted elimination into <code>Type</code> has to be enforced: allowing it would leak the missing information back in.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s9">
+    <h2><span class="num">§ 9</span>Where to go next</h2>
+
+    <h4>Learn to use it</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://adam.math.hhu.de/#/g/leanprover-community/nng4" target="_blank" rel="noopener">
+        <span class="k">Game · start here</span><span class="n">The Natural Number Game</span>
+        <span class="d">Build arithmetic from the Peano axioms in the browser, one tactic at a time. Two hours, no installation, and the best first contact with Lean by a distance.</span></a>
+      <a class="lnk ext" href="https://leanprover-community.github.io/mathematics_in_lean/" target="_blank" rel="noopener">
+        <span class="k">Book · free</span><span class="n">Avigad &amp; Massot, <em>Mathematics in Lean</em></span>
+        <span class="d">The route from the game to real mathematics, with exercises. Written for mathematicians rather than programmers.</span></a>
+      <a class="lnk ext" href="https://leanprover.github.io/theorem_proving_in_lean4/" target="_blank" rel="noopener">
+        <span class="k">Book · free</span><span class="n">Avigad et al., <em>Theorem Proving in Lean 4</em></span>
+        <span class="d">The conceptual text. Chapters 2–8 cover this entire volume properly — dependent types, inductive types, universes, tactics.</span></a>
+      <a class="lnk ext" href="https://leanprover.zulipchat.com/" target="_blank" rel="noopener">
+        <span class="k">Community</span><span class="n">Lean Zulip</span>
+        <span class="d">Where the work happens. #new-members is unusually welcoming, and searching the archive answers most questions before you ask.</span></a>
+    </div>
+
+    <h4>Understand the foundations</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://github.com/digama0/lean-type-theory" target="_blank" rel="noopener">
+        <span class="k">Thesis</span><span class="n">Carneiro, <em>The Type Theory of Lean</em></span>
+        <span class="d">The precise specification of what the kernel implements, and the consistency result relative to ZFC + inaccessibles. The reference for §2 and §5.</span></a>
+      <a class="lnk ext" href="https://lean-lang.org/doc/reference/latest/" target="_blank" rel="noopener">
+        <span class="k">Reference</span><span class="n">The Lean Language Reference</span>
+        <span class="d">Authoritative on elaboration, definitional equality, and the reduction rules of §3.</span></a>
+      <a class="lnk ext" href="https://github.com/leanprover/lean4checker" target="_blank" rel="noopener">
+        <span class="k">Code</span><span class="n">lean4checker</span>
+        <span class="d">An independent re-checker for a compiled environment. Reading it is the shortest path to knowing exactly what is trusted.</span></a>
+      <a class="lnk ext" href="https://plato.stanford.edu/entries/type-theory-intuitionistic/" target="_blank" rel="noopener">
+        <span class="k">Encyclopedia</span><span class="n">SEP — Intuitionistic Type Theory</span>
+        <span class="d">Martin-Löf's system, the ancestor of CIC. Good background on why the rules are shaped this way.</span></a>
+    </div>
+
+    <h4>See it used in anger</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://leanprover-community.github.io/mathlib4_docs/" target="_blank" rel="noopener">
+        <span class="k">Library</span><span class="n">Mathlib 4 documentation</span>
+        <span class="d">Over a million lines of formalised mathematics. Look up a definition you know well and read how it had to be stated.</span></a>
+      <a class="lnk ext" href="https://www.nature.com/articles/d41586-021-01627-2" target="_blank" rel="noopener">
+        <span class="k">Story</span><span class="n">The Liquid Tensor Experiment</span>
+        <span class="d">Scholze asked for a formalisation of a theorem he wasn't sure of. It was delivered, and it found the argument's real load-bearing lemma.</span></a>
+      <a class="lnk ext" href="https://imperialcollegelondon.github.io/FLT/" target="_blank" rel="noopener">
+        <span class="k">Project</span><span class="n">Formalising Fermat's Last Theorem</span>
+        <span class="d">Buzzard's ongoing project — which runs straight through the modular forms of Vol. I. The series closes its own loop.</span></a>
+    </div>
+
+    <hr>
+    <p style="font-family:var(--sans);font-size:14px;color:var(--ink-3)">The series — <strong>Vol. I: Modular Forms.</strong> <strong>Vol. II: Sieve Theory.</strong> <strong>Vol. III: Gödel and the Construction of Mathematical Language.</strong> <strong>Vol. IV: How Lean Works.</strong></p>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  <nav class="seriesnav">
+    <a href="https://claude.ai/code/artifact/6d579501-40cb-40eb-af02-9acfb874a5ec" target="_blank" rel="noopener"><span class="v">Volume I</span><span class="n">Modular Forms</span><span class="d">Rigidity in, finiteness out</span></a>
+    <a href="https://claude.ai/code/artifact/505b1a47-7dc1-4266-8e81-2e1092a55d32" target="_blank" rel="noopener"><span class="v">Volume II</span><span class="n">Sieve Theory</span><span class="d">A method that knows its own limit</span></a>
+    <a href="https://claude.ai/code/artifact/e2cbb6c5-9f15-4d1a-a9aa-9a97777942b4" target="_blank" rel="noopener"><span class="v">Volume III</span><span class="n">Gödel & Formal Language</span><span class="d">Mathematics as a string of symbols</span></a>
+    <a href="#" aria-current="page"><span class="v">Volume IV</span><span class="n">How Lean Works</span><span class="d">A proof is a program</span></a>
+  </nav>
+  <div>Marginalia · Volume IV · How Lean Works</div>
+  <div>The type inferencer and reduction machine are real implementations running in your browser.</div>
+</footer>
+
+<script src="vol4.js"></script>
+
+</html>

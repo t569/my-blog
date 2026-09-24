@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Gödel and Formal Language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="notes.css">
+<style>
+  :root{
+    --acc:#0e7490; --acc-2:#b45309;
+    --acc-soft:rgba(14,116,144,.10); --acc-line:rgba(14,116,144,.36);
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --acc:#22d3ee; --acc-2:#fbbf24;
+    --acc-soft:rgba(34,211,238,.12); --acc-line:rgba(34,211,238,.38);
+  }}
+  :root[data-theme="dark"]{
+    --acc:#22d3ee; --acc-2:#fbbf24;
+    --acc-soft:rgba(34,211,238,.12); --acc-line:rgba(34,211,238,.38);
+  }
+  .tok{font-family:var(--mono); font-size:12px; padding:5px 9px; border-radius:4px; border:1px solid var(--rule);
+    background:var(--paper-3); color:var(--ink); cursor:pointer; margin:0 4px 4px 0}
+  .tok:hover{border-color:var(--acc-line); color:var(--acc)}
+  .fml{font-family:var(--mono); font-size:15px; width:100%; padding:11px 13px; border-radius:5px;
+    border:1px solid var(--rule); background:var(--paper-3); color:var(--ink)}
+  .err{font-family:var(--mono); font-size:12.5px; color:var(--bad); white-space:pre-wrap; margin-top:10px}
+  .good{color:var(--ok)}
+  .prooftable{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px; margin-top:12px}
+  .prooftable td{padding:6px 9px; border-bottom:1px solid var(--rule-soft); text-align:left; white-space:normal}
+  .prooftable td:first-child{width:34px; color:var(--ink-4)}
+  .prooftable td:last-child{width:150px; color:var(--ink-3); font-size:11.5px; text-align:right}
+  .prooftable tr.new td{background:var(--acc-soft)}
+  .prooftable tr.goal td{color:var(--ok); font-weight:600}
+  details{max-width:var(--measure); border:1px solid var(--rule); border-left:3px solid var(--acc-2);
+    border-radius:3px; background:var(--paper-2); margin:10px 0; padding:0}
+  details summary{cursor:pointer; padding:14px 18px; font-family:var(--sans); font-size:15px; font-weight:600; list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:'✕'; color:var(--bad); font-family:var(--mono); margin-right:10px; font-size:12px}
+  details[open] summary::before{content:'✓'; color:var(--ok)}
+  details .d{padding:0 18px 16px; font-size:15px; color:var(--ink-2); line-height:1.6}
+  details .d p{margin:0 0 12px} details .d p:last-child{margin:0}
+  .gnum{font-family:var(--mono); font-size:12px; line-height:1.5; word-break:break-all; max-height:180px;
+    overflow:auto; background:var(--paper-3); border:1px solid var(--rule); border-radius:4px; padding:12px}
+  .hered{font-family:var(--mono); font-size:16px; line-height:2.1; overflow-x:auto; padding:4px 0}
+  .hered sup{font-size:.72em}
+  .ord{font-family:var(--mono); font-size:15px; color:var(--acc-2)}
+</style>
+
+<script src="glossary-terms.js"></script>
+<script src="notes.js"></script>
+<script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.js"></script>
+<script src="glossary.js"></script>
+
+<div class="progress" id="prog"></div>
+
+<header class="masthead">
+  <div class="mh-mark">III</div>
+  <div class="mh-title">Gödel &amp; Formal Language</div>
+  <div class="mh-vol">Marginalia · Vol. III · Interactive Notes</div>
+  <div class="mh-spacer"></div>
+  <span class="lvlhint" id="lvlHint">click any <span style="border-bottom:1px dashed var(--acc-line)">dotted term</span> for a plain explanation</span>
+  <div class="switch" role="group" aria-label="Reading level">
+    <button data-level-btn="grad" aria-pressed="true" title="Concise: assumes the prerequisites">Graduate</button>
+    <button data-level-btn="beg" aria-pressed="false" title="Adds undergraduate-level explanations throughout">Ground-up</button>
+  </div>
+  <button class="icon-btn" id="themeBtn" title="Toggle theme">☀</button>
+</header>
+
+<div class="shell">
+  <nav class="toc"><h6>Contents</h6><div id="toc"></div></nav>
+  <main class="body">
+
+  <div class="cover">
+    <p class="eyebrow">Volume III · Logic &amp; Foundations</p>
+    <h1>Mathematics <em>as</em> a string of symbols</h1>
+    <p class="dek">Before Gödel's theorems can say anything, mathematical language has to become a mathematical object: an alphabet, a grammar, a mechanical notion of proof. Once it is an object, it can be counted — and once it can be counted, it can talk about itself.</p>
+    <dl class="meta-strip">
+      <div><dt>Prerequisites</dt><dd>None assumed — every term is explained on click</dd></div>
+      <div><dt>Interactives</dt><dd>Six</dd></div>
+      <div><dt>Reading time</dt><dd>~80 min graduate · ~2.5 hr ground-up</dd></div>
+      <div><dt>Payoff</dt><dd>Knowing exactly what is and isn't proved</dd></div>
+    </dl>
+
+    <div class="howto">
+      <p><b>Written for three readers at once</b> — graduate students who want the argument, undergraduates meeting formal logic for the first time, and self-studiers with nobody to ask.</p>
+      <p><span class="k">1</span> <b>Click any dotted term</b> for a plain-English card with a worked example and usually an animation. This volume introduces a lot of vocabulary in a hurry; the cards are there so you never have to hold more than one new word at a time.</p>
+      <p><span class="k">2</span> <b>Switch to <i>Ground-up</i></b> in the header for a slower parallel exposition. Logic is the subject where people most often nod along without following, so the ground-up track is unusually detailed here.</p>
+      <p><span class="k">3</span> <b>Drive Fig. 2 and Fig. 4 by hand.</b> Deriving \(p \to p\) yourself, and stepping through the diagonal lemma, is worth more than any amount of reading about self-reference.</p>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <section id="s0">
+    <h2><span class="num">§ 0</span>The one-sentence version</h2>
+
+    <p class="lede">Formal proof is a mechanical relation between finite strings; finite strings can be coded as numbers; therefore a theory that can reason about numbers can reason about its own proofs — and once it can, self-reference is unavoidable and a gap opens between <em>true</em> and <em>provable</em>.</p>
+
+    <p>Notice how much of the work happens before any theorem. Three quarters of Gödel's 1931 paper is bookkeeping: defining the language, defining proof, defining the encoding, and grinding through forty-six primitive recursive functions. The famous part is four pages. <strong>This volume spends its first third on the bookkeeping, because that is where the real ideas are and where most expositions skip.</strong></p>
+
+    <div class="beg">
+      <p><strong>Why does mathematics need a formal language at all?</strong> Ordinary mathematical prose is fine for communicating between humans, but it is hopeless as an object of study. You cannot prove a theorem about "all possible proofs" if a proof is a persuasive essay.</p>
+      <p>So: fix a finite alphabet. Fix a grammar saying which strings count as statements. Fix a finite list of axioms and a finite list of rules, each of which is a purely typographical operation on strings. Now "proof" means "a finite list of strings where each one is an axiom or follows from earlier ones by a rule" — something a machine can check without understanding anything.</p>
+      <p>Once proof is that concrete, it becomes something you can do mathematics <em>to</em>. That move — Hilbert's move — is what makes Gödel's theorems possible. It also makes Lean possible (Vol. IV).</p>
+    </div>
+
+    <div class="box warn">
+      <span class="lab">Two things that are constantly confused</span>
+      <p><strong>Gödel's completeness theorem</strong> (1929, his thesis) says first-order logic is complete: anything true in <em>every</em> model is provable. <strong>Gödel's incompleteness theorem</strong> (1931) says a specific theory (PA, ZFC, …) fails to prove some sentence true in its <em>intended</em> model. These are not in tension. The first is about logic; the second is about theories. Keep them apart or nothing in this subject will make sense.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s1">
+    <h2><span class="num">§ 1</span>How the language is built</h2>
+
+    <p>We construct the language of arithmetic from nothing. Everything is a finite string over a finite alphabet; nothing means anything until §1.4.</p>
+
+    <h3><span class="num">1.1</span>Alphabet</h3>
+
+    <p>Fix these symbols and no others:</p>
+
+    <pre><code>constants   0
+functions   S (unary)   +  ·  (binary)
+relations   =   &lt;
+logical     ¬   ∧   ∨   →   ∀   ∃
+grouping    (   )
+variables   v₀  v₁  v₂  …</code></pre>
+
+    <p>That is the entire vocabulary of arithmetic. There is no symbol for "prime", "divides", "continuous", or "set" — everything else must be <em>defined</em> as an abbreviation for a string built from these.</p>
+
+    <div class="beg" data-t="why this looks so impoverished">
+      <h5>That really is the whole vocabulary</h5>
+      <p>Look at what is missing from that list. No symbol for "prime". None for "divides", "greater than or equal", "is a set", "continuous", "group". Not even subtraction or division.</p>
+      <p>This is deliberate, and it is the point. Every other notion must be <strong>defined</strong> — that is, written out as an abbreviation for a string built from these few symbols. "\(x\) divides \(y\)" becomes <code>E z. (y = (x * z))</code>. "\(x\) is prime" becomes a longer string saying "\(x &gt; 1\) and whenever \(x\) is a product, one factor is 1". The abbreviations are for <em>our</em> convenience; the formal system never sees them.</p>
+
+      <div class="analogy">
+        A computer's processor has a small instruction set — add, compare, jump, load, store. Everything you have ever run was built from those. Nobody writes programs that way, but the fact that it is <em>possible</em> is what lets you reason about what a computer can and cannot do. Same move here, for the same reason.
+      </div>
+
+      <h5>Why a small alphabet is worth the inconvenience</h5>
+      <p>Because we are about to prove a theorem about <em>every possible proof</em>. You cannot do that if a proof is a persuasive essay, and you cannot do it easily if the language has a thousand primitives. Each symbol is another case in every induction. Gödel needed to verify by hand that forty-six different operations on these strings were mechanically computable — with a richer alphabet, that would have been hopeless.</p>
+      <p>So: the language is deliberately miserable to write in, and correspondingly easy to reason <em>about</em>. That trade is the whole of Hilbert's programme, and it is also exactly why Lean's kernel can be a few thousand lines (Vol. IV).</p>
+    </div>
+
+    <h3><span class="num">1.2</span>Terms and formulas, defined inductively</h3>
+
+    <div class="box">
+      <span class="lab">Definition</span>
+      <p><strong>Terms</strong> are the smallest set such that: <code>0</code> is a term; every variable is a term; and if \(s,t\) are terms then so are <code>S(t)</code>, <code>(s + t)</code>, <code>(s · t)</code>.</p>
+      <p><strong>Atomic formulas</strong> are strings <code>s = t</code> and <code>s &lt; t</code> for terms \(s,t\).</p>
+      <p><strong>Formulas</strong> are the smallest set containing the atomic formulas and closed under: if \(\varphi,\psi\) are formulas and \(v\) a variable, then <code>¬φ</code>, <code>(φ ∧ ψ)</code>, <code>(φ ∨ ψ)</code>, <code>(φ → ψ)</code>, <code>∀v φ</code>, <code>∃v φ</code> are formulas.</p>
+    </div>
+
+    <p>"The smallest set closed under …" is doing real work: it licenses <strong>proof by induction on the structure of a formula</strong>, which is the workhorse of every proof in logic and the reason Lean's inductive types (Vol. IV, §3) look the way they do.</p>
+
+    <p>A variable occurrence is <strong>bound</strong> if it lies inside a \(\forall v\) or \(\exists v\) for that same \(v\), and <strong>free</strong> otherwise. A formula with no free variables is a <strong>sentence</strong>; only sentences have truth values.</p>
+
+    <p>Build some and see. The parser below is a real recursive-descent parser over the grammar above — its error messages are the authentic experience of formal syntax.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 1</span>
+        <span class="t">Formula workbench: parse tree, free variables, arithmetic hierarchy</span>
+        <span class="pill">Type here</span>
+      </div>
+      <div class="plate-body">
+        <input class="fml" id="fw-in" spellcheck="false" value="A x. E y. (x &lt; y)">
+        <div style="margin-top:10px" id="fw-pal"></div>
+        <div style="margin-top:6px" id="fw-presets"></div>
+        <div id="fw-msg" class="err"></div>
+        <canvas id="fwCanvas"></canvas>
+        <dl class="readout">
+          <div><dt>well-formed</dt><dd id="fw-wf" class="plain">—</dd></div>
+          <div><dt>free variables</dt><dd id="fw-free">—</dd></div>
+          <div><dt>sentence?</dt><dd id="fw-sent" class="plain">—</dd></div>
+          <div><dt>symbols</dt><dd id="fw-len">—</dd></div>
+          <div><dt>quantifier depth</dt><dd id="fw-qd">—</dd></div>
+          <div><dt>hierarchy class</dt><dd id="fw-cls" class="plain">—</dd></div>
+        </dl>
+        <div id="fw-gloss" style="font-family:var(--sans);font-size:14px;color:var(--ink-2);margin-top:14px"></div>
+      </div>
+      <figcaption class="plate-foot">Syntax: <code>0</code>, variables <code>x y z u v w</code>, <code>S t</code>, <code>(s + t)</code>, <code>(s * t)</code>, atoms <code>s = t</code> / <code>s &lt; t</code>, connectives <code>~φ</code> and <code>(φ &amp; ψ)</code>, <code>(φ | ψ)</code>, <code>(φ -&gt; ψ)</code>, quantifiers <code>A x. φ</code> and <code>E x. φ</code>, bounded quantifiers <code>A x&lt;t. φ</code> and <code>E x&lt;t. φ</code>. <strong>Bounded quantifiers are not decoration.</strong> A formula with only bounded quantifiers (class \(\Delta_0\)) defines a <em>decidable</em> property — you can check it by a finite search — and \(\Sigma_1\) formulas (one unbounded \(\exists\) over a \(\Delta_0\) matrix) define exactly the semi-decidable ones. Everything in §2 turns on that.</figcaption>
+    </figure>
+
+    <div class="beg" data-t="reading an inductive definition">
+      <h5>"The smallest set closed under…" — what that phrase is doing</h5>
+      <p>The definitions above have an unusual shape. Rather than saying what a formula <em>is</em>, they say how to <em>build</em> one, and then add: nothing else counts.</p>
+      <p>Read it as a two-part recipe. <strong>Base cases:</strong> the atomic formulas are formulas. <strong>Building steps:</strong> if \(\varphi\) and \(\psi\) are formulas, so are \(\neg\varphi\), \((\varphi \wedge \psi)\), \(\forall v\,\varphi\), and the rest. <strong>Closure clause:</strong> and nothing is a formula unless it was forced to be by finitely many applications of those rules.</p>
+
+      <div class="analogy">
+        It is exactly how you would define "reachable station" on a rail network. Base case: you are at station A. Step: if you can reach X and there is a line from X to Y, you can reach Y. Closure: nothing else is reachable. That last clause is what lets you <em>prove</em> a station is unreachable — without it, you could only ever demonstrate that things <em>are</em> reachable.
+      </div>
+
+      <h5>The closure clause is what licenses induction</h5>
+      <p>Because every formula is built in finitely many steps from atoms, you can prove a property \(P\) holds of <em>all</em> formulas by doing two things: check \(P\) for the atoms, and check that each building step preserves \(P\). That is <strong>structural induction</strong>, and it is the workhorse of every proof in this volume.</p>
+      <p>It is the same argument as ordinary induction on \(\mathbb{N}\) — which is itself defined the same way: zero is a number, the successor of a number is a number, nothing else is. The dominoes fall in a tree instead of a line, but they fall for the same reason.</p>
+      <p>Hold on to this. In Vol. IV you will meet Lean's <em>inductive types</em>, which are this definition style promoted to a programming language feature, and Lean's <em>recursors</em>, which are structural induction turned into a piece of data you can apply. They are not an analogy for what is happening here. They are the same thing.</p>
+    </div>
+
+    <h3><span class="num">1.3</span>Proof, as a typographical relation</h3>
+
+    <p>A <strong>deductive system</strong> is a decidable set of axioms plus finitely many rules. The classic Hilbert-style presentation for propositional logic needs three axiom schemes and one rule:</p>
+
+    <pre><code>A1.  φ → (ψ → φ)
+A2.  (φ → (ψ → χ)) → ((φ → ψ) → (φ → χ))
+A3.  (¬ψ → ¬φ) → (φ → ψ)
+MP.  from φ and φ → ψ, infer ψ</code></pre>
+
+    <p>A <strong>proof</strong> of \(\varphi\) is a finite sequence of formulas ending in \(\varphi\), each of which is an axiom instance or follows from two earlier ones by MP. <em>Checking</em> a proof requires no understanding whatever — it is pattern-matching on strings. That is exactly what makes it arithmetizable in §2, and exactly what makes Lean's kernel possible in Vol. IV.</p>
+
+    <p>To feel how mechanical it is, derive \(p \to p\). It takes five lines and no insight — only bookkeeping.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 2</span>
+        <span class="t">A proof checker you can drive by hand</span>
+        <span class="pill">Derive p → p</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed">
+            <button class="btn" data-pf="A1">Add A1</button>
+            <button class="btn" data-pf="A2">Add A2</button>
+            <button class="btn" data-pf="MP">Apply MP</button>
+          </div>
+          <button class="btn fixed" data-pf="auto">⚡ Show the canonical proof</button>
+          <button class="btn fixed" data-pf="clear">Clear</button>
+        </div>
+        <div id="pf-form" style="margin-top:12px"></div>
+        <table class="prooftable" id="pf-table"></table>
+        <div id="pf-msg" style="font-family:var(--sans);font-size:13.5px;color:var(--ink-3);margin-top:12px"></div>
+      </div>
+      <figcaption class="plate-foot">Target: \(p \to p\). Choose instantiations for the schemes, then combine lines with modus ponens. <strong>Notice that you never once had to think about what \(p\) means.</strong> That is the whole point of formalisation — and it is also why a proof of \(p\to p\) taking five non-obvious lines is not a defect: Hilbert systems trade human ergonomics for a minimal, easily-arithmetized definition of proof. Natural deduction (and Lean) make the opposite trade.</figcaption>
+    </figure>
+
+    <h3><span class="num">1.4</span>Meaning arrives last</h3>
+
+    <p>Only now do we say what any of it means. An \(L\)-<strong>structure</strong> \(\mathcal{M}\) is a set \(M\) with an element for <code>0</code>, functions for <code>S, +, ·</code>, and relations for <code>=, &lt;</code>. Tarski's recursive definition of satisfaction \(\mathcal{M} \models \varphi[\bar a]\) then assigns truth values by induction on formula structure.</p>
+
+    <p>Two relations now exist and must be kept apart:</p>
+
+    <ul>
+      <li>\(T \vdash \varphi\) — syntactic. There <em>exists a finite string</em> that is a proof. Semi-decidable: search all strings.</li>
+      <li>\(T \models \varphi\) — semantic. \(\varphi\) holds in <em>every</em> model of \(T\). Quantifies over a proper class of structures.</li>
+    </ul>
+
+    <div class="box thm">
+      <span class="lab">Gödel's completeness theorem (1929)</span>
+      <p>For first-order logic, \(T \vdash \varphi \iff T \models \varphi\).</p>
+    </div>
+
+    <p>This is a genuine miracle and it is the reason incompleteness has the shape it does. Because \(\vdash\) and \(\models\) coincide, "PA does not prove \(\varphi\)" is <em>equivalent</em> to "there is a model of PA where \(\varphi\) fails". Independence results are therefore always model constructions in disguise — see §6.</p>
+
+    <div class="beg">
+      <p><strong>Why isn't completeness already the whole story?</strong> Completeness says: if \(\varphi\) is true in all models of \(T\), then \(T\) proves it. Incompleteness produces a \(\varphi\) that is true in the <em>standard</em> model \(\mathbb{N}\) but false in some other model of PA. So \(\varphi\) is <em>not</em> true in all models of PA, and completeness is not violated — it is confirmed.</p>
+      <p>The uncomfortable content is: PA has models other than \(\mathbb{N}\), and no first-order theory can pin \(\mathbb{N}\) down. This is not Gödel's theorem, it's a consequence of compactness, and it's arguably the deeper fact.</p>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">David Hilbert<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Hilbert.jpg?width=460"
+             alt="Portrait of David Hilbert" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1900–1928 · G&#246;ttingen</span>
+        <h4 class="who">David Hilbert</h4>
+        <figcaption>&#8220;We must know. We will know.&#8221; Hilbert proposed that all of mathematics be recast in a fixed formal language, and that the consistency of the infinitary parts be established by strictly finite, mechanical reasoning about the resulting strings. The <em>programme</em> failed — §5 is the obituary. But the <em>reframing</em> succeeded completely: treating proof as a typographical object is what made Gödel\u2019s theorems statable, and it is what makes proof assistants possible a century later.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Hilbert.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s2">
+    <h2><span class="num">§ 2</span>Arithmetization: strings become numbers</h2>
+
+    <p>Gödel's device: assign each symbol a code, then encode a string \(s_1 s_2 \cdots s_n\) as</p>
+
+    <p>\[ \ulcorner s \urcorner = 2^{c(s_1)}\cdot 3^{c(s_2)}\cdot 5^{c(s_3)}\cdots p_n^{c(s_n)}. \]</p>
+
+    <p>Unique factorisation makes this injective and invertible, and — crucially — every operation on strings (concatenation, substitution, "is the \(i\)-th symbol a left bracket") becomes a <em>primitive recursive</em> function of codes.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 3</span>
+        <span class="t">The Gödel numbering machine</span>
+        <span class="pill">Encode / decode</span>
+      </div>
+      <div class="plate-body">
+        <input class="fml" id="gn-in" spellcheck="false" value="A x. ~ (S x = 0)">
+        <div class="ctl">
+          <button class="btn on fixed" id="gn-mode-p">Prime powers (Gödel)</button>
+          <button class="btn fixed" id="gn-mode-b">Base-32 packing</button>
+        </div>
+        <div class="scroller"><table id="gn-table"></table></div>
+        <h4>The number</h4>
+        <div class="gnum" id="gn-num">—</div>
+        <dl class="readout">
+          <div><dt>symbols</dt><dd id="gn-len">—</dd></div>
+          <div><dt>decimal digits</dt><dd id="gn-dig">—</dd></div>
+          <div><dt>vs. atoms in the universe</dt><dd id="gn-atoms" class="plain">—</dd></div>
+          <div><dt>decodes back to</dt><dd id="gn-dec" class="plain">—</dd></div>
+        </dl>
+        <canvas id="gnCanvas"></canvas>
+      </div>
+      <figcaption class="plate-foot">Switch encodings to make the point that <strong>nothing depends on the choice</strong>: any injective, computably invertible map from strings to numbers does the job, and base-32 packing is thousands of digits shorter. Gödel used primes because in 1931 "primitive recursive" had to be verified by hand, and exponent-extraction via unique factorisation is easy to write down that way. The astronomical size is irrelevant — nobody ever computes these numbers; they only need to <em>exist</em> and be definable.</figcaption>
+    </figure>
+
+    <div class="beg" data-t="what the coding buys, and what it does not">
+      <h5>The coding itself is not clever. That is the point.</h5>
+      <p>Assign each symbol a number. Then encode the string \(s_1s_2\cdots s_n\) as \(2^{c(s_1)}\cdot3^{c(s_2)}\cdot5^{c(s_3)}\cdots\), using the primes in order as bases and the symbol codes as exponents.</p>
+      <p>Why is this reversible? Because of <strong>unique factorisation</strong>: every positive integer factors into primes in exactly one way. So from the number you can recover the exponent of 2, of 3, of 5 — and those are your symbols back, in order. Nothing is lost.</p>
+
+      <div class="analogy">
+        It is a filing system, no more. Compare storing a word as a single number in base 27: CAT becomes \(3\cdot27^2 + 1\cdot27 + 20\). You can always decode, because base-27 representation is unique. Gödel used primes rather than a base because in 1931 he had to verify <em>by hand</em> that extracting the \(i\)th symbol was a mechanically computable operation, and "how many times does 5 divide this number" is very easy to write down that way.
+      </div>
+
+      <h5>The numbers are astronomical, and it does not matter at all</h5>
+      <p>Encoding a short formula produces an integer with thousands of digits — more than the atoms in the observable universe, by a wide margin. This bothers people, and it should not. <strong>Nobody ever computes these numbers.</strong> The argument requires only that they <em>exist</em> and that the operations on them be <em>definable</em>. Try the base-32 packing toggle in Fig. 3: it produces vastly smaller numbers and changes nothing, because nothing ever depended on the choice.</p>
+
+      <h5>What the coding does <em>not</em> yet give you</h5>
+      <p>Here is the step people skip. Turning proofs into numbers is worthless by itself. What you need is for the <em>theory</em> — which only talks about numbers — to be able to <em>say things about</em> the coded relations. "There exists a \(p\) such that \(p\) codes a proof of the formula coded by \(f\)" has to be expressible as an honest formula of arithmetic, built from \(0, S, +, \cdot\) and quantifiers.</p>
+      <p>That is what §2.1 supplies, and it is the genuinely hard bookkeeping of Gödel's paper. Once you have it, the theory can express <em>"I can prove this"</em> — and from there the rest is four pages.</p>
+    </div>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Alan Turing<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Alan_Turing_(1951).jpg?width=460"
+             alt="Photograph of Alan Turing" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1936 · Cambridge</span>
+        <h4 class="who">Alan Turing</h4>
+        <figcaption>Five years after Gödel, Turing supplied the notion §2 quietly depends on: a precise, machine-independent definition of <em>computable</em>. Gödel had to verify by hand that forty-six particular functions were mechanically calculable; Turing explained what that phrase means. The halting problem is then the same diagonal argument as §3, run on machines instead of formulas — and the semi-decidability of provability (you can confirm a proof by finding it, never confirm its absence by searching) is the halting problem wearing a logician’s coat.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Alan_Turing_(1951).jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+
+    <h3><span class="num">2.1</span>Representability — the bridge</h3>
+
+    <p>Coding is useless unless the theory can <em>talk</em> about the coded relations. That is the content of:</p>
+
+    <div class="box thm">
+      <span class="lab">Representability theorem</span>
+      <p>Every recursive function \(f\) is representable in Robinson arithmetic \(Q\): there is a formula \(\Phi_f(x,y)\) with \(Q \vdash \forall y\,(\Phi_f(\bar n, y) \leftrightarrow y = \overline{f(n)})\). Every recursive relation is similarly definable, and every \(\Sigma_1\) truth is provable in \(Q\) (\(\Sigma_1\)-completeness).</p>
+    </div>
+
+    <p>Apply it to the relation \(\mathrm{Prf}_T(p, f)\): "\(p\) codes a \(T\)-proof of the formula coded by \(f\)". Because proof-checking is mechanical (§1.3), this relation is primitive recursive, so there's a \(\Delta_0\) formula defining it. Then</p>
+
+    <p>\[ \mathrm{Prov}_T(f) \;:=\; \exists p\, \mathrm{Prf}_T(p,f) \]</p>
+
+    <p>is \(\Sigma_1\). <strong>The theory can now express "I can prove this".</strong> Note the asymmetry that runs through everything downstream: \(\mathrm{Prov}\) has an unbounded existential, so provability is semi-decidable, not decidable — you can confirm a proof exists by finding it, but never confirm none exists by searching.</p>
+
+    <div class="box warn">
+      <span class="lab">Where the hypotheses live</span>
+      <p>"\(T\) is a theory" is not enough — the axiom set must be <strong>decidable</strong> (or at least computably enumerable), otherwise \(\mathrm{Prf}_T\) is not recursive and nothing above works. This is why "the set of all true arithmetic sentences" evades incompleteness: it is complete and consistent, but not computably axiomatisable, so you cannot write down its \(\mathrm{Prov}\). Tarski's undefinability theorem is the matching statement: <em>truth</em> is not definable in the language, even though <em>provability</em> is.</p>
+    </div>
+  </section>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Alfred Tarski<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Alfred_Tarski.jpeg?width=460"
+             alt="Portrait of Alfred Tarski" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1933 · Warsaw</span>
+        <h4 class="who">Alfred Tarski</h4>
+        <figcaption>Tarski proved the result that makes Gödel’s sentence a theorem rather than a paradox: <strong>arithmetic truth is not definable in the language of arithmetic</strong>. Provability <em>is</em> definable — it is the \(\Sigma_1\) formula of §2.1. So “this sentence is false” cannot even be written down, while “this sentence is unprovable” can. That single asymmetry is the whole difference between the liar and Gödel.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Alfred_Tarski.jpeg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+  <!-- ================================================================= -->
+  <section id="s3">
+    <h2><span class="num">§ 3</span>Self-reference, made safe</h2>
+
+    <p>The liar paradox — "this sentence is false" — is genuinely paradoxical. Gödel's sentence is not, and the difference is entirely in §2: <em>provability is definable, truth is not</em>. Replacing "false" with "unprovable" converts a paradox into a theorem.</p>
+
+    <div class="beg" data-t="why self-reference is not cheating">
+      <h5>The objection you should be raising</h5>
+      <p>"You are defining a sentence in terms of itself. That is circular. I could define anything that way."</p>
+      <p>It is a good objection, and answering it properly is the entire content of §3. The answer is: <strong>nothing is defined in terms of itself.</strong> The sentence \(G\) is constructed by a finite, mechanical procedure that at no point mentions \(G\). It only <em>turns out afterwards</em> — as a discovered fact, not a stipulation — that the sentence so constructed happens to be about its own code.</p>
+
+      <div class="analogy">
+        A program cannot contain a literal copy of its own source text; that would have to be infinitely long. But it <em>can</em> contain a short <strong>recipe</strong> which, when run on itself, reproduces the text. That is a quine, and you can run one in Fig. 4. No circularity — just a description applied to itself.
+      </div>
+
+      <h5>The three ingredients</h5>
+      <p><strong>One:</strong> substitution is a mechanical string operation. "Take formula number \(n\), and put the numeral \(m\) in place of its free variable." Tedious, but obviously computable — so by §2.1 it is representable by a formula.</p>
+      <p><strong>Two:</strong> the diagonal move. Build \(\beta(x)\) saying "whatever you get by substituting \(x\) into formula number \(x\), \(\psi\) holds of it". Note the <em>doubled</em> \(x\) — a formula is being fed its own number. This is the only clever step in the whole construction.</p>
+      <p><strong>Three:</strong> take \(\beta\)'s own code \(b\) and form \(\theta = \beta(\bar b)\). This is an ordinary sentence, produced by ordinary substitution. And now the fact falls out: \(\theta\) <em>is</em> the result of substituting \(b\) into formula \(b\), so its own code is exactly what \(\beta\) was talking about. \(\theta\) says \(\psi(\ulcorner\theta\urcorner)\).</p>
+
+      <h5>The crucial generality</h5>
+      <p>Notice that \(\psi\) was never specified. The construction works for <em>any</em> property. Feed it "is not provable" and you get Gödel's sentence. Feed it "is provable" and you get Henkin's sentence, which by Löb's theorem turns out to be <em>provable</em>. Feed it "is false" and you get the liar — which is why Tarski's theorem says truth cannot be a formula in the first place.</p>
+      <p><strong>The diagonal lemma is a theorem about substitution, not about paradox.</strong> Learn it that way and Gödel, Tarski, Löb, Rice's theorem and Kleene's recursion theorem become one lemma wearing five hats.</p>
+    </div>
+
+    <p>The mechanism is a fixed-point construction that has nothing to do with logic per se. You have met it before, in programming.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 4</span>
+        <span class="t">Self-reference without magic: a quine, then the diagonal lemma</span>
+        <span class="pill">Run it</span>
+      </div>
+      <div class="plate-body">
+        <h4>A. A program that prints its own source</h4>
+        <pre id="q-src"></pre>
+        <div class="ctl">
+          <button class="btn fixed" id="q-run">▶ Run it</button>
+          <span id="q-res" style="font-family:var(--mono);font-size:12px"></span>
+        </div>
+        <p style="font-size:15px;color:var(--ink-2);max-width:none;margin-top:12px">The trick: the program contains a <em>description</em> of itself (the string <code>s</code>), and then applies that description to itself. No program can literally contain its own text — that would be infinite — but it can contain a recipe that, when run on itself, reproduces the text. <strong>The diagonal lemma is this exact move, with "string" replaced by "Gödel number" and "run" replaced by "substitute".</strong></p>
+
+        <h4 style="margin-top:30px">B. The diagonal lemma, step by step</h4>
+        <div class="steps" data-steps>
+          <div class="step">
+            <h5>Substitution is computable</h5>
+            <div class="expr">sub(n, m) = ⌜ the result of replacing the free variable of formula #n by the numeral m̄ ⌝</div>
+            <p class="note">Pure string surgery on codes, so primitive recursive — hence representable by a formula Sub(x, y, z) meaning "sub(x,y) = z". Nothing subtle here; it is the tedious part of Gödel's paper.</p>
+          </div>
+          <div class="step">
+            <h5>Start from any property ψ(x) of numbers</h5>
+            <div class="expr">ψ(x)   — one free variable, any formula you like</div>
+            <p class="note">We are going to build a sentence that asserts ψ holds of its own code. We do not yet care what ψ says.</p>
+          </div>
+          <div class="step">
+            <h5>Build the "self-application" formula</h5>
+            <div class="expr">β(x)  :≡  ∀z ( Sub(x, x, z) → ψ(z) )</div>
+            <p class="note">Read it: "whatever you get by substituting x into formula #x, ψ holds of that." Note the doubled x — this is the diagonal, and it is the only clever step.</p>
+          </div>
+          <div class="step">
+            <h5>Take β's own code and feed it in</h5>
+            <div class="expr">b := ⌜β⌝        θ  :≡  β(b̄)  ≡  ∀z ( Sub(b̄, b̄, z) → ψ(z) )</div>
+            <p class="note">θ is a perfectly ordinary sentence with no free variables. It was built by a finite mechanical procedure. Nothing circular has happened yet.</p>
+          </div>
+          <div class="step">
+            <h5>Compute what θ's code is</h5>
+            <div class="expr">⌜θ⌝ = sub(b, b)</div>
+            <p class="note">Because θ <em>is</em> the result of substituting b̄ into formula #b. That is a fact about strings, checkable by hand.</p>
+          </div>
+          <div class="step">
+            <h5>Therefore θ says ψ(⌜θ⌝)</h5>
+            <div class="expr">T ⊢ θ ↔ ψ(⌜θ⌝)</div>
+            <p class="note">The unique z with Sub(b̄, b̄, z) is exactly ⌜θ⌝, so θ's content collapses to ψ(⌜θ⌝). <strong>Self-reference achieved, with no self-referential definition anywhere.</strong> θ was defined by ordinary substitution; it only turns out, after the fact, to be about itself.</p>
+          </div>
+          <div class="step">
+            <h5>Now choose ψ</h5>
+            <div class="expr">ψ(x) :≡ ¬Prov_T(x)       gives       G  with  T ⊢ G ↔ ¬Prov_T(⌜G⌝)</div>
+            <p class="note">G is Gödel's sentence: "I am not provable." Choose ψ(x) :≡ Prov_T(x) instead and you get Henkin's sentence, "I am provable" — which, by Löb's theorem (§5), is <em>provable</em>. Same machine, opposite outcome.</p>
+          </div>
+        </div>
+        <div class="ctl">
+          <button class="btn fixed" data-step-prev>← Back</button>
+          <button class="btn fixed" data-step-next>Next →</button>
+          <button class="btn fixed" data-step-reset>Reset</button>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--ink-3)" data-step-count></span>
+        </div>
+      </div>
+      <figcaption class="plate-foot">The diagonal lemma holds for <em>any</em> ψ. It is a theorem about substitution, not about truth, provability, or paradox — which is why the same lemma yields Gödel's theorem, Tarski's undefinability of truth, Löb's theorem, Rice's theorem, and the recursion theorem in computability. If you learn one thing from this volume, learn that these are all one lemma wearing different hats.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s4">
+    <h2><span class="num">§ 4</span>The first incompleteness theorem</h2>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Kurt Gödel<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Kurt_g%C3%B6del.jpg?width=460"
+             alt="Portrait of Kurt Gödel" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1931 · Vienna</span>
+        <h4 class="who">Kurt Gödel</h4>
+        <figcaption>He was 25. The paper is titled <em>On formally undecidable propositions of Principia Mathematica and related systems I</em> — there was never a part II, because nobody disputed part I. Three quarters of it is the bookkeeping of §1 and §2: defining the language, defining proof, defining the coding, and grinding through forty-six primitive recursive functions. The famous argument occupies about four pages, and it is only possible because of the seventy that precede it.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Kurt_g%C3%B6del.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+
+    <div class="box thm">
+      <span class="lab">Gödel–Rosser</span>
+      <p>Let \(T\) be a consistent, computably axiomatised theory interpreting Robinson arithmetic \(Q\). Then there is a sentence \(\varphi\) with \(T \nvdash \varphi\) and \(T \nvdash \neg\varphi\).</p>
+    </div>
+
+    <p>The argument, given §2 and §3, is four lines:</p>
+
+    <ol>
+      <li>Get \(G\) with \(T \vdash G \leftrightarrow \neg\mathrm{Prov}_T(\ulcorner G\urcorner)\).</li>
+      <li>If \(T \vdash G\), take a proof; its code \(p\) satisfies \(\mathrm{Prf}_T(p, \ulcorner G\urcorner)\), which is a true \(\Delta_0\) fact, so by \(\Sigma_1\)-completeness \(T \vdash \mathrm{Prov}_T(\ulcorner G \urcorner)\), i.e. \(T\vdash\neg G\). So \(T\) is inconsistent. Contradiction.</li>
+      <li>Hence \(T \nvdash G\). So \(\mathrm{Prov}_T(\ulcorner G\urcorner)\) is <em>false</em>, so \(G\) is <em>true</em> (in \(\mathbb{N}\)).</li>
+      <li>\(T\nvdash \neg G\) needs a little more care — Gödel assumed \(\omega\)-consistency; Rosser's refinement replaces \(\mathrm{Prov}\) with "there is a proof of \(\varphi\) with no shorter proof of \(\neg\varphi\)", which needs only consistency.</li>
+    </ol>
+
+    <p>Step 3 is where "true but unprovable" comes from, and it is worth staring at: the truth of \(G\) is established by <em>us</em>, reasoning in the metatheory about \(\mathbb{N}\). It is not an extra axiom, not mysticism, and not evidence that minds exceed machines — it is an ordinary argument that uses assumptions (the consistency of \(T\)) that \(T\) itself cannot use about itself.</p>
+
+    <h3><span class="num">4.1</span>What it does not say</h3>
+
+    <p>This theorem is the most misquoted result in mathematics. Open each claim only after deciding whether it's true.</p>
+
+    <details>
+      <summary>"Gödel proved that some mathematical truths can never be proved."</summary>
+      <div class="d"><p>Nearly right and importantly wrong. \(G\) is unprovable <em>in \(T\)</em>. It is perfectly provable in \(T + \mathrm{Con}(T)\), or in ZFC if \(T\) is PA. There is no sentence that is unprovable in every reasonable system — indeed \(G\) has a short proof once you are allowed to assume \(T\) is consistent, which every working mathematician does.</p>
+      <p>The theorem is about the relationship between a theory and its own consistency, not about an absolute barrier to knowledge.</p></div>
+    </details>
+    <details>
+      <summary>"Therefore mathematics is inconsistent / unreliable / built on sand."</summary>
+      <div class="d"><p>It says the opposite. Incompleteness is a consequence of <em>consistency</em>: an inconsistent theory proves everything and is perfectly complete. The theorem is "if you are consistent, you are incomplete" — being incomplete is the good case.</p></div>
+    </details>
+    <details>
+      <summary>"Human minds can see G is true, so minds surpass computers."</summary>
+      <div class="d"><p>The Lucas–Penrose argument. The standard objection: what we can actually see is the conditional "if \(T\) is consistent then \(G\) is true" — and <em>that</em> conditional is provable inside \(T\) itself (it is essentially the second incompleteness theorem). Establishing the antecedent for one's own reasoning is exactly what no system, human or machine, gets for free.</p>
+      <p>A machine given the axiom \(\mathrm{Con}(T)\) sees \(G\) as easily as we do. The asymmetry is about which system we are standing in, not about silicon.</p></div>
+    </details>
+    <details>
+      <summary>"Every sufficiently strong theory is incomplete, so all foundations are equally arbitrary."</summary>
+      <div class="d"><p>Incompleteness is uniform, but theories are not interchangeable. They form a rich, strictly increasing hierarchy of consistency strength — PA ⊂ ATR₀ ⊂ Z₂ ⊂ ZFC ⊂ ZFC + large cardinals — and where a theorem sits in that hierarchy is real mathematical information (this is the programme of reverse mathematics). "All incomplete" no more makes theories equivalent than "all finite" makes groups equivalent.</p></div>
+    </details>
+    <details>
+      <summary>"Gödel's sentence is a contrived logician's trick with no bearing on real mathematics."</summary>
+      <div class="d"><p>This was defensible until 1977. Then Paris–Harrington gave a natural finite Ramsey-theoretic statement independent of PA, and Kirby–Paris gave Goodstein's theorem and the hydra game. All are statements a combinatorialist might have asked about for their own sake. See §7 — you can run one.</p>
+      <p>For ZFC, the continuum hypothesis and a long list of set-theoretic statements are independent, and independence results now routinely appear in group theory, topology and analysis.</p></div>
+    </details>
+    <details>
+      <summary>"It means there are things we will never know."</summary>
+      <div class="d"><p>Epistemologically overloaded. What the theorem delivers is a precise relation: no c.e. consistent theory extending \(Q\) proves its own consistency. Anything beyond that — about human knowledge, physics, or the mind — is philosophy with Gödel's name attached, and usually smuggles in premises the theorem does not supply.</p></div>
+    </details>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s5">
+    <h2><span class="num">§ 5</span>The second theorem, and Löb</h2>
+
+    <p>Formalise the proof of step 2 above <em>inside</em> \(T\). It shows \(T \vdash \mathrm{Con}(T) \to G\). Since \(T\nvdash G\), we get \(T \nvdash \mathrm{Con}(T)\).</p>
+
+    <div class="box thm">
+      <span class="lab">Second incompleteness theorem</span>
+      <p>If \(T\) is consistent, computably axiomatised, and interprets enough arithmetic, then \(T \nvdash \mathrm{Con}(T)\), where \(\mathrm{Con}(T) :\equiv \neg\mathrm{Prov}_T(\ulcorner 0=1\urcorner)\).</p>
+    </div>
+
+    <p>"Enough arithmetic" here is more than \(Q\): the formalisation needs the <strong>Hilbert–Bernays–Löb derivability conditions</strong>, writing \(\Box\varphi\) for \(\mathrm{Prov}_T(\ulcorner\varphi\urcorner)\):</p>
+
+    <p>\[ \text{D1: } T\vdash\varphi \Rightarrow T \vdash \Box\varphi, \qquad \text{D2: } T\vdash \Box(\varphi\to\psi)\to(\Box\varphi\to\Box\psi), \qquad \text{D3: } T \vdash \Box\varphi \to \Box\Box\varphi. \]</p>
+
+    <p>D3 is the demanding one — it requires \(T\) to prove \(\Sigma_1\)-completeness about itself, which needs induction, which is why \(Q\) alone is not enough for the second theorem though it suffices for the first.</p>
+
+    <div class="beg">
+      <p><strong>Why is "I can't prove my own consistency" so much worse than it sounds — or so much better?</strong> Both, depending on where you stand.</p>
+      <p>Worse: Hilbert's programme wanted to justify infinitary mathematics by a <em>finitary</em> consistency proof. The second theorem says the finitary part (formalisable in PA) cannot even certify itself, let alone the rest. The programme in its original form is dead.</p>
+      <p>Better: consistency proofs still exist, they just have to use genuinely stronger principles. Gentzen (1936) proved Con(PA) using transfinite induction up to \(\varepsilon_0\) — a principle that is not provable in PA but is intuitively far more evident than the full strength of PA. That trade turned out to be enormously productive; it is the origin of ordinal analysis and of §7.</p>
+    </div>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Gerhard Gentzen<br>image needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Gerhard_Gentzen.jpg?width=460"
+             alt="Portrait of Gerhard Gentzen" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1936 · Göttingen</span>
+        <h4 class="who">Gerhard Gentzen</h4>
+        <figcaption>The second incompleteness theorem says PA cannot prove its own consistency. Gentzen proved Con(PA) anyway — using transfinite induction up to \(\varepsilon_0\), a principle PA lacks but which is far more obviously true, on inspection, than the full strength of arithmetic. That is not a loophole; it is the honest shape of the answer. It also created <em>ordinal analysis</em>: measure a theory by the ordinal it needs. §7 lets you watch \(\varepsilon_0\) do its job on a concrete sequence.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Gerhard_Gentzen.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+
+    <div class="box thm">
+      <span class="lab">Löb's theorem (1955)</span>
+      <p>If \(T \vdash \Box\varphi \to \varphi\), then \(T \vdash \varphi\).</p>
+    </div>
+
+    <p>Startling on first reading: you cannot safely assert "if this is provable then it's true" about any particular sentence unless it is already provable. Taking \(\varphi \equiv 0=1\) recovers the second theorem, since \(\Box(0{=}1)\to 0{=}1\) is exactly \(\mathrm{Con}(T)\) in contrapositive. The proof is the diagonal lemma again, applied to \(\psi(x) :\equiv \mathrm{Prov}_T(x) \to \varphi\).</p>
+
+    <p>Löb's theorem is what makes <strong>provability logic</strong> work: the modal logic <strong>GL</strong> (axiom \(\Box(\Box\varphi\to\varphi)\to\Box\varphi\)) is, by Solovay's completeness theorem, <em>exactly</em> the set of schemes about provability that PA proves. A decidable modal logic completely characterises PA's view of itself — one of the most satisfying results in the subject.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s6">
+    <h2><span class="num">§ 6</span>What a model of \(\mathrm{PA} + \neg\mathrm{Con}(\mathrm{PA})\) looks like</h2>
+
+    <p>By completeness (§1.4), \(\mathrm{PA}\nvdash\mathrm{Con}(\mathrm{PA})\) means there is a model \(\mathcal{M}\models \mathrm{PA}+\neg\mathrm{Con}(\mathrm{PA})\). In \(\mathcal{M}\) there is an element \(c\) that \(\mathcal{M}\) believes codes a proof of \(0=1\). Since PA really is consistent, \(c\) cannot be a standard natural number. So \(\mathcal{M}\) contains elements beyond \(\mathbb{N}\).</p>
+
+    <p>Every countable nonstandard model of PA has the same order type: \(\mathbb{N}\) followed by a dense order of copies of \(\mathbb{Z}\), with no first and no last copy — order type \(\mathbb{N} + \mathbb{Z}\cdot\mathbb{Q}\).</p>
+
+    <div class="beg" data-t="numbers that are not numbers">
+      <h5>How there can be extra natural numbers</h5>
+      <p>This is the part that sounds like a trick and is not. The claim is that there are structures satisfying <em>every single axiom of PA</em> — including every instance of induction — which nonetheless contain elements beyond \(0, 1, 2, 3, \dots\).</p>
+      <p>Here is the construction, and it needs nothing from Gödel. Add a brand-new constant symbol \(c\) to the language, together with infinitely many new axioms: \(c &gt; 0\), \(c &gt; 1\), \(c &gt; 2\), and so on forever.</p>
+      <p>Now ask whether this is contradictory. Take any <em>finite</em> collection of these axioms — say the ones up to \(c &gt; 1000\). Is it satisfiable? Obviously: work in ordinary \(\mathbb{N}\) and let \(c = 1001\). Every finite piece is fine.</p>
+      <p>And the <strong>compactness theorem</strong> says that if every finite piece of a set of axioms has a model, the whole set does. (Why? Because proofs are finite. If the infinite set were contradictory, some finite subset would already be.) So there is a structure where \(c\) exceeds every ordinary number.</p>
+
+      <div class="analogy">
+        Compactness is a promise about finiteness, not about infinity. A contradiction, if there is one, has to show up in a finite argument — so if no finite part is broken, nothing is.
+      </div>
+
+      <h5>Why the model cannot notice</h5>
+      <p>Surely \(\mathcal{M}\) could just define "the standard numbers" as those reachable from 0 by finitely many successor steps, and observe that \(c\) is not among them?</p>
+      <p>No — and the reason is precise. Induction in PA is a <em>scheme</em>: one axiom for each <strong>formula</strong>. It applies to definable properties only, not to arbitrary collections. And "is a standard natural number" is <em>not definable</em> in the language. So \(\mathcal{M}\) has no way to formulate the distinction, and induction never gets a chance to rule the extra elements out.</p>
+
+      <h5>What this does to "true but unprovable"</h5>
+      <p>Everything becomes concrete. A model of PA + ¬Con(PA) contains an element \(c\) that it believes codes a proof of \(0=1\). Since PA really is consistent, \(c\) is nonstandard. The model can check, step by internal step, that \(c\) is a valid proof — but the checking takes nonstandardly many steps, so no contradiction ever reaches us.</p>
+      <p><strong>"True but unprovable" always means: true in \(\mathbb{N}\), false in some other model.</strong> Incompleteness is not a hole in mathematics. It is the shadow cast by the fact that first-order axioms cannot single out \(\mathbb{N}\) — and compactness guarantees that before Gödel says a word.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 5</span>
+        <span class="t">Anatomy of a nonstandard model</span>
+        <span class="pill">Zoom in</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="nsCanvas"></canvas>
+        <div class="ctl">
+          <label>zoom <span class="v" id="ns-zv">1.0</span><input type="range" id="ns-z" min="0" max="100" step="1" value="0"></label>
+          <button class="btn fixed" id="ns-mark">Mark the "proof" of 0 = 1</button>
+        </div>
+        <div id="ns-note" style="font-family:var(--sans);font-size:14px;color:var(--ink-2);margin-top:14px"></div>
+      </div>
+      <figcaption class="plate-foot">Every element of a \(\mathbb{Z}\)-block has a predecessor and a successor but is reachable from \(0\) by no finite number of steps. \(\mathcal{M}\) cannot notice this: "is standard" is not expressible in the language, precisely because induction only applies to <em>definable</em> sets and the standard part is not definable. The nonstandard \(c\) is a perfectly good element that \(\mathcal{M}\) can verify, step by internal step, is a proof of \(0=1\) — but the verification has nonstandardly many steps, so no contradiction reaches us.</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">The moral</span>
+      <p>"True but unprovable" always means: <em>true in \(\mathbb{N}\), false in some other model</em>. Incompleteness is not a hole in mathematics; it is the shadow cast by the fact that first-order axioms cannot single out \(\mathbb{N}\) among all their models. Compactness guarantees the extra models exist before Gödel says a word.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s7">
+    <h2><span class="num">§ 7</span>An independent statement you can actually run</h2>
+
+    <p>Goodstein's theorem is a genuine combinatorial statement, independent of PA (Kirby–Paris, 1982). Here is the process:</p>
+
+    <ol>
+      <li>Write \(n\) in <strong>hereditary base 2</strong>: as a sum of powers of 2, where the exponents are themselves written in hereditary base 2, recursively. So \(266 = 2^{2^3}+2^3+2 = 2^{2^{2+1}}+2^{2+1}+2\).</li>
+      <li><strong>Bump</strong> the base: replace every 2 by 3. Then <strong>subtract 1</strong>.</li>
+      <li>Repeat, bumping to 4, 5, 6, …</li>
+    </ol>
+
+    <div class="box thm">
+      <span class="lab">Goodstein, 1944</span>
+      <p>Every Goodstein sequence reaches 0.</p>
+    </div>
+
+    <p>The values grow so violently that this looks obviously false. The proof is three lines: replace every base by \(\omega\) to get an ordinal below \(\varepsilon_0\); base-bumping does not change the ordinal; subtracting 1 strictly decreases it; \(\varepsilon_0\) is well-ordered, so no infinite descent. Watch both columns at once.</p>
+
+    <div class="beg" data-t="following the Goodstein process by hand">
+      <h5>Do one by hand, with \(n = 3\)</h5>
+      <p><strong>Step 1.</strong> Write 3 in hereditary base 2: \(3 = 2 + 1\). (Hereditary means the exponents are themselves written this way — here there are none to worry about.)</p>
+      <p><strong>Step 2.</strong> Bump base 2 to base 3, giving \(3 + 1 = 4\). Then subtract 1: <strong>3</strong>.</p>
+      <p><strong>Step 3.</strong> Write 3 in hereditary base 3: just \(3\). Bump to base 4: \(4\). Subtract 1: <strong>3</strong>.</p>
+      <p>Then 3 in base 4 is \(3\); bumping does nothing to a bare digit; subtract 1 gives <strong>2</strong>. Then <strong>1</strong>. Then <strong>0</strong>. Five steps and it is done.</p>
+      <p>Now try \(n=4\) in the figure. \(4 = 2^2\). Bump: \(3^3 = 27\). Subtract 1: 26. The values rocket past \(10^{100}\) within a dozen steps and the sequence does not terminate until step \(3\cdot2^{402653211}-1\). It looks <em>obviously</em> divergent.</p>
+
+      <h5>Why it terminates anyway</h5>
+      <p>Watch the second column instead. Take the hereditary base-\(b\) form and replace every \(b\) by the symbol \(\omega\). You get an <strong>ordinal</strong> — a transfinite counting number.</p>
+      <p>Now the two operations, one at a time. <strong>Base-bumping</strong> changes every \(b\) to \(b+1\) — but since you replaced all of them by \(\omega\) anyway, the ordinal is <em>completely unchanged</em>. It is invisible to the substitution. <strong>Subtracting 1</strong> genuinely lowers the ordinal.</p>
+      <p>So the ordinal never increases, and strictly decreases at every step. And ordinals below \(\varepsilon_0\) are <strong>well-ordered</strong>: there is no infinite strictly decreasing sequence, any more than there is one in \(0,1,2,3,\dots\). A sequence that strictly decreases must therefore stop.</p>
+
+      <div class="analogy">
+        You are descending an infinitely tall staircase whose steps have no smallest size — but every move takes you down at least one step, and the staircase has a bottom. However astronomically long it takes, you arrive. The integers exploding is a distraction; the ordinal is the quantity that is actually in charge.
+      </div>
+
+      <h5>And why PA cannot run that argument</h5>
+      <p>The proof needs one thing PA does not have: transfinite induction up to \(\varepsilon_0\). Gentzen showed that is <em>exactly</em> what PA is missing — adding it proves Con(PA), which by the second theorem PA cannot do alone.</p>
+      <p>So Goodstein's theorem is a perfectly ordinary statement about integers, provable by three lines of ordinal reasoning, and <strong>independent of Peano arithmetic</strong>. It was the answer to the standing objection that Gödel sentences are contrived logicians' tricks — this is a statement a combinatorialist might have asked about for its own sake.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 6</span>
+        <span class="t">Goodstein sequences: the value explodes, the ordinal descends</span>
+        <span class="pill">Run it</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="gs-pick">
+            <button class="btn" data-n="3">n = 3</button>
+            <button class="btn on" data-n="4">n = 4</button>
+            <button class="btn" data-n="5">n = 5</button>
+            <button class="btn" data-n="19">n = 19</button>
+            <button class="btn" data-n="266">n = 266</button>
+          </div>
+          <button class="btn fixed" id="gs-step">Step →</button>
+          <button class="btn fixed" id="gs-run">▶ Run 50</button>
+          <button class="btn fixed" id="gs-reset">Reset</button>
+        </div>
+        <dl class="readout">
+          <div><dt>step k</dt><dd id="gs-k" class="plain">0</dd></div>
+          <div><dt>base</dt><dd id="gs-b" class="plain">2</dd></div>
+          <div><dt>value</dt><dd id="gs-v">—</dd></div>
+          <div><dt>decimal digits</dt><dd id="gs-d">—</dd></div>
+        </dl>
+        <h4>Hereditary base-b form</h4>
+        <div class="hered" id="gs-her">—</div>
+        <h4>Associated ordinal (base → ω)</h4>
+        <div class="ord" id="gs-ord">—</div>
+        <canvas id="gsCanvas"></canvas>
+      </div>
+      <figcaption class="plate-foot">The curve is \(\log_{10}\) of \(\log_{10}\) of the value — a <em>double</em> logarithm, because a single one outruns the plot within ten steps. Below it, the ordinal ladder: each new Cantor normal form is checked against the previous one by actual ordinal comparison, not by eye. For \(n=3\) the whole thing reaches 0 after 5 steps. For \(n=4\) it terminates after \(3\cdot 2^{402653211}-1\) steps — a finite number, and PA cannot prove the sequence ever gets there. <strong>The reason is exactly Gentzen's: proving Goodstein's theorem requires induction up to \(\varepsilon_0\), which is precisely the transfinite reach that PA lacks.</strong> You are watching the proof-theoretic ordinal of arithmetic do its job.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s8">
+    <h2><span class="num">§ 8</span>Check yourself</h2>
+    <div class="quiz">
+      <div class="q" data-a="2">
+        <p class="qq">Gödel proved both a completeness theorem and an incompleteness theorem. Are they in tension?</p>
+        <button class="opt">Yes — he later retracted the completeness theorem.</button>
+        <button class="opt">Yes, but only for theories with infinitely many axioms.</button>
+        <button class="opt">No. Completeness is about logic (true in all models ⇒ provable); incompleteness is about a theory failing to prove something true in its <em>intended</em> model but false in another model of the same theory.</button>
+        <button class="opt">No, because completeness applies only to propositional logic.</button>
+        <p class="why">\(G\) is true in \(\mathbb{N}\) and false in some other model of PA, so it is not a semantic consequence of PA — completeness is confirmed, not violated. The two theorems together give the sharpest formulation: <em>unprovable</em> and <em>has a countermodel</em> are the same thing, so every independence result is a model construction.</p>
+      </div>
+      <div class="q" data-a="1">
+        <p class="qq">"The set of all true sentences of arithmetic" is consistent and complete. Why doesn't it refute Gödel?</p>
+        <button class="opt">Because it is inconsistent in disguise.</button>
+        <button class="opt">Because it is not computably axiomatisable, so \(\mathrm{Prf}\) is not a recursive relation and the whole arithmetization fails.</button>
+        <button class="opt">Because it does not interpret Robinson arithmetic.</button>
+        <button class="opt">Because it has no models.</button>
+        <p class="why">Decidability of the axiom set is a genuine hypothesis, not fine print. Tarski's theorem makes it precise: arithmetic truth is not even <em>definable</em> in the language of arithmetic, let alone recursively axiomatisable. Provability is definable (it's \(\Sigma_1\)); truth is not. That single asymmetry is what turns the liar paradox into Gödel's theorem.</p>
+      </div>
+      <div class="q" data-a="3">
+        <p class="qq">The diagonal lemma builds \(\theta\) with \(T \vdash \theta \leftrightarrow \psi(\ulcorner\theta\urcorner)\). What is it fundamentally a theorem about?</p>
+        <button class="opt">Truth.</button>
+        <button class="opt">Consistency.</button>
+        <button class="opt">The liar paradox.</button>
+        <button class="opt">Substitution — that substituting a formula's code into itself is a computable operation, hence representable.</button>
+        <p class="why">The lemma mentions neither truth nor provability; \(\psi\) is arbitrary. That generality is why the same construction yields Gödel, Tarski, Löb, Rice's theorem, and Kleene's recursion theorem. Recognising a diagonal argument as "a fixed point of a computable transformation" rather than "a paradox" is the single most portable idea in this volume.</p>
+      </div>
+      <div class="q" data-a="0">
+        <p class="qq">In Fig. 6, the Goodstein value for \(n=4\) rockets past \(10^{100}\) while the ordinal drops from \(\omega^\omega\) downward. Why does the ordinal settle the question?</p>
+        <button class="opt">Because \(\varepsilon_0\) is well-ordered, so there is no infinite strictly decreasing sequence — the process must halt, however long it takes.</button>
+        <button class="opt">Because the ordinal is an upper bound for the value.</button>
+        <button class="opt">Because ordinals below \(\varepsilon_0\) are finite.</button>
+        <button class="opt">Because base-bumping decreases the ordinal.</button>
+        <p class="why">Base-bumping leaves the ordinal <em>unchanged</em> (that's the point — it is invisible to the \(\omega\)-substitution); only the "subtract 1" moves it, and always downward. Well-ordering then finishes the argument in one line. PA cannot run this argument because it cannot prove transfinite induction up to \(\varepsilon_0\) — and Gentzen showed that principle is <em>exactly</em> what PA is missing, since adding it proves Con(PA).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s9">
+    <h2><span class="num">§ 9</span>Where to go next</h2>
+
+    <h4>Start here</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://www.logicmatters.net/igt/" target="_blank" rel="noopener">
+        <span class="k">Book · free PDF</span><span class="n">Peter Smith, <em>Gödel Without (Too Many) Tears</em></span>
+        <span class="d">The best entry point in print, and free. His longer <em>Introduction to Gödel's Theorems</em> is the careful version.</span></a>
+      <a class="lnk ext" href="https://plato.stanford.edu/entries/goedel-incompleteness/" target="_blank" rel="noopener">
+        <span class="k">Encyclopedia</span><span class="n">SEP — Gödel's Incompleteness Theorems</span>
+        <span class="d">Precise statements, correct hypotheses, and a sober survey of the philosophical claims made in the theorem's name.</span></a>
+      <a class="lnk ext" href="https://global.oup.com/academic/product/forever-undecided-9780192801418" target="_blank" rel="noopener">
+        <span class="k">Book · puzzles</span><span class="n">Smullyan, <em>Forever Undecided</em></span>
+        <span class="d">Provability logic taught entirely through knights-and-knaves puzzles. Sounds like a gimmick; is in fact the fastest route to real intuition for \(\Box\).</span></a>
+      <a class="lnk ext" href="https://www.cs.cornell.edu/courses/cs4860/2009sp/lec-goedel.pdf" target="_blank" rel="noopener">
+        <span class="k">Notes</span><span class="n">Lecture notes on the arithmetization</span>
+        <span class="d">If §2 felt hand-waved, this is where to see the forty-six primitive recursive functions actually written out.</span></a>
+    </div>
+
+    <h4>Deeper</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://projecteuclid.org/journals/bulletin-of-symbolic-logic" target="_blank" rel="noopener">
+        <span class="k">Textbook</span><span class="n">Kaye, <em>Models of Peano Arithmetic</em></span>
+        <span class="d">The whole story behind §6: overspill, definable cuts, and why every countable nonstandard model has order type \(\mathbb{N}+\mathbb{Z}\cdot\mathbb{Q}\).</span></a>
+      <a class="lnk ext" href="https://www.cambridge.org/core/books/logic-of-provability/" target="_blank" rel="noopener">
+        <span class="k">Book</span><span class="n">Boolos, <em>The Logic of Provability</em></span>
+        <span class="d">Solovay's theorem in full: the modal logic GL is exactly PA's theory of its own provability.</span></a>
+      <a class="lnk ext" href="https://www.jstor.org/stable/2273227" target="_blank" rel="noopener">
+        <span class="k">Paper</span><span class="n">Kirby &amp; Paris, <em>Accessible independence results for Peano arithmetic</em> (1982)</span>
+        <span class="d">Goodstein's theorem and the hydra game, both shown independent of PA. The source for §7.</span></a>
+      <a class="lnk ext" href="https://plato.stanford.edu/entries/proof-theory-development/" target="_blank" rel="noopener">
+        <span class="k">Survey</span><span class="n">Ordinal analysis and Gentzen's consistency proof</span>
+        <span class="d">Why \(\varepsilon_0\) is "the" ordinal of PA, and what the corresponding ordinals are for stronger theories.</span></a>
+    </div>
+
+    <h4>Do it yourself</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://github.com/leanprover-community/mathlib4" target="_blank" rel="noopener">
+        <span class="k">Formalisation</span><span class="n">Gödel's first theorem, formalised in Lean</span>
+        <span class="d">The incompleteness theorems have been fully machine-checked. Reading the formalisation is the ultimate test of whether you understood the hypotheses — and it leads straight into Vol. IV.</span></a>
+      <a class="lnk ext" href="https://www.metamath.org/" target="_blank" rel="noopener">
+        <span class="k">System</span><span class="n">Metamath</span>
+        <span class="d">The closest real system to the Hilbert-style checker in Fig. 2 — proofs are literally substitution steps, and its whole database is verifiable by a few hundred lines of code.</span></a>
+      <a class="lnk ext" href="https://us.metamath.org/mpeuni/mmset.html#trivia" target="_blank" rel="noopener">
+        <span class="k">Curio</span><span class="n">"2 + 2 = 4" from the axioms</span>
+        <span class="d">A few thousand primitive steps. Sobering, and a good argument for the elaborators of Vol. IV.</span></a>
+    </div>
+
+    <hr>
+    <p style="font-family:var(--sans);font-size:14px;color:var(--ink-3)">Next — <strong>Vol. IV: How Lean Works</strong>, which is this volume's §1 taken completely seriously and made to run on a computer. <strong>Vol. I: Modular Forms.</strong> <strong>Vol. II: Sieve Theory.</strong></p>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  <nav class="seriesnav">
+    <a href="https://claude.ai/code/artifact/6d579501-40cb-40eb-af02-9acfb874a5ec" target="_blank" rel="noopener"><span class="v">Volume I</span><span class="n">Modular Forms</span><span class="d">Rigidity in, finiteness out</span></a>
+    <a href="https://claude.ai/code/artifact/505b1a47-7dc1-4266-8e81-2e1092a55d32" target="_blank" rel="noopener"><span class="v">Volume II</span><span class="n">Sieve Theory</span><span class="d">A method that knows its own limit</span></a>
+    <a href="#" aria-current="page"><span class="v">Volume III</span><span class="n">Gödel & Formal Language</span><span class="d">Mathematics as a string of symbols</span></a>
+    <a href="https://claude.ai/code/artifact/c28ec44f-e713-4736-b088-b66859ed44aa" target="_blank" rel="noopener"><span class="v">Volume IV</span><span class="n">How Lean Works</span><span class="d">A proof is a program</span></a>
+  </nav>
+  <div>Marginalia · Volume III · Gödel &amp; Formal Language</div>
+  <div>The parser, proof checker, Gödel numbering and Goodstein engine all run live in your browser.</div>
+</footer>
+
+<script src="vol3.js"></script>
+
+</html>

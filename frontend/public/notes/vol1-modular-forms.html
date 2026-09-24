@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Modular Forms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="notes.css">
+<style>
+  :root{
+    --acc:#7048e8; --acc-2:#e8590c;
+    --acc-soft:rgba(112,72,232,.10); --acc-line:rgba(112,72,232,.36);
+  }
+  :root[data-theme="dark"], :root:not([data-theme="light"]){ }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --acc:#a78bfa; --acc-2:#fb923c;
+    --acc-soft:rgba(167,139,250,.13); --acc-line:rgba(167,139,250,.40);
+  }}
+  :root[data-theme="dark"]{
+    --acc:#a78bfa; --acc-2:#fb923c;
+    --acc-soft:rgba(167,139,250,.13); --acc-line:rgba(167,139,250,.40);
+  }
+  /* volume-specific bits */
+  #hpCanvas{background:var(--paper-2)}
+  .dcwrap{position:relative}
+  .dcwrap .busy{position:absolute; inset:0; display:none; place-items:center; background:color-mix(in srgb,var(--paper-2) 70%,transparent);
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--acc)}
+  .dcwrap.busy-on .busy{display:grid}
+  .chip{display:inline-block; font-family:var(--mono); font-size:11px; padding:3px 9px; border-radius:999px;
+    border:1px solid var(--rule); margin:0 5px 5px 0; background:var(--paper-3)}
+  .chip.hit{border-color:var(--ok); color:var(--ok)}
+  .chip.miss{border-color:var(--bad); color:var(--bad)}
+  .basis{font-family:var(--mono); font-size:13px; line-height:2}
+  .dimbars{display:block; width:100%}
+</style>
+
+<script src="glossary-terms.js"></script>
+<script src="notes.js"></script>
+<script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.js"></script>
+<script src="glossary.js"></script>
+
+<div class="progress" id="prog"></div>
+
+<header class="masthead">
+  <div class="mh-mark">I</div>
+  <div class="mh-title">Modular Forms</div>
+  <div class="mh-vol">Marginalia · Vol. I · Interactive Notes</div>
+  <div class="mh-spacer"></div>
+  <span class="lvlhint" id="lvlHint">click any <span style="border-bottom:1px dashed var(--acc-line)">dotted term</span> for a plain explanation</span>
+  <div class="switch" role="group" aria-label="Reading level">
+    <button data-level-btn="grad" aria-pressed="true" title="Concise: assumes the prerequisites">Graduate</button>
+    <button data-level-btn="beg" aria-pressed="false" title="Adds undergraduate-level explanations throughout">Ground-up</button>
+  </div>
+  <button class="icon-btn" id="themeBtn" title="Toggle theme">☀</button>
+</header>
+
+<div class="shell">
+  <nav class="toc"><h6>Contents</h6><div id="toc"></div></nav>
+  <main class="body">
+
+  <div class="cover">
+    <p class="eyebrow">Volume I · Analytic Number Theory</p>
+    <h1>A function with <em>too much</em> symmetry</h1>
+    <p class="dek">Modular forms are holomorphic functions on the upper half-plane that are invariant under an infinite discrete group — a condition so rigid it should have no solutions. It has exactly enough. That tension is the whole subject.</p>
+    <dl class="meta-strip">
+      <div><dt>Prerequisites</dt><dd>None assumed — every term is explained on click</dd></div>
+      <div><dt>Interactives</dt><dd>Eight, plus a diagram</dd></div>
+      <div><dt>Reading time</dt><dd>~75 min graduate · ~2 hr ground-up</dd></div>
+      <div><dt>Payoff</dt><dd>Why finite-dimensionality is a superpower</dd></div>
+    </dl>
+
+    <div class="howto">
+      <p><b>This volume is written for three readers at once.</b> Graduate students who want the argument and nothing else; undergraduates meeting complex analysis and group theory for the first time; and people teaching themselves, with no one to ask.</p>
+      <p><span class="k">1</span> <b>Click any dotted term.</b> A card opens with a plain-English explanation, a worked example, and usually a small animation. Cards link to each other, so you can follow a thread as far back as you need — all the way down to "what is a group" or "what is a complex number". Nothing in this volume is assumed; it is only <i>deferred</i>.</p>
+      <p><span class="k">2</span> <b>Switch to <i>Ground-up</i> in the header.</b> That reveals a slower parallel exposition — the same mathematics with the steps filled in, the notation unpacked, and an analogy wherever one genuinely helps. Switch back to <i>Graduate</i> to hide it again. The two modes are the same document; pick per section, not once.</p>
+      <p><span class="k">3</span> <b>Play with the figures before reading past them.</b> Every one computes live in your browser. Fig. 1 and Fig. 5 in particular will teach you more in thirty seconds of dragging than a page of prose.</p>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <section id="s0">
+    <h2><span class="num">§ 0</span>The one-sentence version</h2>
+
+    <p class="lede">Here is the entire subject in a single sentence: <strong>an infinite amount of symmetry, imposed on a space of analytic functions, cuts that space down to something finite-dimensional — and finite-dimensional spaces let you prove infinitely many identities by checking finitely many numbers.</strong></p>
+
+    <p>Everything below is an unpacking of that sentence. If you remember nothing else, remember the shape of the argument: <em>rigidity in, finiteness out, arithmetic identities as a consequence.</em></p>
+
+    <div class="beg" data-t="what this subject is">
+      <h5>Symmetry is a constraint, and constraints kill functions</h5>
+      <p>Suppose I hand you a function \(f\) and demand that \(f(x) = f(x+1)\) for every \(x\). That is one symmetry, and plenty of functions satisfy it — every periodic function does. Sine, cosine, "the fractional part of \(x\)", and infinitely many others.</p>
+      <p>Now demand a <em>second</em> symmetry as well, one that does not obviously get along with the first. Most of those functions die. Demand a third and almost nothing is left. Demand <em>infinitely many at once</em> and your honest expectation should be that only \(f = 0\) survives — the function that is zero everywhere satisfies every symmetry you could ask for, and it is useless.</p>
+
+      <div class="analogy">
+        Think of it like a jigsaw. One constraint ("this piece has a straight edge") leaves thousands of candidates. Add "and a notch on the left", then "and it is blue", and the candidates collapse fast. Ask for enough constraints at once and usually <em>nothing</em> fits. Modular forms are the case where, astonishingly, exactly a handful of pieces fit — and you can list them.
+      </div>
+
+      <h5>What actually survives, and why anyone cares</h5>
+      <p>The shock is that something does survive, and the surviving collection is <em>small enough to write down completely</em>. Not "small" in a vague sense: the set of all such functions of a given type forms a vector space, and that space turns out to have dimension 1, or 2, or 3 — a specific finite number you can compute from a formula.</p>
+      <p>Here is why that is worth caring about. If a space has dimension \(d\), then \(d\) numbers pin down an element <em>completely</em>. So if two formulas that look nothing alike both produce functions living in the same \(d\)-dimensional space, and their first \(d\) coefficients agree, the two formulas must be <strong>equal</strong> — and therefore <em>all</em> of their infinitely many remaining coefficients agree too.</p>
+      <p>You checked \(d\) numbers. You got infinitely many identities. Since those coefficients turn out to be things like "the sum of the divisors of \(n\)", the identities you get for free are statements about ordinary whole numbers that nobody could find by thinking about whole numbers. <strong>That trade — finitely many checks for infinitely many arithmetic facts — is the entire reason number theorists care about modular forms.</strong></p>
+
+      <h5>The three words to carry through the volume</h5>
+      <p><strong>Rigidity in.</strong> We impose an absurd amount of symmetry. <strong>Finiteness out.</strong> The space of survivors is finite-dimensional. <strong>Arithmetic as a consequence.</strong> Finite dimension turns identity-checking into a finite computation, and the identities happen to be about primes and divisors.</p>
+      <p>Everything in §1–§5 is machinery for making those three words precise. If you get lost, come back and ask which of the three you are currently in the middle of.</p>
+    </div>
+
+    <div class="box">
+      <span class="lab">Map of the volume</span>
+      <p>§1 builds the stage (the upper half-plane and the group acting on it). §2 states the definition. §3–4 produce actual examples and let you <em>look</em> at them. §5 proves the finiteness. §6 adds the Hecke operators that make coefficients multiplicative. §7 cashes it all in for classical arithmetic. §8 points onward.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s1">
+    <h2><span class="num">§ 1</span>The stage: \(\mathbb{H}\) and \(\mathrm{SL}_2(\mathbb{Z})\)</h2>
+
+    <p>Let \(\mathbb{H} = \{z \in \mathbb{C} : \operatorname{Im} z &gt; 0\}\) be the <strong>upper half-plane</strong>. The group \(\mathrm{SL}_2(\mathbb{Z})\) of integer matrices with determinant \(1\) acts on \(\mathbb{H}\) by <span class="g" data-def="A map of the form z ↦ (az+b)/(cz+d). These are exactly the conformal automorphisms of the Riemann sphere; the real ones with positive determinant preserve the upper half-plane.">Möbius transformations</span>:</p>
+
+    <p>\[ \gamma = \begin{pmatrix} a &amp; b \\ c &amp; d\end{pmatrix}, \qquad \gamma z = \frac{az+b}{cz+d}. \]</p>
+
+    <p>The key computation, which you should do once by hand and then never again, is</p>
+
+    <p>\[ \operatorname{Im}(\gamma z) = \frac{\operatorname{Im} z}{|cz+d|^2}. \]</p>
+
+    <p>This is why the action preserves \(\mathbb{H}\): the imaginary part gets rescaled by a positive real number, never flipped. That denominator \(|cz+d|^2\) is going to follow us through the entire subject; the quantity \(j(\gamma, z) = cz+d\) is called the <strong>automorphy factor</strong>, and essentially every definition in the theory is built around it.</p>
+
+    <div class="beg" data-t="reading the setup">
+      <h5>First, what all this notation is saying</h5>
+      <p>Three objects have just been introduced. Take them one at a time; none is complicated.</p>
+      <p><strong>\(\mathbb{H}\), the upper half-plane.</strong> A complex number \(z = x + iy\) is just a point in a plane, with \(x\) across and \(y\) up. \(\mathbb{H}\) means: take the plane and keep only the points strictly <em>above</em> the horizontal axis, i.e. \(y &gt; 0\). Nothing on the axis, nothing below. That is the whole playing field.</p>
+      <p><strong>\(\mathrm{SL}_2(\mathbb{Z})\), the group.</strong> A \(2\times2\) box of whole numbers \(\begin{pmatrix}a&amp;b\\c&amp;d\end{pmatrix}\) with the one requirement \(ad-bc=1\). There are infinitely many such boxes. Collectively they form a <em>group</em>: you can combine two of them (multiply the matrices), and you can undo any of them.</p>
+      <p><strong>The action.</strong> Each box gets to <em>move points around</em> in \(\mathbb{H}\), by the rule \(z \mapsto \frac{az+b}{cz+d}\). So the group is not a bag of numbers sitting there; it is a collection of <em>motions</em> of the playing field.</p>
+
+      <div class="analogy">
+        Picture the symmetries of a square: 4 rotations and 4 reflections. Those 8 moves form a group, and they <em>act on</em> the square by shuffling its corners. Here the playing field is \(\mathbb{H}\) instead of a square, and there are infinitely many moves instead of 8 — but it is exactly the same kind of thing. Every question below is "what does a function look like if it barely notices these moves?"
+      </div>
+
+      <h5>Why the moves cannot push a point out of \(\mathbb{H}\)</h5>
+      <p>This is the one computation worth doing by hand, and it takes four lines. We want to know what \(\gamma z\) does to the height \(\operatorname{Im} z\). Write \(\gamma z = \frac{az+b}{cz+d}\) and multiply top and bottom by the conjugate \(\overline{cz+d}\) — the standard trick for getting a complex number out of a denominator:</p>
+      <p>\[ \gamma z = \frac{(az+b)\overline{(cz+d)}}{|cz+d|^2} = \frac{ac|z|^2 + adz + bc\bar z + bd}{|cz+d|^2}. \]</p>
+      <p>Now the denominator \(|cz+d|^2\) is a real number, so it does not affect which part is imaginary. In the numerator, \(ac|z|^2\) and \(bd\) are real, so they contribute nothing. That leaves \(\operatorname{Im}(adz + bc\bar z)\). Since \(\bar z\) has the opposite imaginary part to \(z\), this is \((ad - bc)\operatorname{Im} z\), and \(ad-bc = 1\). So:</p>
+      <p>\[ \operatorname{Im}(\gamma z) = \frac{\operatorname{Im} z}{|cz+d|^2}. \]</p>
+      <p><strong>Read what that says.</strong> The height gets divided by \(|cz+d|^2\), which is a <em>positive real number</em> — a length squared. Dividing a positive height by a positive number keeps it positive. So a point above the axis stays above the axis, always. The playing field is preserved.</p>
+      <p>And notice where \(ad - bc = 1\) entered: if the determinant had been \(-1\), the imaginary part would have flipped sign and every point would have been thrown out of \(\mathbb{H}\). <strong>The determinant condition is load-bearing, not decoration.</strong></p>
+
+      <h5>The quantity to watch for the rest of the volume</h5>
+      <p>That denominator \(cz+d\) is going to follow us everywhere. It gets the name \(j(\gamma,z)\), the <em>automorphy factor</em>. Almost every definition in the subject is built around it, for the simple reason that it is the unavoidable residue of the algebra above — you cannot move a point without it appearing.</p>
+    </div>
+
+    <h3><span class="num">1.1</span>Two generators run the whole show</h3>
+
+    <p>\(\mathrm{SL}_2(\mathbb{Z})\) is generated by just two elements:</p>
+
+    <p>\[ T = \begin{pmatrix}1&amp;1\\0&amp;1\end{pmatrix} : z \mapsto z+1, \qquad S = \begin{pmatrix}0&amp;-1\\1&amp;0\end{pmatrix} : z \mapsto -\tfrac{1}{z}. \]</p>
+
+    <p>\(T\) is a horizontal translation. \(S\) is inversion in the unit circle composed with a reflection — it swaps the region near \(0\) with the region near \(\infty\). They satisfy \(S^2 = -I\) and \((ST)^3 = -I\), and in fact \(\mathrm{PSL}_2(\mathbb{Z}) = \mathrm{SL}_2(\mathbb{Z})/\{\pm I\} \cong \mathbb{Z}/2 * \mathbb{Z}/3\), the free product generated by \(S\) and \(ST\).<span class="sn"></span></p>
+
+    <p class="sn-body">The free-product structure is why the tessellation below looks like a tree of triangles: there are no unexpected relations, so distinct reduced words in \(S\) and \(ST\) give genuinely distinct tiles.</p>
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Felix Klein<br>portrait needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Felix_Klein.jpeg?width=420" alt="Photograph of Felix Klein" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1878 · Leipzig</span>
+        <h4 class="who">Felix Klein</h4>
+        <figcaption>The tessellation you are about to drag a point around was Klein's idea of what a group <em>is</em>. His <em>Erlangen programme</em> (1872) proposed that a geometry should be defined by the group of transformations that leaves it alone — so studying \(\mathrm{SL}_2(\mathbb{Z})\) and studying the tiling of \(\mathbb{H}\) are not two subjects but one. Klein and Fricke's volumes on modular functions filled hundreds of pages with hand-drawn tilings like the one in Fig. 1; every picture in this volume that you can drag, they had to draw.
+        <span class="cred">Photograph, public domain · <a href="https://commons.wikimedia.org/wiki/File:Felix_Klein.jpeg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+
+    <h3><span class="num">1.2</span>The fundamental domain</h3>
+
+    <p>Because the action is properly discontinuous, \(\mathbb{H}\) breaks into orbits, and there is a canonical region containing (almost) exactly one point per orbit:</p>
+
+    <div class="box thm">
+      <span class="lab">Proposition</span>
+      <p>Every \(z \in \mathbb{H}\) is \(\mathrm{SL}_2(\mathbb{Z})\)-equivalent to a point of \(\mathcal{F} = \{ z : |\operatorname{Re} z| \le \tfrac12,\ |z| \ge 1 \}\), and the representative is unique except on the boundary.</p>
+    </div>
+
+    <p>The proof <em>is</em> an algorithm, and it's worth internalising because it is the model for every reduction theory you'll meet later:</p>
+
+    <ol>
+      <li>Apply \(T^{-n}\) to force \(|\operatorname{Re} z| \le \tfrac12\).</li>
+      <li>If \(|z| &lt; 1\), apply \(S\). By the imaginary-part formula, \(\operatorname{Im}(-1/z) = \operatorname{Im}(z)/|z|^2 &gt; \operatorname{Im} z\) — the point moves strictly <em>up</em>.</li>
+      <li>Repeat. Since \(\operatorname{Im}\) strictly increases and the set of achievable imaginary parts is discrete, the process terminates.</li>
+    </ol>
+
+    <p>Drag the point below and watch it happen.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 1</span>
+        <span class="t">The modular tessellation, reduction algorithm, and the \(S,T\) orbit</span>
+        <span class="pill">Drag me</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="hpCanvas"></canvas>
+        <div class="ctl">
+          <div class="seg fixed">
+            <button class="btn" data-hp="T">z + 1</button>
+            <button class="btn" data-hp="Ti">z − 1</button>
+            <button class="btn" data-hp="S">−1/z</button>
+          </div>
+          <button class="btn fixed" data-hp="reduce">▶ Reduce to 𝓕</button>
+          <button class="btn fixed" data-hp="reset">Reset</button>
+          <button class="btn on fixed" data-hp="tess">Tessellation</button>
+          <button class="btn fixed" data-hp="trail">Show path</button>
+        </div>
+        <dl class="readout">
+          <div><dt>z</dt><dd id="hp-z">—</dd></div>
+          <div><dt>Im z</dt><dd id="hp-im">—</dd></div>
+          <div><dt>|z|</dt><dd id="hp-abs">—</dd></div>
+          <div><dt>reducing γ</dt><dd id="hp-g" class="plain">—</dd></div>
+          <div><dt>word in S,T</dt><dd id="hp-w" class="plain">—</dd></div>
+          <div><dt>in 𝓕?</dt><dd id="hp-in">—</dd></div>
+        </dl>
+      </div>
+      <figcaption class="plate-foot">Shaded tile: the fundamental domain \(\mathcal{F}\). Every other tile is \(\gamma\mathcal{F}\) for some \(\gamma \in \mathrm{SL}_2(\mathbb{Z})\) — they tile \(\mathbb{H}\) with no overlaps and no gaps. Tiles shrink towards the real axis because the hyperbolic metric \(ds = |dz|/y\) makes them all the <em>same size</em>; the distortion is an artefact of Euclidean eyes. The three corners of \(\mathcal{F}\) are the two <em>elliptic points</em> \(i\) (stabilised by \(S\), order 2) and \(\rho = e^{2\pi i/3}\) (order 3), plus the <em>cusp</em> at \(i\infty\).</figcaption>
+    </figure>
+
+    <div class="beg">
+      <p><strong>Why should I care about a tessellation?</strong> Because it tells you what a modular form really is. A modular form of weight \(0\) would be a function that takes the same value at every point of a given orbit — so it's really a function on the <em>quotient</em> \(\mathrm{SL}_2(\mathbb{Z})\backslash\mathbb{H}\), i.e. on a single tile with its edges glued.</p>
+      <p>That quotient is a surface: glue the left edge of \(\mathcal{F}\) to the right edge (that's \(T\)), and fold the bottom arc onto itself around \(i\) (that's \(S\)). What you get is topologically a sphere with one point removed (the cusp). Add the cusp back and you get \(\mathbb{P}^1\) — a genus-zero Riemann surface. <em>Modular forms are sections of line bundles on this sphere.</em> The finiteness in §5 is ultimately Riemann–Roch on a sphere.</p>
+    </div>
+
+    <div class="box warn">
+      <span class="lab">A trap worth naming</span>
+      <p>"Invariant under an infinite group" sounds like it should force \(f\) to be constant, and in weight \(0\) it nearly does — the only holomorphic weight-0 modular forms are constants, because the quotient is compact and a holomorphic function on a compact Riemann surface is constant. The subject only becomes interesting because we allow the automorphy factor \((cz+d)^k\). <strong>The weight is not a technicality; it is the entire reason non-trivial examples exist.</strong></p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s2">
+    <h2><span class="num">§ 2</span>The definition, and why each clause is there</h2>
+
+    <div class="box">
+      <span class="lab">Definition</span>
+      <p>Let \(k \in \mathbb{Z}\). A <strong>modular form of weight \(k\)</strong> for \(\mathrm{SL}_2(\mathbb{Z})\) is a function \(f : \mathbb{H} \to \mathbb{C}\) such that</p>
+      <ol>
+        <li><strong>(Holomorphy)</strong> \(f\) is holomorphic on \(\mathbb{H}\);</li>
+        <li><strong>(Modularity)</strong> \(f\!\left(\dfrac{az+b}{cz+d}\right) = (cz+d)^k f(z)\) for all \(\begin{pmatrix}a&amp;b\\c&amp;d\end{pmatrix} \in \mathrm{SL}_2(\mathbb{Z})\);</li>
+        <li><strong>(Growth)</strong> \(f\) is holomorphic at the cusp: in the expansion \(f(z) = \sum_{n \in \mathbb{Z}} a_n q^n\) with \(q = e^{2\pi i z}\), we have \(a_n = 0\) for \(n &lt; 0\).</li>
+      </ol>
+      <p>The space of these is \(M_k\). If moreover \(a_0 = 0\), \(f\) is a <strong>cusp form</strong>; those form \(S_k \subset M_k\).</p>
+    </div>
+
+    <div class="beg" data-t="the definition, clause by clause">
+      <h5>What the definition is actually asking for</h5>
+      <p>A definition with three numbered clauses looks forbidding, but each one is doing a job you can state in a sentence. Read them as three separate demands on the same function.</p>
+
+      <p><strong>Clause 1, holomorphic on \(\mathbb{H}\)</strong> — "\(f\) is differentiable, in the complex sense, everywhere on the playing field". Complex differentiability is a much stronger demand than the real kind: you require the derivative to exist no matter which direction you approach from, and there are infinitely many directions in a plane. The payoff is <em>rigidity</em> — a holomorphic function is determined by its behaviour on any tiny arc. That rigidity is what will eventually force finiteness.</p>
+
+      <p><strong>Clause 2, modularity</strong> — "moving \(z\) by any group element changes \(f\) only by the factor \((cz+d)^k\)". This is the symmetry demand, and it is infinite: one equation per group element. The reason it is checkable at all is §2.2 below.</p>
+
+      <p><strong>Clause 3, growth</strong> — "\(f\) does not blow up as you go straight upward". It sounds like a technical afterthought. It is not: without it the whole theory is infinite-dimensional and nothing works. §2.2 shows it is really the innocuous statement "no negative powers of \(q\)".</p>
+
+      <div class="analogy">
+        Compare: "a regular polygon is (1) a closed shape made of straight segments, (2) with all sides equal, (3) and all angles equal." Drop any one clause and you get a wildly bigger collection — polygons in general, rhombuses, rectangles. Keep all three and you get one shape per number of sides: a small, listable family. The three clauses here do the same job.
+      </div>
+
+      <h5>Why \(k\) has to be even, in one line</h5>
+      <p>The matrix \(-I = \begin{pmatrix}-1&amp;0\\0&amp;-1\end{pmatrix}\) is in the group, and it does <em>nothing</em> to points: \(\frac{-z+0}{0-1} = z\). But its \(cz+d\) is \(-1\). So clause 2 says \(f(z) = (-1)^kf(z)\). If \(k\) is odd this reads \(f = -f\), which forces \(f \equiv 0\).</p>
+      <p>So for the full modular group, <strong>only even weights carry anything at all</strong>. This is not a loss — it is the first example of the pattern that runs through the volume: impose a symmetry, watch a whole family of candidates vanish, and be left with something small enough to understand.</p>
+    </div>
+
+    <p>Take the clauses one at a time.</p>
+
+    <h3><span class="num">2.1</span>Clause 2 forces \(k\) to be even</h3>
+
+    <p>Apply modularity to \(\gamma = -I\), which acts trivially on \(\mathbb{H}\) (since \(\frac{-z+0}{0-1} = z\)) but has \(c z + d = -1\):</p>
+
+    <p>\[ f(z) = f(-I \cdot z) = (-1)^k f(z). \]</p>
+
+    <p>If \(k\) is odd this gives \(f \equiv 0\). So for the full modular group, <strong>only even weights carry anything</strong>. (For congruence subgroups not containing \(-I\), odd weights come back to life — that's where the interesting arithmetic of the 21st century happens.)</p>
+
+    <h3><span class="num">2.2</span>Clause 2 only needs to be checked on generators</h3>
+
+    <p>Because \(S\) and \(T\) generate, and because the automorphy factor satisfies the <strong>cocycle relation</strong></p>
+
+    <p>\[ j(\gamma_1\gamma_2, z) = j(\gamma_1, \gamma_2 z)\, j(\gamma_2, z), \]</p>
+
+    <p>modularity for \(S\) and \(T\) implies it for everything. Concretely, the definition reduces to two equations:</p>
+
+    <p>\[ f(z+1) = f(z), \qquad f(-1/z) = z^k f(z). \]</p>
+
+    <p>The first is why a \(q\)-expansion exists at all: a 1-periodic holomorphic function on \(\mathbb{H}\) descends to a holomorphic function of \(q = e^{2\pi i z}\) on the punctured disc \(0 &lt; |q| &lt; 1\), hence has a Laurent expansion. Clause 3 says the puncture is removable.</p>
+
+    <div class="beg">
+      <p><strong>Unpacking \(q = e^{2\pi i z}\).</strong> Write \(z = x + iy\). Then \(q = e^{2\pi i x}e^{-2\pi y}\), so \(|q| = e^{-2\pi y}\) and \(\arg q = 2\pi x\). Two consequences worth holding on to:</p>
+      <ul>
+        <li>Moving \(z\) right by 1 (i.e. \(x \to x+1\)) leaves \(q\) unchanged. So \(q\) "knows" the \(T\)-symmetry automatically.</li>
+        <li>Going up (\(y \to \infty\)) sends \(q \to 0\). So "the cusp \(i\infty\)" is literally the point \(q = 0\), and "holomorphic at the cusp" literally means "no pole at \(q=0\)".</li>
+      </ul>
+      <p>The map \(z \mapsto q\) wraps the infinite vertical strip \(\{0 \le x &lt; 1\}\) around the punctured unit disc, like rolling a sheet of paper into a tube and then squashing it flat.</p>
+    </div>
+
+    <h3><span class="num">2.3</span>The cocycle condition is not an accident</h3>
+
+    <p>Define the <strong>weight-\(k\) slash operator</strong> \((f|_k\gamma)(z) = (cz+d)^{-k} f(\gamma z)\). The cocycle relation is exactly what makes \(f \mapsto f|_k\gamma\) a genuine <em>right group action</em>: \(f|_k(\gamma_1\gamma_2) = (f|_k\gamma_1)|_k\gamma_2\). A modular form is then simply a fixed point: \(f|_k\gamma = f\) for all \(\gamma\).</p>
+
+    <p>Phrased that way, a modular form of weight \(k\) is a \(\Gamma\)-invariant section of the line bundle \(\omega^{\otimes k}\) on the modular curve. The mysterious \((cz+d)^k\) is just the transition function of that bundle. You do not need this language to compute, but it is the sentence that makes the subject click.</p>
+
+    <p>Rather than take modularity on faith, verify it numerically. The panel below evaluates the Eisenstein series \(G_k(z) = \sum_{(m,n)\neq(0,0)} (mz+n)^{-k}\) directly from its lattice-sum definition — no \(q\)-expansion, no cleverness — at a point \(z\) and at \(\gamma z\) for a \(\gamma\) you choose, then compares.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 2</span>
+        <span class="t">Verify \(G_k(\gamma z) = (cz+d)^k G_k(z)\) from the raw lattice sum</span>
+        <span class="pill">Compute</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <label class="fixed">weight k
+            <select id="mv-k"><option>4</option><option>6</option><option>8</option><option>10</option><option>12</option></select>
+          </label>
+          <label>Re z <span class="v" id="mv-xv">0.190</span><input type="range" id="mv-x" min="-0.5" max="0.5" step="0.005" value="0.19"></label>
+          <label>Im z <span class="v" id="mv-yv">1.100</span><input type="range" id="mv-y" min="0.5" max="2.5" step="0.01" value="1.1"></label>
+          <label class="fixed">γ
+            <select id="mv-g">
+              <option value="0,-1,1,0">S = (0 −1 ; 1 0)</option>
+              <option value="1,1,0,1">T = (1 1 ; 0 1)</option>
+              <option value="1,0,1,1">(1 0 ; 1 1)</option>
+              <option value="2,1,1,1">(2 1 ; 1 1)</option>
+              <option value="3,-2,5,-3">(3 −2 ; 5 −3)</option>
+              <option value="7,5,4,3">(7 5 ; 4 3)</option>
+            </select>
+          </label>
+          <button class="btn fixed" id="mv-go">Evaluate</button>
+        </div>
+        <dl class="readout">
+          <div><dt>z</dt><dd id="mv-z" class="plain">—</dd></div>
+          <div><dt>γz</dt><dd id="mv-gz" class="plain">—</dd></div>
+          <div><dt>G_k(z)</dt><dd id="mv-a">—</dd></div>
+          <div><dt>G_k(γz)</dt><dd id="mv-b">—</dd></div>
+          <div><dt>(cz+d)^k · G_k(z)</dt><dd id="mv-c">—</dd></div>
+          <div><dt>relative error</dt><dd id="mv-e">—</dd></div>
+        </dl>
+        <div id="mv-msg" style="margin-top:12px;font-family:var(--sans);font-size:13.5px;color:var(--ink-3)"></div>
+      </div>
+      <figcaption class="plate-foot">Sum truncated to \(|m|,|n| \le 160\) — 103,041 lattice points per evaluation. The residual error is truncation, not falsity — push \(\operatorname{Im} z\) down and you'll see it grow, because the tail of a conditionally-delicate lattice sum converges more slowly near the real axis. Try weight \(k=6\) with \(\gamma = S\) and \(z\) near \(i\): the factor \((cz+d)^k = z^6\) is near \(-1\), and \(G_6(i) = 0\) exactly — you're watching a zero of a modular form get detected.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s3">
+    <h2><span class="num">§ 3</span>Eisenstein series: the first examples</h2>
+
+    <p>Where do you get a function invariant under an infinite group? The universal trick: <strong>average over the group</strong>. Start with something, sum its translates, and invariance is automatic — provided the sum converges.</p>
+
+    <p>For weight \(k\), average the function \(1\) against the automorphy factor. The clean way to say it is as a sum over the lattice \(\Lambda_z = \mathbb{Z}z + \mathbb{Z}\):</p>
+
+    <p>\[ G_k(z) = \sum_{\substack{(m,n)\in\mathbb{Z}^2 \\ (m,n)\neq(0,0)}} \frac{1}{(mz+n)^k}, \qquad k \ge 4 \text{ even}. \]</p>
+
+    <p>Modularity is now almost tautological: replacing \(z\) by \(\gamma z\) permutes the lattice \(\Lambda_{\gamma z} = (cz+d)^{-1}\Lambda_z\), and pulling the scalar out of \(k\) factors gives exactly \((cz+d)^k\). Convergence needs \(k &gt; 2\), which is why \(k \ge 4\).</p>
+
+    <div class="beg">
+      <p><strong>The averaging trick in miniature.</strong> Suppose you want a function on \(\mathbb{R}\) invariant under \(x \mapsto x+1\), and you start with \(g(x) = e^{-x^2}\), which isn't. Just sum the translates: \(F(x) = \sum_{n\in\mathbb{Z}} e^{-(x+n)^2}\). Now \(F(x+1) = F(x)\), because shifting \(x\) just re-indexes the sum. You've manufactured invariance out of nothing but patience.</p>
+      <p>Eisenstein series are the same move, with two complications: the group is bigger and nastier, and we're averaging with a weight so the sum transforms by \((cz+d)^k\) instead of being literally invariant. The requirement \(k \ge 4\) is the price — for \(k=2\) the sum doesn't converge absolutely, and the resulting \(E_2\) fails modularity by a correction term. (That failure is itself famous and useful; see §7.4.)</p>
+    </div>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Gotthold Eisenstein<br>portrait needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Gotthold_Eisenstein.jpeg?width=420"
+             alt="Portrait of Gotthold Eisenstein" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1823–1852 · Berlin</span>
+        <h4 class="who">Gotthold Eisenstein</h4>
+        <figcaption>Gauss reportedly said there had been three epoch-making mathematicians: Archimedes, Newton, and Eisenstein. He died of tuberculosis at 29. The series that carry his name were, for him, a tool in the theory of elliptic functions — the idea that their coefficients are divisor sums, and that this connects complex analysis to the arithmetic of whole numbers, is the thread §3.1 picks up and the rest of the volume follows to the end.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Gotthold_Eisenstein.jpeg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">3.1</span>The \(q\)-expansion, and why \(\sigma_{k-1}\) shows up</h3>
+
+    <p>Normalise so the constant term is \(1\): set \(E_k = G_k / (2\zeta(k))\). Then a computation with the <span class="g" data-def="π cot(πz) = 1/z + Σ_{n≥1} (1/(z+n) + 1/(z−n)), differentiated k−1 times and re-expanded in q = e^{2πiz}. This is the single computation that converts a lattice sum into a q-series.">Lipschitz formula</span> gives</p>
+
+    <p>\[ \boxed{\;E_k(z) = 1 - \frac{2k}{B_k}\sum_{n\ge 1}\sigma_{k-1}(n)\, q^n\;} \qquad \sigma_{k-1}(n) = \sum_{d \mid n} d^{\,k-1}. \]</p>
+
+    <p>So \(E_4 = 1 + 240\sum\sigma_3(n)q^n\) and \(E_6 = 1 - 504\sum\sigma_5(n)q^n\). Divisor sums — pure elementary number theory — have appeared out of a statement about complex-analytic symmetry. This is the first hint that modular forms are arithmetic objects wearing an analytic costume.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 3</span>
+        <span class="t">\(q\)-expansion explorer</span>
+        <span class="pill">Coefficients</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="qe-pick">
+            <button class="btn on" data-f="E4">E₄</button>
+            <button class="btn" data-f="E6">E₆</button>
+            <button class="btn" data-f="E8">E₈</button>
+            <button class="btn" data-f="E10">E₁₀</button>
+            <button class="btn" data-f="E12">E₁₂</button>
+            <button class="btn" data-f="E14">E₁₄</button>
+            <button class="btn" data-f="D">Δ</button>
+            <button class="btn" data-f="J">j</button>
+          </div>
+          <label>terms shown <span class="v" id="qe-nv">20</span><input type="range" id="qe-n" min="6" max="40" step="1" value="20"></label>
+          <button class="btn fixed" id="qe-log">log scale</button>
+        </div>
+        <canvas id="qeCanvas"></canvas>
+        <div id="qe-formula" style="font-family:var(--sans);font-size:14px;color:var(--ink-2);margin-top:12px"></div>
+        <div class="scroller"><table id="qe-table"></table></div>
+      </div>
+      <figcaption class="plate-foot">Bars are \(a_n\), signed. Note the qualitative split: Eisenstein coefficients grow <em>polynomially</em> like \(n^{k-1}\) (they're essentially divisor sums), while the cusp form \(\Delta\) has \(|\tau(n)| \le d(n)n^{11/2}\) — a square-root saving. That gap between \(n^{k-1}\) and \(n^{(k-1)/2}\) is Deligne's theorem, and it is the reason cusp forms control error terms in analytic number theory while Eisenstein series supply main terms.</figcaption>
+    </figure>
+
+    <h3><span class="num">3.2</span>Your first free identity</h3>
+
+    <p>Here is the finiteness principle in action, three sections early. Both \(E_4^2\) and \(E_8\) are modular forms of weight \(8\). In §5 we'll prove \(\dim M_8 = 1\). Two elements of a one-dimensional space with the same constant term \(1\) must be <em>equal</em>. Therefore \(E_4^2 = E_8\), and comparing \(q^n\) coefficients:</p>
+
+    <p>\[ \sigma_7(n) = \sigma_3(n) + 120\sum_{m=1}^{n-1}\sigma_3(m)\,\sigma_3(n-m). \]</p>
+
+    <p>That is a genuinely non-obvious identity about divisor sums, proved by a dimension count. Nobody found it by manipulating divisors. Check it below.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 4</span>
+        <span class="t">Identities for free: verify a coefficient at a time</span>
+        <span class="pill">Sturm bound</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <label class="fixed">identity
+            <select id="id-pick">
+              <option value="E4sq">E₄² = E₈  (weight 8)</option>
+              <option value="E4E6">E₄E₆ = E₁₀  (weight 10)</option>
+              <option value="disc">1728Δ = E₄³ − E₆²  (weight 12)</option>
+              <option value="E6E8">E₆E₈ = E₁₄  (weight 14)</option>
+              <option value="tau">691·(τ − σ₁₁) ≡ 0 mod 691  (Ramanujan congruence)</option>
+            </select>
+          </label>
+          <label>check up to n = <span class="v" id="id-nv">14</span><input type="range" id="id-n" min="4" max="30" step="1" value="14"></label>
+        </div>
+        <div id="id-chips" style="margin-top:14px"></div>
+        <div id="id-note" style="font-family:var(--sans);font-size:13.5px;color:var(--ink-2);margin-top:12px"></div>
+      </div>
+      <figcaption class="plate-foot">Every chip is one coefficient comparison. The point is not that they all match — the point is that <strong>you only ever need finitely many</strong>. The <em>Sturm bound</em> makes this precise: for level 1 weight \(k\), a form vanishing to order \(&gt; k/12\) at the cusp is identically zero, so agreement up to \(q^{\lfloor k/12\rfloor}\) already forces equality. For weight 8 that's <em>one</em> coefficient.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s4">
+    <h2><span class="num">§ 4</span>\(\Delta\), \(j\), and what these functions look like</h2>
+
+    <p>Weight 12 is where the subject acquires its protagonist. Define</p>
+
+    <p>\[ \Delta(z) = \frac{E_4^3 - E_6^2}{1728} = q\prod_{n\ge1}(1-q^n)^{24} = \sum_{n\ge1}\tau(n)q^n. \]</p>
+
+    <p>The middle expression — the <strong>eta product</strong>, since \(\Delta = \eta^{24}\) with \(\eta(z)=q^{1/24}\prod(1-q^n)\) — is not obvious from the left one; proving it is a small rite of passage. The coefficients \(\tau(n)\) are <strong>Ramanujan's tau function</strong>: \(1, -24, 252, -1472, 4830, -6048, \dots\)</p>
+
+    <div class="box thm">
+      <span class="lab">Theorem (Jacobi)</span>
+      <p>\(\Delta\) has no zeros on \(\mathbb{H}\). Its only zero is a simple zero at the cusp.</p>
+    </div>
+
+    <p>This is immediate from the product formula (\(|q^n| &lt; 1\) so no factor vanishes) and it is enormously useful: dividing by \(\Delta\) is an isomorphism \(M_{k} \xrightarrow{\ \sim\ } S_{k+12}\), which is how the dimension formula gets bootstrapped.</p>
+
+    <p>Since \(\Delta\) is a nowhere-zero weight-12 form and \(E_4^3\) is a weight-12 form, the ratio</p>
+
+    <p>\[ j(z) = \frac{E_4^3}{\Delta} = \frac{1}{q} + 744 + 196884q + 21493760q^2 + \cdots \]</p>
+
+    <p>is weight <em>zero</em>: a genuine \(\mathrm{SL}_2(\mathbb{Z})\)-invariant function. It's meromorphic (a pole at the cusp) and it's a <em>bijection</em> from the fundamental domain onto \(\mathbb{C}\) — the uniformiser of the modular curve.<span class="sn"></span></p>
+
+    <p class="sn-body">The coefficient \(196884 = 196883 + 1\), where 196883 is the dimension of the smallest faithful representation of the Monster group. That observation — "monstrous moonshine" — looked like numerology in 1978 and won Borcherds a Fields Medal in 1998.</p>
+
+    <h3><span class="num">4.1</span>Look at them</h3>
+
+    <p>The following is the most valuable thirty seconds in this volume. It's a <strong>domain colouring</strong> of a modular form on a patch of \(\mathbb{H}\): hue encodes \(\arg f(z)\), brightness encodes \(|f(z)|\) with contour bands at powers of 2. You are looking directly at the symmetry.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 5</span>
+        <span class="t">Domain colouring of modular forms on \(\mathbb{H}\)</span>
+        <span class="pill">Showpiece</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="dc-pick">
+            <button class="btn on" data-f="D">Δ</button>
+            <button class="btn" data-f="E4">E₄</button>
+            <button class="btn" data-f="E6">E₆</button>
+            <button class="btn" data-f="E12">E₁₂</button>
+            <button class="btn" data-f="J">j</button>
+          </div>
+          <label>lowest Im z <span class="v" id="dc-yv">0.16</span><input type="range" id="dc-y" min="0.08" max="0.45" step="0.005" value="0.16"></label>
+          <label>contrast <span class="v" id="dc-cv">1.0</span><input type="range" id="dc-c" min="0.3" max="2.5" step="0.05" value="1.0"></label>
+          <button class="btn on fixed" id="dc-tess">Overlay 𝓕-tiling</button>
+        </div>
+        <div class="dcwrap" id="dcwrap"><canvas id="dcCanvas"></canvas><div class="busy">rendering…</div></div>
+      </div>
+      <figcaption class="plate-foot" id="dc-cap">—</figcaption>
+    </figure>
+
+    <div class="box">
+      <span class="lab">What to look for</span>
+      <ul>
+        <li><strong>Horizontal periodicity.</strong> The picture repeats exactly every 1 unit left-to-right. That's \(T\)-invariance, visible.</li>
+        <li><strong>Folding across \(|z|=1\).</strong> The pattern inside the unit disc is the pattern outside, inverted. That's \(S\). Turn on the tiling overlay and every tile carries a colour-scrambled copy of the same data.</li>
+        <li><strong>Δ has no colour singularity anywhere</strong> — no point where all hues meet. That is Jacobi's theorem, seen rather than proved.</li>
+        <li><strong>\(E_6\) has a zero at \(z = i\)</strong> (all hues converge there), and so, by symmetry, at every point of the orbit of \(i\). \(E_4\) instead has its zero at \(\rho = e^{2\pi i/3}\), the corner of \(\mathcal{F}\).</li>
+        <li><strong>\(j\) has a pole at the cusp</strong> — the top of the frame flares. And \(j\) takes every complex value exactly once per tile.</li>
+      </ul>
+    </div>
+
+    <div class="beg">
+      <p><strong>How to read a domain-coloured plot.</strong> Every complex number has a length and an angle. We paint the angle as a colour going round the rainbow (red → yellow → green → cyan → blue → magenta → red) and the length as brightness, with thin dark contour lines whenever \(|f|\) crosses a power of two.</p>
+      <p>The tell-tale of a <strong>zero</strong> is a point where <em>all</em> the colours meet in a pinwheel, going round once counterclockwise. A <strong>pole</strong> looks the same but the pinwheel spins the other way and the surroundings are bright. A zero of order \(m\) has the rainbow wrapping \(m\) times.</p>
+      <p>So: count pinwheels, and you've counted zeros. That's all the valence formula in §5 is doing, with a contour integral instead of eyes.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s5">
+    <h2><span class="num">§ 5</span>The finiteness miracle</h2>
+
+    <p>Now we pay off §0. The tool is the <strong>valence formula</strong>, which is Cauchy's argument principle applied to the boundary of \(\mathcal{F}\), with care taken at the corners and the cusp.</p>
+
+    <div class="box thm">
+      <span class="lab">Valence formula</span>
+      <p>For \(0 \neq f \in M_k\),
+      \[ \operatorname{ord}_\infty(f) + \tfrac12\operatorname{ord}_i(f) + \tfrac13\operatorname{ord}_\rho(f) + \sum_{P \in \mathcal{F}'} \operatorname{ord}_P(f) = \frac{k}{12}, \]
+      where \(\mathcal{F}'\) is \(\mathcal{F}\) minus the two elliptic points, and orders are counted once per orbit.</p>
+    </div>
+
+    <p>Every term on the left is \(\ge 0\). So the whole thing is a <strong>budget</strong>: a weight-\(k\) form has exactly \(k/12\) worth of zeros to spend, in units where a zero at \(i\) costs a half and a zero at \(\rho\) costs a third. The consequences fall out immediately:</p>
+
+    <ul>
+      <li><strong>\(k &lt; 0\) or \(k\) odd:</strong> no budget (or a negative one) \(\Rightarrow M_k = 0\).</li>
+      <li><strong>\(k = 2\):</strong> budget \(1/6\), which cannot be written as a non-negative combination of \(1\), \(1/2\), \(1/3\). So \(M_2 = 0\).</li>
+      <li><strong>\(k = 4\):</strong> budget \(1/3\) \(\Rightarrow\) the only option is a simple zero at \(\rho\). So \(\dim M_4 \le 1\), and \(E_4\) realises it. Its zero is at \(\rho\) — which you saw in Fig. 5.</li>
+      <li><strong>\(k = 6\):</strong> budget \(1/2\) \(\Rightarrow\) simple zero at \(i\). Hence \(E_6(i) = 0\).</li>
+      <li><strong>\(k = 12\):</strong> budget \(1\), first time a zero at the cusp is affordable — enter \(\Delta\), and with it the first cusp form.</li>
+    </ul>
+
+    <div class="box thm">
+      <span class="lab">Structure theorem</span>
+      <p>\(\displaystyle\bigoplus_k M_k = \mathbb{C}[E_4, E_6]\), a polynomial ring in two free generators. Equivalently
+      \[ \dim M_k = \begin{cases} 0 &amp; k &lt; 0 \text{ or } k \text{ odd},\\ \lfloor k/12\rfloor &amp; k \equiv 2 \pmod{12},\\ \lfloor k/12\rfloor + 1 &amp; \text{otherwise},\end{cases} \qquad \sum_{k} \dim M_k\, x^k = \frac{1}{(1-x^4)(1-x^6)}. \]</p>
+    </div>
+
+    <p>Read that generating function: \(\frac{1}{(1-x^4)(1-x^6)}\) is exactly the Hilbert series of a polynomial ring on generators of degree 4 and 6. <strong>Every</strong> modular form of level 1 is a polynomial in \(E_4\) and \(E_6\). That's the whole theory, and it's tiny.</p>
+
+    <figure class="diag">
+      <div class="dh">Diagram · the zero budget, drawn to scale</div>
+      <svg viewBox="0 0 640 232" role="img" aria-label="Bar diagram of the zero budget k/12 for weights 4, 6, 8, 10, 12 and 14">
+        <defs>
+          <style>
+            .bt{font-family:var(--mono);font-size:11px;fill:var(--ink-3)}
+            .bk{font-family:var(--mono);font-size:12px;fill:var(--ink)}
+            .bv{font-family:var(--mono);font-size:10.5px;fill:var(--acc)}
+          </style>
+        </defs>
+        <text class="bt" x="0" y="12">weight</text>
+        <text class="bt" x="64" y="12">budget k/12, and the only way to spend it</text>
+
+        <g transform="translate(0,26)">
+          <text class="bk" x="0" y="13">k = 4</text>
+          <rect x="64" y="2" width="48" height="15" rx="2" fill="var(--acc-2)" opacity=".75"/>
+          <text class="bv" x="120" y="13">1/3 &#8594; one zero at &#961; (costs 1/3). Exactly one option &#8594; dim M&#8324; = 1</text>
+        </g>
+        <g transform="translate(0,54)">
+          <text class="bk" x="0" y="13">k = 6</text>
+          <rect x="64" y="2" width="72" height="15" rx="2" fill="var(--acc)" opacity=".75"/>
+          <text class="bv" x="144" y="13">1/2 &#8594; one zero at i (costs 1/2). So E&#8326;(i) = 0, forced</text>
+        </g>
+        <g transform="translate(0,82)">
+          <text class="bk" x="0" y="13">k = 8</text>
+          <rect x="64" y="2" width="96" height="15" rx="2" fill="var(--acc-2)" opacity=".75"/>
+          <text class="bv" x="168" y="13">2/3 &#8594; two zeros at &#961;. dim M&#8328; = 1, so E&#8324;&#178; = E&#8328;</text>
+        </g>
+        <g transform="translate(0,110)">
+          <text class="bk" x="0" y="13">k = 10</text>
+          <rect x="64" y="2" width="120" height="15" rx="2" fill="var(--acc)" opacity=".75"/>
+          <text class="bv" x="192" y="13">5/6 = 1/2 + 1/3 &#8594; one at i, one at &#961;. dim M&#8321;&#8320; = 1</text>
+        </g>
+        <g transform="translate(0,138)">
+          <text class="bk" x="0" y="13">k = 12</text>
+          <rect x="64" y="2" width="144" height="15" rx="2" fill="var(--ok)" opacity=".8"/>
+          <text class="bv" x="216" y="13">1 &#8594; first time a zero at the cusp is affordable. Enter &#916;</text>
+        </g>
+        <g transform="translate(0,166)">
+          <text class="bk" x="0" y="13">k = 2</text>
+          <rect x="64" y="2" width="24" height="15" rx="2" fill="var(--bad)" opacity=".45"/>
+          <text class="bv" x="96" y="13" fill="var(--bad)">1/6 &#8594; cannot be paid with 1, 1/2, 1/3. So M&#8322; = 0</text>
+        </g>
+
+        <line x1="64" y1="198" x2="616" y2="198" stroke="var(--rule)"/>
+        <text class="bt" x="64" y="216">denominations: interior zero = 1 &#183; zero at i = 1/2 &#183; zero at &#961; = 1/3 &#183; zero at the cusp = 1</text>
+      </svg>
+      <figcaption>The valence formula says a weight-\(k\) form has exactly \(k/12\) worth of zeros — no more, no fewer. Since every order of vanishing is a non-negative whole number (halved at \(i\), thirded at \(\rho\)), a fixed total can be split in only finitely many ways. <strong>Counting those ways is counting the dimension.</strong> The failure at \(k=2\) is the whole reason \(E_2\) is not a modular form, and the first affordable cusp zero at \(k=12\) is the whole reason \(\Delta\) is where the subject begins.</figcaption>
+    </figure>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 6</span>
+        <span class="t">Dimension counter and explicit basis</span>
+        <span class="pill">Structure</span>
+      </div>
+      <div class="plate-body">
+        <canvas id="dimCanvas"></canvas>
+        <div class="ctl">
+          <label>weight k <span class="v" id="dim-kv">12</span><input type="range" id="dim-k" min="0" max="72" step="2" value="12"></label>
+        </div>
+        <dl class="readout">
+          <div><dt>dim M_k</dt><dd id="dim-m">—</dd></div>
+          <div><dt>dim S_k</dt><dd id="dim-s">—</dd></div>
+          <div><dt>zero budget k/12</dt><dd id="dim-b">—</dd></div>
+          <div><dt>Sturm bound</dt><dd id="dim-st">—</dd></div>
+        </dl>
+        <h4>Monomial basis \(E_4^aE_6^b\), \(4a+6b=k\)</h4>
+        <div class="basis" id="dim-basis">—</div>
+      </div>
+      <figcaption class="plate-foot">Bars show \(\dim M_k\) for even \(k\). The staircase climbs by 1 every 12, with the characteristic stumble at \(k \equiv 2 \pmod{12}\) — the weights where the budget \(k/12\) leaves a remainder of \(1/6\) that cannot be paid with halves and thirds. \(\dim S_k = \dim M_k - 1\) whenever \(M_k \neq 0\), since the constant term is one linear condition and \(E_k\) always realises it.</figcaption>
+    </figure>
+
+    <div class="beg">
+      <p><strong>Why does this "budget" language work?</strong> The argument principle says: integrate \(f'/f\) around a closed contour and you count the zeros inside. Do it around the boundary of the fundamental domain. Now the magic: the left edge and the right edge of \(\mathcal{F}\) are identified by \(T\), and \(f\) takes the <em>same values</em> on both — so their contributions cancel exactly. The bottom arc is folded onto itself by \(S\), and there \(f(-1/z) = z^kf(z)\) means the two halves <em>almost</em> cancel, leaving behind a residue proportional to \(k\).</p>
+      <p>That leftover is where \(k/12\) comes from. All the symmetry cancels, and the only thing that survives the cancellation is the weight. Then since orders of vanishing are non-negative integers (or non-negative multiples of \(1/2\) and \(1/3\) at the corners, because those points are fixed by extra symmetry), a fixed total \(k/12\) can only be split up in finitely many ways — which bounds the dimension.</p>
+    </div>
+
+    <div class="box">
+      <span class="lab">The principle, stated once properly</span>
+      <p><strong>Finiteness \(\Rightarrow\) decidable identities.</strong> If \(f, g \in M_k\) and \(\dim M_k = d\), then \(f = g\) as soon as their first \(d\) coefficients agree. Any identity between two modular objects of the same weight and level becomes a <em>finite computation</em>. This is the engine behind: Jacobi's four-square theorem, Ramanujan's congruences, the Eichler–Selberg trace formula, and — in vastly generalised form — the modularity theorem behind Fermat's Last Theorem.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s6">
+    <h2><span class="num">§ 6</span>Hecke operators and multiplicative coefficients</h2>
+
+    <p>The spaces \(M_k\) are finite-dimensional, so any linear operator on them has eigenvectors. The Hecke operators are a commuting family of such operators, and their simultaneous eigenvectors turn out to be exactly the forms whose coefficients are multiplicative.</p>
+
+    <p>For a prime \(p\), define on \(q\)-expansions:</p>
+
+    <p>\[ (T_p f)(z) = \sum_{n \ge 0} \left( a_{np} + p^{k-1}a_{n/p} \right)q^n, \qquad a_{n/p} := 0 \text{ if } p \nmid n. \]</p>
+
+    <p>Geometrically \(T_p\) sums \(f\) over the \(p+1\) sublattices of index \(p\); the formula above is that statement in coordinates. Two facts make it powerful:</p>
+
+    <ul>
+      <li>\(T_p\) preserves \(M_k\) and \(S_k\), and the \(T_p\) commute with each other.</li>
+      <li>They're self-adjoint for the <span class="g" data-def="⟨f,g⟩ = ∫_𝓕 f(z) conj(g(z)) y^k dμ, with dμ = dx dy / y². Finite on cusp forms; it makes S_k a Hilbert space on which Hecke operators are Hermitian.">Petersson inner product</span> on \(S_k\), hence simultaneously diagonalisable with real eigenvalues.</li>
+    </ul>
+
+    <div class="beg" data-t="what a Hecke operator is for">
+      <h5>Eigenvectors, and why they are the interesting elements</h5>
+      <p>A linear map takes vectors to vectors. Most vectors get rotated as well as stretched. But usually a few special directions only get <em>stretched</em> — the arrow comes out pointing the same way, just longer or shorter. Those are the <strong>eigenvectors</strong>, and the stretch factor is the <strong>eigenvalue</strong>.</p>
+      <p>Eigenvectors matter because they are where a complicated map becomes simple. In an eigen-direction, "apply the map" degenerates to "multiply by a number".</p>
+
+      <div class="analogy">
+        Push on a wobbly table. Push in most directions and it twists as well as moves. Push along one of its natural axes and it just compresses along that axis. Those axes are the eigenvectors of the table's stiffness, and along them the physics is one-dimensional.
+      </div>
+
+      <h5>Now do that to a space of functions</h5>
+      <p>Here the "vectors" are modular forms, and \(T_p\) is a linear map from \(M_k\) to itself. Because \(M_k\) is finite-dimensional, eigenvectors are guaranteed to exist — that is a fact from linear algebra, free of charge.</p>
+      <p>Two extra facts make it powerful. The operators \(T_p\) for different primes <em>commute</em>, and they are self-adjoint for the Petersson inner product. Commuting self-adjoint operators can be diagonalised <em>simultaneously</em>: one basis works for every prime at once. So there are forms that are eigenvectors for <strong>all</strong> the \(T_p\) — the <em>eigenforms</em>.</p>
+
+      <h5>Why that produces arithmetic</h5>
+      <p>Here is the payoff, and it is worth reading twice. Scale an eigenform so \(a_1 = 1\). Then the eigenvalue equation \(T_pf = \lambda f\) forces \(\lambda = a_p\) — <strong>the eigenvalue is literally the \(p\)th Fourier coefficient</strong>. Unwinding the operator relations then turns into statements about the coefficients:</p>
+      <p>\[ a_ma_n = a_{mn} \quad (\gcd(m,n)=1), \qquad a_{p^{r+1}} = a_pa_{p^r} - p^{k-1}a_{p^{r-1}}. \]</p>
+      <p>A structural fact about linear operators has become a multiplication rule for a sequence of integers. And for \(\Delta\) it comes entirely free: \(\dim S_{12} = 1\), and a linear map on a one-dimensional space is just multiplication by a number, so <em>every</em> non-zero element is an eigenvector automatically. Ramanujan conjectured \(\tau(mn) = \tau(m)\tau(n)\) from numerical evidence; it falls out of a dimension count.</p>
+    </div>
+
+    <p>Normalise an eigenform so \(a_1 = 1\). Then \(T_p f = a_p f\) — <em>the eigenvalue is the coefficient</em> — and the eigenvalue relations translate into:</p>
+
+    <p>\[ a_m a_n = a_{mn} \ \ (\gcd(m,n)=1), \qquad a_{p^{r+1}} = a_p a_{p^r} - p^{k-1}a_{p^{r-1}}. \]</p>
+
+    <p>Since \(\dim S_{12} = 1\), \(\Delta\) is automatically an eigenform, and we get Ramanujan's conjectured multiplicativity of \(\tau\) for free.</p>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 7</span>
+        <span class="t">\(\tau(n)\): multiplicativity, recursion, and the Deligne bound</span>
+        <span class="pill">Verify</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="hk-mode">
+            <button class="btn on" data-m="mult">τ(m)τ(n) = τ(mn)</button>
+            <button class="btn" data-m="rec">prime-power recursion</button>
+            <button class="btn" data-m="sato">Deligne / Sato–Tate</button>
+          </div>
+        </div>
+        <div id="hk-mult">
+          <div class="ctl">
+            <label>m <span class="v" id="hk-mv">3</span><input type="range" id="hk-m" min="2" max="30" step="1" value="3"></label>
+            <label>n <span class="v" id="hk-nv">5</span><input type="range" id="hk-n" min="2" max="30" step="1" value="5"></label>
+          </div>
+          <dl class="readout">
+            <div><dt>gcd(m,n)</dt><dd id="hk-gcd" class="plain">—</dd></div>
+            <div><dt>τ(m)</dt><dd id="hk-tm">—</dd></div>
+            <div><dt>τ(n)</dt><dd id="hk-tn">—</dd></div>
+            <div><dt>τ(m)·τ(n)</dt><dd id="hk-prod">—</dd></div>
+            <div><dt>τ(mn)</dt><dd id="hk-tmn">—</dd></div>
+            <div><dt>verdict</dt><dd id="hk-verdict" class="plain">—</dd></div>
+          </dl>
+        </div>
+        <div id="hk-rec" hidden>
+          <div class="ctl">
+            <label class="fixed">p <select id="hk-p"><option>2</option><option>3</option><option>5</option><option>7</option><option>11</option><option>13</option></select></label>
+            <label>r <span class="v" id="hk-rv">2</span><input type="range" id="hk-r" min="1" max="7" step="1" value="2"></label>
+          </div>
+          <dl class="readout">
+            <div><dt>τ(p^(r+1))</dt><dd id="hk-lhs">—</dd></div>
+            <div><dt>τ(p)τ(p^r)</dt><dd id="hk-t1" class="plain">—</dd></div>
+            <div><dt>p^11·τ(p^(r−1))</dt><dd id="hk-t2" class="plain">—</dd></div>
+            <div><dt>difference</dt><dd id="hk-rhs">—</dd></div>
+          </dl>
+          <div id="hk-recnote" style="font-family:var(--sans);font-size:13.5px;color:var(--ink-3);margin-top:12px"></div>
+        </div>
+        <div id="hk-sato" hidden>
+          <canvas id="satoCanvas"></canvas>
+          <div class="ctl">
+            <label>primes up to <span class="v" id="hk-Nv">600</span><input type="range" id="hk-N" min="60" max="600" step="20" value="600"></label>
+          </div>
+        </div>
+      </div>
+      <figcaption class="plate-foot">Deligne (1974) proved \(|\tau(p)| \le 2p^{11/2}\) — the Ramanujan conjecture, obtained as a corollary of the Weil conjectures. Write \(\tau(p) = 2p^{11/2}\cos\theta_p\); the Sato–Tate law (proved for \(\Delta\) by Barnet-Lamb–Geraghty–Harris–Taylor, 2011) says \(\theta_p\) equidistributes with density \(\frac{2}{\pi}\sin^2\theta\). The histogram is thin at this range, but the semicircular bulge is already visible.</figcaption>
+    </figure>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Pierre Deligne<br>portrait needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Pierre_Deligne_(2005)_(cropped).jpg?width=420"
+             alt="Photograph of Pierre Deligne" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1974 · Bures-sur-Yvette</span>
+        <h4 class="who">Pierre Deligne</h4>
+        <figcaption>Ramanujan guessed in 1916 that \\(|\\tau(p)| \\le 2p^{11/2}\\) — a square-root-size bound, the signature of perfect cancellation. It resisted for 58 years. Deligne got it as a corollary of proving the Weil conjectures, which are about counting solutions of equations over finite fields and have, on the face of it, nothing to do with holomorphic functions on the upper half-plane. The histogram in Fig. 7 is that theorem\u2019s shape, drawn from live data.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Pierre_Deligne_(2005)_(cropped).jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">6.1</span>Why anyone should care: the \(L\)-function</h3>
+
+    <p>Multiplicativity is exactly the condition for the Dirichlet series to factor as an Euler product:</p>
+
+    <p>\[ L(f,s) = \sum_{n\ge1}\frac{a_n}{n^s} = \prod_p \left(1 - a_p p^{-s} + p^{k-1-2s}\right)^{-1}. \]</p>
+
+    <p>And modularity of \(f\) becomes a <strong>functional equation</strong> for \(L(f,s)\) under \(s \mapsto k-s\), via the Mellin transform \(\Lambda(f,s) = (2\pi)^{-s}\Gamma(s)L(f,s) = \int_0^\infty f(iy)y^{s}\frac{dy}{y}\) and the substitution \(y \to 1/y\) using \(f(i/y) = i^k y^k f(iy)\).</p>
+
+    <p>That's the punchline of the classical theory: <em>an \(\mathrm{SL}_2(\mathbb{Z})\)-symmetry of a function on \(\mathbb{H}\) is the same thing as an \(s \mapsto k-s\) symmetry of a Dirichlet series.</em> Analytic continuation and functional equations, which are miraculous from the Dirichlet-series side, are trivial consequences of a geometric symmetry.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s7">
+    <h2><span class="num">§ 7</span>Cashing in</h2>
+
+    <h3><span class="num">7.1</span>Sums of squares</h3>
+
+    <p>Let \(r_k(n) = \#\{(x_1,\dots,x_k)\in\mathbb{Z}^k : \sum x_i^2 = n\}\), and let \(\theta(z) = \sum_{n\in\mathbb{Z}}q^{n^2}\). Then \(\theta^k = \sum r_k(n)q^n\) by simple counting. The content is that \(\theta\) is a modular form of weight \(1/2\) on \(\Gamma_0(4)\), so \(\theta^4\) lives in the weight-2 space for \(\Gamma_0(4)\) — a space of dimension 2, spanned by Eisenstein series. Matching two coefficients gives the whole theorem:</p>
+
+    <div class="box thm">
+      <span class="lab">Jacobi, 1829</span>
+      <p>\(\displaystyle r_4(n) = 8\sum_{\substack{d\mid n\\ 4\nmid d}} d\). In particular \(r_4(n) &gt; 0\) for every \(n\) — Lagrange's four-square theorem falls out as a corollary of a <em>formula</em>.</p>
+    </div>
+
+    <div class="beg" data-t="how a symmetry counts lattice points">
+      <h5>Where the counting actually happens</h5>
+      <p>\(r_4(n)\) is a completely elementary quantity: the number of ways to write \(n\) as \(x_1^2+x_2^2+x_3^2+x_4^2\) with the \(x_i\) integers, counting order and signs. For \(n=1\) there are 8 ways (\(\pm1\) in any of four slots). You could compute it all day with a loop and never mention complex analysis.</p>
+      <p>The link is a trick worth understanding, because the same trick appears everywhere. Define \(\theta(z) = \sum_{n \in \mathbb{Z}} q^{n^2} = 1 + 2q + 2q^4 + 2q^9 + \cdots\). Now multiply four copies of it together. When you expand the product, each term comes from choosing one exponent \(n_i^2\) from each factor, so the coefficient of \(q^n\) in \(\theta^4\) is exactly the number of ways to write \(n = n_1^2+n_2^2+n_3^2+n_4^2\). <strong>Multiplying the series <em>is</em> the counting.</strong> No cleverness yet — just bookkeeping.</p>
+
+      <div class="analogy">
+        It is the same move as rolling dice with generating functions. \((x + x^2 + \cdots + x^6)^2\) has coefficient of \(x^7\) equal to 6, because there are 6 ways for two dice to total 7. Expanding a product and counting are the same operation.
+      </div>
+
+      <h5>And then the symmetry does the work</h5>
+      <p>The content is that \(\theta\) is a modular form (of weight \(1/2\), on a subgroup). So \(\theta^4\) is a modular form of weight 2, and it lives in a space of dimension <strong>2</strong>. Two numbers determine it completely. Compare it against the Eisenstein series spanning that space, match two coefficients, and you have a closed formula valid for <em>every</em> \(n\):</p>
+      <p>\[ r_4(n) = 8\sum_{d \mid n,\ 4 \nmid d} d. \]</p>
+      <p>That right-hand side is never zero, so <em>every</em> positive integer is a sum of four squares. Lagrange's theorem — a famous result in its own right — arrives as a throwaway corollary of having a formula rather than an existence proof. <strong>You checked two coefficients and got infinitely many exact counts.</strong> This is the §0 promise, cashed.</p>
+    </div>
+
+    <figure class="plate">
+      <div class="plate-head">
+        <span class="n">Fig. 8</span>
+        <span class="t">Brute-force lattice count vs. the modular formula</span>
+        <span class="pill">Arithmetic payoff</span>
+      </div>
+      <div class="plate-body">
+        <div class="ctl">
+          <div class="seg fixed" id="sq-k">
+            <button class="btn" data-k="2">k = 2</button>
+            <button class="btn on" data-k="4">k = 4</button>
+            <button class="btn" data-k="6">k = 6</button>
+            <button class="btn" data-k="8">k = 8</button>
+          </div>
+          <label>n up to <span class="v" id="sq-nv">40</span><input type="range" id="sq-n" min="12" max="90" step="1" value="40"></label>
+        </div>
+        <canvas id="sqCanvas"></canvas>
+        <div id="sq-formula" style="font-family:var(--sans);font-size:14px;color:var(--ink-2);margin-top:12px"></div>
+        <div class="scroller"><table id="sq-table"></table></div>
+      </div>
+      <figcaption class="plate-foot">Dots: \(r_k(n)\) obtained by <em>counting only</em> — convolving \(	heta(z)=\sum_{m\in\mathbb{Z}}q^{m^2}\) with itself \(k\) times, which is exactly tallying representations. No modularity is used on this side. Line: the closed formula from the modular-forms argument. For \(k = 2, 4, 6, 8\) the relevant space is pure Eisenstein, so the formula is exact. For \(k \ge 10\) a cusp form appears and the divisor formula acquires an error term of size \(O(n^{k/4})\) — an honest place to see "main term + error term" arise structurally rather than by estimation.</figcaption>
+    </figure>
+
+    <h3><span class="num">7.2</span>Ramanujan's congruences</h3>
+
+    <p>\(\tau(n) \equiv \sigma_{11}(n) \pmod{691}\). Where does 691 come from? From \(B_{12} = -691/2730\): the Eisenstein series \(E_{12} = 1 + \frac{65520}{691}\sum\sigma_{11}(n)q^n\) has a 691 in its denominator. Since \(\dim M_{12} = 2\) with basis \(E_{12}, \Delta\), and \(E_4^3\) is also in there, comparing and clearing denominators traps a factor of 691. <strong>The prime is visible in the dimension bookkeeping.</strong> This kind of thing — congruences between Eisenstein series and cusp forms — is the seed of Iwasawa theory and Ribet's converse to Herbrand's theorem.</p>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Carl Gustav Jacob Jacobi<br>portrait needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Carl_Jacobi2.jpg?width=420"
+             alt="Portrait of Carl Gustav Jacob Jacobi" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1829 · K&#246;nigsberg</span>
+        <h4 class="who">Carl Gustav Jacob Jacobi</h4>
+        <figcaption>Jacobi\u2019s <em>Fundamenta Nova</em> introduced the theta functions and, with them, the four-square formula above. He also proved that \\(\\Delta\\) has no zeros in \\(\\mathbb{H}\\) — the fact you can <em>see</em> in Fig. 5 as the absence of any colour pinwheel. He worked before the word \u201cmodular form\u201d existed; the structure was found in examples long before anyone named the category.
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Carl_Jacobi2.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">7.3</span>Modularity of elliptic curves</h3>
+
+    <p>To an elliptic curve \(E/\mathbb{Q}\) attach \(a_p(E) = p + 1 - \#E(\mathbb{F}_p)\). The <strong>modularity theorem</strong> (Wiles, Taylor–Wiles, Breuil–Conrad–Diamond–Taylor) says: there is a weight-2 newform \(f\) of level \(N = \operatorname{cond}(E)\) with \(a_p(f) = a_p(E)\) for all \(p \nmid N\).</p>
+
+    <p>Frey's observation was that a solution \(a^p + b^p = c^p\) would produce a curve \(y^2 = x(x-a^p)(x+b^p)\) whose associated modular form would have to live in a space of dimension \(0\). Ribet proved the level-lowering step that forces this; modularity supplies the form. A non-existent object in an empty space. <em>The dimension formula from §5 is, at heart, the thing that kills Fermat.</em></p>
+
+
+    <figure class="hist">
+      <div class="ph">
+        <div class="miss">Andrew Wiles<br>portrait needs a connection</div>
+        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Andrew_wiles1-3.jpg?width=420"
+             alt="Photograph of Andrew Wiles" loading="lazy"
+             onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">
+      </div>
+      <div class="hb">
+        <span class="yr">1994 · Princeton</span>
+        <h4 class="who">Andrew Wiles</h4>
+        <figcaption>Fermat\u2019s Last Theorem was reduced to a question about dimensions. Frey observed that a solution to \\(a^p+b^p=c^p\\) would produce an elliptic curve; Ribet proved the modular form attached to it would have to live at level 2, weight 2 — a space whose dimension is <strong>zero</strong>. Wiles, with Taylor, proved the modularity that supplies the form. An object that must exist, in a space with nothing in it. <strong>The dimension formula of §5 is the step that does the killing.</strong>
+        <span class="cred">Public domain · <a href="https://commons.wikimedia.org/wiki/File:Andrew_wiles1-3.jpg" target="_blank" rel="noopener">Wikimedia Commons</a></span></figcaption>
+      </div>
+    </figure>
+    <h3><span class="num">7.4</span>The quasi-modular \(E_2\)</h3>
+
+    <p>\(E_2 = 1 - 24\sum\sigma_1(n)q^n\) is not modular; instead \(E_2(-1/z) = z^2E_2(z) + \frac{12z}{2\pi i}\). That defect makes \(E_2\) a <em>quasi-modular</em> form, and it has two famous consequences: \(E_2^* = E_2 - \frac{3}{\pi y}\) is modular but non-holomorphic, and the Serre derivative \(\vartheta f = q\frac{df}{dq} - \frac{k}{12}E_2 f\) maps \(M_k \to M_{k+2}\), giving the space of modular forms a differential structure. Ramanujan's system</p>
+
+    <p>\[ q\frac{dE_2}{dq} = \frac{E_2^2-E_4}{12},\quad q\frac{dE_4}{dq} = \frac{E_2E_4-E_6}{3},\quad q\frac{dE_6}{dq} = \frac{E_2E_6-E_4^2}{2} \]</p>
+
+    <p>makes \(\mathbb{C}[E_2,E_4,E_6]\) a differential ring — which is why modular forms show up in the theory of differential equations, mirror symmetry, and topological string amplitudes.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s8">
+    <h2><span class="num">§ 8</span>Check yourself</h2>
+    <div class="quiz">
+      <div class="q" data-a="1">
+        <p class="qq">Why is there no non-zero modular form of weight 2 for \(\mathrm{SL}_2(\mathbb{Z})\)?</p>
+        <button class="opt">Because the Eisenstein series \(G_2\) diverges.</button>
+        <button class="opt">Because the valence formula would need \(2/12 = 1/6\) to be a non-negative combination of \(1\), \(\tfrac12\), \(\tfrac13\), which is impossible.</button>
+        <button class="opt">Because weight 2 is not divisible by 4.</button>
+        <button class="opt">Because \(-I\) forces all odd weights to vanish.</button>
+        <p class="why">The divergence of \(G_2\) shows the <em>averaging construction</em> fails, but that alone wouldn't rule out some other weight-2 form. The valence formula rules out all of them: \(1/6\) simply cannot be paid out of a budget whose denominations are \(1\), \(1/2\) and \(1/3\) with non-negative integer multiplicities. (Weight 2 <em>is</em> even, so the \(-I\) argument doesn't apply.)</p>
+      </div>
+      <div class="q" data-a="2">
+        <p class="qq">You have two weight-24 forms with matching \(q\)-coefficients \(a_0, a_1, a_2\). \(\dim M_{24} = 3\). What can you conclude?</p>
+        <button class="opt">Nothing yet — you'd need infinitely many coefficients.</button>
+        <button class="opt">They agree up to a scalar.</button>
+        <button class="opt">They are equal.</button>
+        <button class="opt">They differ by a cusp form.</button>
+        <p class="why">The map \(M_k \to \mathbb{C}^d\) sending \(f\) to its first \(d = \dim M_k\) coefficients is injective (if the first \(d\) vanish, the valence formula forces \(\operatorname{ord}_\infty \ge d &gt; k/12\), so \(f=0\)). Matching \(d\) coefficients therefore proves equality outright. This is the Sturm bound, and it is the whole method.</p>
+      </div>
+      <div class="q" data-a="0">
+        <p class="qq">\(\Delta\) is a Hecke eigenform. Which fact makes that automatic, with no computation?</p>
+        <button class="opt">\(\dim S_{12} = 1\), and Hecke operators preserve \(S_{12}\).</button>
+        <button class="opt">\(\Delta\) has an infinite product expansion.</button>
+        <button class="opt">\(\tau(1) = 1\).</button>
+        <button class="opt">\(\Delta\) has no zeros on \(\mathbb{H}\).</button>
+        <p class="why">A linear operator on a 1-dimensional space is multiplication by a scalar, so <em>every</em> non-zero element is an eigenvector. Ramanujan's multiplicativity conjecture is therefore a corollary of a dimension count — one of the great cheap victories in mathematics. (The product formula and the non-vanishing are true and useful, but neither implies eigenform-ness.)</p>
+      </div>
+      <div class="q" data-a="3">
+        <p class="qq">In Fig. 5, \(\Delta\) shows no pinwheel of colours anywhere in the frame. What does that demonstrate?</p>
+        <button class="opt">\(\Delta\) is constant.</button>
+        <button class="opt">\(\Delta\) is real-valued.</button>
+        <button class="opt">The rendering resolution is too coarse.</button>
+        <button class="opt">\(\Delta\) has no zeros on \(\mathbb{H}\) — its entire zero budget of \(12/12 = 1\) is spent at the cusp.</button>
+        <p class="why">A pinwheel is a zero. No pinwheels means no zeros in \(\mathbb{H}\). Weight 12 has budget exactly 1, and \(\Delta\) spends all of it on the simple zero at \(q=0\), leaving nothing for the interior. This is exactly the content of the eta-product formula \(\Delta = q\prod(1-q^n)^{24}\), where no factor can vanish for \(|q|&lt;1\).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="s9">
+    <h2><span class="num">§ 9</span>Where to go next</h2>
+
+    <p>The natural next moves are: <strong>congruence subgroups</strong> (\(\Gamma_0(N)\), newforms, the Atkin–Lehner theory), <strong>half-integral weight</strong> (Shimura correspondence, the Tunnell criterion for congruent numbers), and <strong>automorphic representations</strong> (the adelic reformulation that makes Langlands statable). If you want one book, take Diamond–Shurman; if you want one afternoon, take Zagier's chapter in <em>The 1-2-3 of Modular Forms</em>.</p>
+
+    <h4>Primary texts</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://link.springer.com/book/10.1007/978-0-387-27226-9" target="_blank" rel="noopener">
+        <span class="k">Book · standard course</span><span class="n">Diamond &amp; Shurman, <em>A First Course in Modular Forms</em></span>
+        <span class="d">The default graduate text. Builds to modularity of elliptic curves. Chapters 1–3 cover everything above, properly.</span></a>
+      <a class="lnk ext" href="https://people.mpim-bonn.mpg.de/zagier/files/doi/10.1007/978-3-540-74119-0_1/chapter.pdf" target="_blank" rel="noopener">
+        <span class="k">PDF · free</span><span class="n">Zagier, <em>Elliptic Modular Forms and Their Applications</em></span>
+        <span class="d">Ninety pages that cover this entire volume and then some, with unmatched density and wit. Start here if you like being trusted.</span></a>
+      <a class="lnk ext" href="https://link.springer.com/book/10.1007/978-1-4684-9884-4" target="_blank" rel="noopener">
+        <span class="k">Book · classic</span><span class="n">Serre, <em>A Course in Arithmetic</em>, Ch. VII</span>
+        <span class="d">Forty pages, no wasted words. The valence formula and structure theorem in their cleanest form.</span></a>
+      <a class="lnk ext" href="https://kconrad.math.uconn.edu/blurbs/" target="_blank" rel="noopener">
+        <span class="k">Notes · free</span><span class="n">Keith Conrad's blurbs</span>
+        <span class="d">Short, careful expository notes on \(\mathrm{SL}_2(\mathbb{Z})\), the upper half-plane, and related topics. Excellent for filling specific gaps.</span></a>
+    </div>
+
+    <h4>Compute and explore</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://www.lmfdb.org/ModularForm/GL2/Q/holomorphic/" target="_blank" rel="noopener">
+        <span class="k">Database</span><span class="n">LMFDB — classical modular forms</span>
+        <span class="d">Every newform of small level and weight, with coefficients, \(L\)-functions, and the elliptic curves they match. Browse level 11 weight 2 and meet the curve behind Fermat's proof.</span></a>
+      <a class="lnk ext" href="https://doc.sagemath.org/html/en/reference/modfrm/index.html" target="_blank" rel="noopener">
+        <span class="k">Software</span><span class="n">SageMath — modular forms</span>
+        <span class="d"><code>ModularForms(1,12).basis()</code> and <code>CuspForms(1,12).0.q_expansion(20)</code>. The fastest way to turn this volume into experiments.</span></a>
+      <a class="lnk ext" href="https://oeis.org/A000594" target="_blank" rel="noopener">
+        <span class="k">OEIS</span><span class="n">A000594 — Ramanujan's \(\tau\)</span>
+        <span class="d">The coefficient sequence, with its congruences, references, and a hundred related sequences one click away.</span></a>
+      <a class="lnk ext" href="https://www.pmath.ca/" target="_blank" rel="noopener">
+        <span class="k">Visualisation</span><span class="n">Domain colouring, further reading</span>
+        <span class="d">If Fig. 5 was the part that landed, the phase-portrait literature (Wegert, <em>Visual Complex Functions</em>) is where to go next.</span></a>
+    </div>
+
+    <h4>Onward</h4>
+    <div class="links">
+      <a class="lnk ext" href="https://www.ams.org/notices/199507/faltings.pdf" target="_blank" rel="noopener">
+        <span class="k">Survey</span><span class="n">Faltings, <em>The Proof of Fermat's Last Theorem</em> (Notices AMS)</span>
+        <span class="d">Five pages on how modularity kills Fermat, written for mathematicians who are not number theorists.</span></a>
+      <a class="lnk ext" href="https://terrytao.wordpress.com/tag/modular-forms/" target="_blank" rel="noopener">
+        <span class="k">Blog</span><span class="n">Tao — posts tagged <em>modular forms</em></span>
+        <span class="d">Context on where modular forms sit inside analytic number theory, and how they interact with the circle method and sieve theory (Vol. II).</span></a>
+      <a class="lnk ext" href="https://arxiv.org/abs/math/0412079" target="_blank" rel="noopener">
+        <span class="k">arXiv</span><span class="n">Gannon, <em>Monstrous Moonshine: the first twenty-five years</em></span>
+        <span class="d">Where \(196884 = 196883 + 1\) goes. Readable, and genuinely strange.</span></a>
+    </div>
+
+    <hr>
+    <p style="font-family:var(--sans);font-size:14px;color:var(--ink-3)">Next in this series — <strong>Vol. II: Sieve Theory</strong>, where the object of study is not a function but an <em>inequality</em>, and the limits of a method get named precisely. <strong>Vol. III: Gödel and the Construction of Mathematical Language.</strong> <strong>Vol. IV: How Lean Works.</strong></p>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  <nav class="seriesnav">
+    <a href="#" aria-current="page"><span class="v">Volume I</span><span class="n">Modular Forms</span><span class="d">Rigidity in, finiteness out</span></a>
+    <a href="https://claude.ai/code/artifact/505b1a47-7dc1-4266-8e81-2e1092a55d32" target="_blank" rel="noopener"><span class="v">Volume II</span><span class="n">Sieve Theory</span><span class="d">A method that knows its own limit</span></a>
+    <a href="https://claude.ai/code/artifact/e2cbb6c5-9f15-4d1a-a9aa-9a97777942b4" target="_blank" rel="noopener"><span class="v">Volume III</span><span class="n">Gödel & Formal Language</span><span class="d">Mathematics as a string of symbols</span></a>
+    <a href="https://claude.ai/code/artifact/c28ec44f-e713-4736-b088-b66859ed44aa" target="_blank" rel="noopener"><span class="v">Volume IV</span><span class="n">How Lean Works</span><span class="d">A proof is a program</span></a>
+  </nav>
+  <div>Marginalia · Volume I · Modular Forms</div>
+  <div>Math typeset with MathJax (SVG output). All figures computed live in your browser.</div>
+</footer>
+
+<script src="vol1.js"></script>
+
+</html>

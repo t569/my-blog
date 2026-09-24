@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Loader2, Layers, User, Menu, X, FlaskConical } from "lucide-react";
+import { Search, Moon, Sun, Loader2, Layers, User, Menu, X, BookOpen, FlaskConical } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { semanticSearch } from "@/services/api";
 import { SITE } from "@/lib/constants";
+import SkinPicker from "./SkinPicker";
 
 // Simple custom hook for debouncing a value.
 function useDebounce<T>(value: T, delay: number): T {
@@ -189,6 +190,8 @@ export default function PublicNavbar() {
 						)}
 					</button>
 
+					<SkinPicker />
+
 					<button
 						onClick={toggleTheme}
 						className="rounded-md p-2 text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
@@ -211,6 +214,14 @@ export default function PublicNavbar() {
 					>
 						<Layers size={12} />
 						Series
+					</Link>
+
+					<Link
+						href="/notes"
+						className="hidden md:inline-flex items-center gap-1.5 rounded border border-border-default px-3 py-1.5 font-mono text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors"
+					>
+						<BookOpen size={12} />
+						Notes
 					</Link>
 
 					<Link
@@ -256,6 +267,14 @@ export default function PublicNavbar() {
 						>
 							<Layers size={12} />
 							Series
+						</Link>
+						<Link
+							href="/notes"
+							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							<BookOpen size={12} />
+							Notes
 						</Link>
 						<Link
 							href="/about"

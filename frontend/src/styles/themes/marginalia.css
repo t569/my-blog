@@ -1,0 +1,165 @@
+/* ============================================================================
+  Skin: marginalia — the reading look, carried over from The Marginalia Series.
+
+  Ported from the shared stylesheet of four volumes of interactive mathematics
+  notes, so the blog and the notes read as one publication rather than two
+  sites that happen to share a domain.
+
+  Three decisions follow from that, and are deliberate:
+
+  1. **Paper is the subject, not the fallback.** The light block is where the
+     design actually lives — #f6f3ec paper against #17171e ink. Dark is a real
+     night mode, but it is the alternate. (The skin system declares its base
+     block as dark and light as the override, so the two are written in the
+     opposite order to how they are meant to be read.)
+
+  2. **The accent is not fixed.** Each volume of the notes picks its own, and a
+     post here does the same: `--color-accent` reads `--post-accent-*`, which a
+     page sets per post (see lib/accent.ts). Unset — the home page, the feed,
+     anything that is not one post — it falls back to the series violet.
+     Muted and border are mixed from whatever accent is current, so one
+     variable moves all three.
+
+  3. **Nothing glows.** `--shadow-neon-accent` is `none` in both modes, not just
+     on paper. Neon belongs to cyber-luxury; here a rule is a printed rule.
+
+  Type: Spectral for reading and Instrument Serif for display — a serif body
+  because KaTeX typesets math in a serif face, so inline formulas sit *in* the
+  line rather than on top of it. Archivo carries the small interface text,
+  IBM Plex Mono the code and the data labels.
+
+  This file never edits cyber-luxury.css or garden.css — both stay intact and
+  selectable. Switch with NEXT_PUBLIC_SITE_SKIN.
+============================================================================ */
+
+[data-skin="marginalia"] {
+	color-scheme: dark;
+
+	/* ── Fonts ──
+	   Four families against three slots; --font-sans-family is the fourth and
+	   is wired through @theme inline in globals.css. */
+	--font-body-family: "Spectral", Georgia, "Times New Roman", serif;
+	--font-mono-family: "IBM Plex Mono", ui-monospace, monospace;
+	--font-display-family: "Instrument Serif", "Spectral", Georgia, serif;
+	/* Instrument Serif has exactly one weight; anything else is synthesised. */
+	--font-display-weight: 400;
+	--font-sans-family: "Archivo", system-ui, "Helvetica Neue", sans-serif;
+
+	/* ── Backgrounds — ink-dark, warm rather than blue ── */
+	--color-bg-page: #0f0f13;
+	--color-bg-surface: #16161c;
+	--color-bg-elevated: #1e1e26;
+	--color-bg-subtle: #262630;
+
+	/* ── Text — aged paper, down to the ruled faint ── */
+	--color-text-primary: #e9e5dc;
+	--color-text-secondary: #b6b2a9;
+	--color-text-tertiary: #8a8781;
+	--color-text-inverse: #0f0f13;
+
+	/* ── Accent — per post, with the series violet as the default ──
+	   Muted and border mix from whatever --color-accent resolved to, so a page
+	   overrides one variable and the whole accent family follows. */
+	--color-accent: var(--post-accent-dark, #957cff);
+	/* The tints come from lib/accent.ts as finished 8-digit hex rather than
+	   being mixed here — see withAlpha() there for why the CSS version could
+	   not be made safe. Hover keeps color-mix: its build-time fallback is the
+	   plain accent, which merely means hover does not lighten. */
+	--color-accent-hover: color-mix(in srgb, var(--color-accent) 72%, #e9e5dc);
+	--color-accent-muted: var(--post-accent-dark-muted, #957cff24);
+	--color-accent-border: var(--post-accent-dark-border, #957cff66);
+
+	/* ── Borders — printed rules, not boxes ── */
+	--color-border-subtle: rgba(233, 229, 220, 0.08);
+	--color-border-default: rgba(233, 229, 220, 0.16);
+	--color-border-strong: rgba(233, 229, 220, 0.3);
+
+	/* ── Semantic ── */
+	--color-success: #4ec99f;
+	--color-success-muted: #4ec99f20;
+	--color-warning: #e0a33e;
+	--color-warning-muted: #e0a33e20;
+	--color-danger: #ef7a72;
+	--color-danger-muted: #ef7a7220;
+	--color-info: #22d3ee;
+	--color-info-muted: #22d3ee20;
+
+	/* ── Special ── */
+	--color-agent-badge: #22d3ee;
+	--shadow-neon-accent: none;
+
+	/* ── Syntax ──
+	   Deliberately fixed rather than following --color-accent. The notes do key
+	   keywords to the volume accent, but a volume is one document; here code
+	   would change colour from post to post, which reads as a bug. */
+	--syn-comment: #5f5d59;
+	--syn-keyword: #957cff;
+	--syn-string: #4ec99f;
+	--syn-number: #e0a33e;
+	--syn-function: #fb923c;
+	--syn-type: #22d3ee;
+	--syn-variable: #e9e5dc;
+
+	/* ── Shadows — a sheet lifted off the page, barely ── */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -18px rgba(0, 0, 0, 0.9);
+	--shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.45), 0 18px 48px -24px rgba(0, 0, 0, 1);
+
+	/* ── Beyond the shared vocabulary ──
+	   The millimetre grid the notes are ruled on. Used only in hand-written
+	   CSS, so it needs no @theme inline entry. */
+	--color-grid: rgba(233, 229, 220, 0.05);
+}
+
+/* ── Light: the actual design ──
+   #f6f3ec paper, #17171e ink. This is the mode the notes were drawn in and the
+   one long proofs are meant to be read in; the dark block above is the
+   alternate, despite being written first. */
+[data-skin="marginalia"][data-theme="light"] {
+	color-scheme: light;
+
+	--color-bg-page: #f6f3ec;
+	--color-bg-surface: #fffdf8;
+	--color-bg-elevated: #ece7dc;
+	--color-bg-subtle: #e4dece;
+
+	--color-text-primary: #17171e;
+	--color-text-secondary: #43434f;
+	--color-text-tertiary: #75757f;
+	--color-text-inverse: #fffdf8;
+
+	--color-accent: var(--post-accent-light, #6d4aff);
+	--color-accent-hover: color-mix(in srgb, var(--color-accent) 75%, #17171e);
+	--color-accent-muted: var(--post-accent-light-muted, #6d4aff1a);
+	--color-accent-border: var(--post-accent-light-border, #6d4aff57);
+
+	--color-border-subtle: rgba(23, 23, 30, 0.07);
+	--color-border-default: rgba(23, 23, 30, 0.14);
+	--color-border-strong: rgba(23, 23, 30, 0.28);
+
+	--color-success: #1d7a5f;
+	--color-success-muted: #1d7a5f18;
+	--color-warning: #b45309;
+	--color-warning-muted: #b4530918;
+	--color-danger: #b3261e;
+	--color-danger-muted: #b3261e18;
+	--color-info: #0e7490;
+	--color-info-muted: #0e749018;
+
+	--color-agent-badge: #0e7490;
+	--shadow-neon-accent: none;
+
+	--syn-comment: #a3a29a;
+	--syn-keyword: #6d4aff;
+	--syn-string: #1d7a5f;
+	--syn-number: #b45309;
+	--syn-function: #c2410c;
+	--syn-type: #0e7490;
+	--syn-variable: #17171e;
+
+	--shadow-sm: 0 1px 2px rgba(23, 23, 30, 0.05);
+	--shadow-md: 0 1px 2px rgba(23, 23, 30, 0.05), 0 8px 28px -18px rgba(23, 23, 30, 0.35);
+	--shadow-lg: 0 1px 3px rgba(23, 23, 30, 0.08), 0 16px 44px -22px rgba(23, 23, 30, 0.45);
+
+	--color-grid: rgba(23, 23, 30, 0.045);
+}
