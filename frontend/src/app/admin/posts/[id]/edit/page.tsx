@@ -39,12 +39,14 @@ export default function EditPostPage() {
 
 	const handleSave = async (data: any) => {
 		try {
-			await updatePostMutation.mutateAsync({
+			// Returned, not discarded: the editor shows the slug the server
+			// settled on, which is not always the one that was typed.
+			return await updatePostMutation.mutateAsync({
 				postId,
 				payload: {
 					title: data.title,
 					content: data.content,
-					slug: data.slug,
+					slug: data.slug?.trim() || undefined,
 					category_id: data.category_id || undefined,
 					tags: data.tag_names || [],
 					series_id: data.series_id || null,

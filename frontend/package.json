@@ -8,7 +8,8 @@
 		"start": "next start",
 		"lint": "eslint",
 		"check:math": "node --experimental-strip-types --no-warnings scripts/check-math.ts",
-		"check:timeouts": "node --experimental-strip-types --no-warnings scripts/check-timeouts.ts"
+		"check:timeouts": "node --experimental-strip-types --no-warnings scripts/check-timeouts.ts",
+		"check:slug": "node --experimental-strip-types --no-warnings scripts/check-slug.ts"
 	},
 	"dependencies": {
 		"@blocknote/code-block": "^0.49.0",

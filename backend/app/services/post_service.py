@@ -52,12 +52,17 @@ def _generate_excerpt(content: str) -> str:
 
 async def _generate_unique_slug(
     db: AsyncSession,
-    title: str,
+    source: str,
     *,
     exclude_post_id: uuid.UUID | None = None,
 ) -> str:
-    """Generate a URL-safe slug from a title, appending a suffix if it collides."""
-    base_slug = slugify(title, max_length=300)
+    """Slugify ``source`` (a title, or a slug an author typed), de-duplicating it.
+
+    Collisions get a ``-1``, ``-2`` suffix rather than an error, because the
+    caller is creating a post and failing the whole save over a URL the author
+    can still change is the worse outcome.
+    """
+    base_slug = slugify(source, max_length=300)
     slug = base_slug
     counter = 1
 
@@ -180,8 +185,8 @@ async def create_post(
     data: PostCreate,
     owner_id: uuid.UUID,
 ) -> Post:
-    """Create a new post with auto-generated slug, excerpt, and reading time."""
-    slug = await _generate_unique_slug(db, data.title)
+    """Create a new post. The slug is the author's, or the title's if they gave none."""
+    slug = await _generate_unique_slug(db, data.slug or data.title)
     excerpt = _generate_excerpt(data.content)
     reading_time = _calculate_reading_time(data.content)
 
