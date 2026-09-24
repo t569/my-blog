@@ -264,6 +264,22 @@
 	top: 8rem;
 }
 
+/* The live scene (KleinScene) takes the static svg's place only once it has
+   mounted — no JS, reduced motion, or a failed mount all leave the static
+   figure showing. */
+.figureLive {
+	display: none;
+}
+.figureLive[data-klein-live] {
+	display: block;
+	width: 100%;
+	aspect-ratio: 5 / 4;
+	cursor: grab;
+}
+.figureSticky:has(.figureLive[data-klein-live]) .figureSvg {
+	display: none;
+}
+
 .figureSvg {
 	display: block;
 	width: 100%;

@@ -26,6 +26,7 @@
  */
 
 import styles from "./about.module.css";
+import KleinScene from "./KleinScene";
 
 const R = 3.2; // radius of the tube's path — wide enough that rings don't pile up
 const SAMPLES = 44; // points per ring — also the morph's command count
@@ -391,6 +392,8 @@ export default function KleinFigure() {
 						strokeWidth={px(1.4)}
 					/>
 				</svg>
+				{/* The live 3D version. Hidden until mounted; hides the svg above once it is. */}
+				<KleinScene />
 				<p className={styles.figureReadout}>
 					<span>Klein bottle · figure-8</span>
 					<span className={styles.figureU} data-klein="readout" />
