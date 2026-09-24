@@ -80,6 +80,28 @@ git checkout dev/t569 && git merge feat/<name>
   `node -e "const fs=require('fs'),f='package-lock.json';fs.writeFileSync(f,JSON.stringify(JSON.parse(fs.readFileSync(f,'utf8')),null,2)+'\n')"`
   — a 3-dependency install then shows ~170 added lines, not 20k changed ones.
 
+## Packages are subtrees
+
+`frontend/packages/scene-engine` and `frontend/packages/ai-assistant` are
+[`t569/scene-engine`](https://github.com/t569/scene-engine) and
+[`t569/ai-assistant`](https://github.com/t569/ai-assistant), pulled in with
+`git subtree --squash`. They are their own libraries with their own tests,
+docs and style (2-space, single quotes): **don't reformat them into blog
+style**, and keep blog-specific code out of them.
+
+- **Wired by tsconfig `paths`**, straight to `src/`. No build step, no `file:`
+  dependency, no lockfile change. Their sources import `./x.ts` (rewritten to
+  `.js` only in their own `dist/`) because Turbopack won't map `.js` → `.ts`.
+- **Edit in place, then send upstream:**
+  ```bash
+  git subtree push --prefix=frontend/packages/scene-engine <scene-engine remote> main
+  git subtree pull --prefix=frontend/packages/scene-engine <scene-engine remote> main --squash
+  ```
+  Same for `ai-assistant`. Run their tests in their own repo (`npm test`); the
+  blog's `tsc` excludes `packages/**/*.test.ts`.
+- **Upstream (DejusDevspace) never needs them:** everything that uses them is
+  off unless an env var turns it on, so a merge leaves his site as it was.
+
 ## Gotchas worth remembering
 
 - `@theme inline` in Tailwind v4 bakes literal values into utilities

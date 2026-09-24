@@ -20,7 +20,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@t569/scene-engine": ["./packages/scene-engine/src/index.ts"],
+      "@t569/scene-engine/*": ["./packages/scene-engine/src/plugins/*.ts"],
+      "@t569/ai-assistant": ["./packages/ai-assistant/src/index.ts"]
     }
   },
   "include": [
@@ -31,5 +34,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "packages/**/*.test.ts", "packages/**/node_modules"]
 }
