@@ -2,7 +2,7 @@
  * Asserts that a slug typed in the editor survives the trip to the database.
  * Run: `npm run check:slug`
  *
- * No test framework on purpose — same role and reasoning as check-timeouts.ts.
+ * No test framework on purpose: plain node, asserts, one exit code.
  *
  * This exists because the slug box lied for as long as it had existed. The
  * editor showed it, the URL preview under it updated as you typed, and on a new
