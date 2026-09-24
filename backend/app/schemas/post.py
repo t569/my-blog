@@ -29,6 +29,10 @@ class PostCreate(BaseModel):
     """Request body for creating a post."""
 
     title: str = Field(..., min_length=1, max_length=300)
+    # Optional: absent or blank, the slug is derived from the title. Present, it
+    # is slugified and de-duplicated the same way, so an author can choose the
+    # URL without being able to mint an invalid or colliding one.
+    slug: str | None = Field(None, max_length=350)
     content: str = Field(..., min_length=1)
     category_id: uuid.UUID
     tags: list[str] = Field(default_factory=list)

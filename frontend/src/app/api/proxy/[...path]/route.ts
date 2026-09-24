@@ -21,6 +21,13 @@ import { timeoutFor } from "@/lib/coldStart";
 const BACKEND_URL =
   process.env.BACKEND_URL ?? "http://localhost:8000";
 
+// The platform kills the function before any timeout in this file can fire, so
+// the ceiling has to be raised here as well. 60s is the Vercel Hobby maximum —
+// the same one src/app/api/cron/agent/route.ts is written against — and
+// COLD_START_MS is set below it so the abort below is the one that bites and
+// the log says which request gave up.
+export const maxDuration = 60;
+
 /**
  * Generic handler that forwards the request to the backend.
  */
@@ -91,6 +98,21 @@ async function proxyRequest(request: NextRequest): Promise<NextResponse> {
     return response;
   } catch (error) {
     console.error("[API Proxy] Backend request failed:", error);
+
+    // Gave up waiting and never answered are different problems with different
+    // fixes — one is "try again in a moment", the other is "the backend is
+    // down" — and the person reading the toast is the one who has to tell them
+    // apart.
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json(
+        {
+          detail:
+            "The backend did not answer in time — it may be waking up. Try again in a moment.",
+        },
+        { status: 504 },
+      );
+    }
+
     return NextResponse.json(
       { detail: "Backend service unavailable." },
       { status: 502 },

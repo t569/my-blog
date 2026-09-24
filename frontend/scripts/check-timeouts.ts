@@ -12,6 +12,7 @@
  * just gets a 502 on a cold start, which reads exactly like a dead backend.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
 	COLD_START_MS,
@@ -53,7 +54,7 @@ const cases: Array<[string | undefined, boolean, string]> = [
 	["/administrators", false, "not an admin route"],
 	["/api/v1/healthcheck", false, "same"],
 
-	[undefined, false, "a request with no url is not a reason to wait 90s"],
+	[undefined, false, "a request with no url is not a reason to wait at all"],
 ];
 
 for (const [path, expected, why] of cases) {
@@ -73,9 +74,27 @@ check(
 	COLD_START_MS > PUBLIC_TIMEOUT_MS,
 	"a cold start is allowed longer than public traffic",
 );
+/* The third ceiling, and the only one with the power to kill: the serverless
+   function the proxy runs inside. This used to assert COLD_START_MS >= 90_000,
+   which sounded generous and was unreachable — Vercel Hobby stops a function at
+   60s, so the wait was cut short by the platform and the admin got a 504 with
+   no body and no log line. Read from the route rather than restated here,
+   because a constant copied into a test is a constant that drifts. */
+const proxyRoute = readFileSync(
+	new URL("../src/app/api/proxy/[...path]/route.ts", import.meta.url),
+	"utf8",
+);
+const maxDuration = Number(
+	proxyRoute.match(/export const maxDuration = (\d+)/)?.[1],
+);
+
 check(
-	COLD_START_MS >= 90_000,
-	"a measured cold start is ~75s — leave room above it",
+	Number.isFinite(maxDuration),
+	"the proxy route declares a maxDuration — without one the default is far shorter",
+);
+check(
+	COLD_START_MS < maxDuration * 1000,
+	`the wait (${COLD_START_MS}ms) ends before the platform kills the function (${maxDuration}s)`,
 );
 
 assert.equal(failed, 0, `${failed} timeout check(s) failed`);

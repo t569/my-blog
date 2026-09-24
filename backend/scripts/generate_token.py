@@ -12,11 +12,17 @@ Requires NEXTAUTH_SECRET to be set in your .env file.
 
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import jwt
 
+# Python puts *this file's* directory on sys.path, not the one it was run from,
+# so `python scripts/generate_token.py` could never import `app` — the usage
+# line above was wrong from the start. Add the repo root ourselves.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 # Load settings — this requires the .env file to be present.
-from app.config import settings
+from app.config import settings  # noqa: E402
 
 EXPIRY_HOURS = 24
 
