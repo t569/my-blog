@@ -1,6 +1,6 @@
 {
   "name": "@t569/ai-assistant",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Headless state + streaming runtime for animated AI assistants: a LangGraph SSE client, a table-driven avatar state machine, React bindings.",
   "license": "MIT",
   "author": "t569",
