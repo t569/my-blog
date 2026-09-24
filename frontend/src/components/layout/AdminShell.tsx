@@ -16,8 +16,7 @@ import {
 	Network,
 	SlidersHorizontal,
 	TerminalSquare,
-	Tag,
-} from "lucide-react";
+	Tag, Smile } from "lucide-react";
 import { useAdminStats } from "@/hooks/useApi";
 
 export default function AdminShell({
@@ -60,6 +59,7 @@ export default function AdminShell({
 					label: "Agent Settings",
 					icon: SlidersHorizontal,
 				},
+				{ href: "/admin/settings/characters", label: "Characters", icon: Smile },
 			],
 		},
 		{
