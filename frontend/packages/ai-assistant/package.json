@@ -1,0 +1,44 @@
+{
+  "name": "@t569/ai-assistant",
+  "version": "0.2.0",
+  "description": "Headless state + streaming runtime for animated AI assistants: a LangGraph SSE client, a table-driven avatar state machine, React bindings.",
+  "license": "MIT",
+  "author": "t569",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t569/ai-assistant.git"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "langgraph",
+    "sse",
+    "react",
+    "avatar"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.15",
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.4"
+  }
+}
