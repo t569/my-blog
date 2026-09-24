@@ -93,6 +93,30 @@ ps = [Page("/a", "page", "War — Peace", []), Page("/b", "page", "Other", []), 
 strip_site_suffix(ps)
 check(ps[0].title == "War — Peace", "a suffix only one title has is part of that title")
 
+# ── the crawl starts only from a site this backend already trusts ──
+from starlette.requests import Request  # noqa: E402
+
+from app.config import settings  # noqa: E402
+from app.routers.admin_site_index import site_from  # noqa: E402
+
+settings.cors_origins = "http://localhost:3000, https://blog.example/"
+
+
+def origin(value: str | None, forwarded: str | None = None) -> Request:
+    headers = [(b"origin", value.encode())] if value else []
+    if forwarded:
+        headers.append((b"x-forwarded-host", forwarded.encode()))
+    return Request({"type": "http", "headers": headers})
+
+
+check(site_from(origin("https://blog.example")) == "https://blog.example", "a listed origin is crawled (trailing slash tolerated)")
+check(site_from(origin("https://attacker.example")) is None, "an unlisted origin can't aim the crawler elsewhere")
+check(site_from(origin(None)) is None, "no origin, no crawl")
+check(site_from(origin("https://live.example", "live.example")) == "https://live.example",
+      "a deployed site is recognised from its own host — no setting needed")
+check(site_from(origin("https://attacker.example", "live.example")) is None, "an origin the edge didn't see is refused")
+check(site_from(origin("http://live.example", "live.example")) is None, "plain http is not trusted that way")
+
 # ── a real notes volume ──
 vol = Path(__file__).resolve().parents[2] / "frontend" / "public" / "notes" / "vol2-sieve-theory.html"
 if vol.exists():

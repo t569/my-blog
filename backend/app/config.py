@@ -157,10 +157,10 @@ class Settings(BaseSettings):
     ASSISTANT_SITE_GUIDE: str = ""
 
     # --- Site index ---
-    # The public site's address, e.g. https://example.com. When set, a
-    # site-index rebuild crawls it (from the home page, following its own
-    # links) so pages that only exist on the frontend — static notes, a lab —
-    # are searchable too. Empty = index posts only, from the database.
+    # Optional. A rebuild started from the admin crawls the site it was
+    # started from (the request's Origin, confirmed by the edge's
+    # x-forwarded-host, or listed in CORS_ORIGINS), so nothing needs setting. This overrides that — for a
+    # rebuild with no browser behind it, like a scheduled job.
     SITE_URL: str = ""
 
     @property

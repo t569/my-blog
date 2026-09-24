@@ -759,8 +759,9 @@ To do:
       invisible to it), each linking to its exact section. Unchanged pages
       cost nothing on rebuild. Admin → Knowledge shows it and rebuilds it.
       Karlsefni searches it. Check: `python -m scripts.check_site_index`.
-- [ ] Set `SITE_URL` on Render, deploy (migration `5d1b7c9e2a31` runs), then
-      Admin → Knowledge → Rebuild.
+- [ ] Deploy (migration `5d1b7c9e2a31` runs), then Admin → Knowledge → Rebuild.
+      No setting needed: it crawls the site it's pressed from (Origin, confirmed by
+      Vercel's x-forwarded-host; CORS_ORIGINS for local dev).
 - [ ] The constellation: a 2D, Obsidian-style physical graph of the index
       (links + nearest-by-meaning), as a scene-engine plugin, on /constellation.
 - [ ] The posts index's 750-word chunks (search bar) have the same truncation

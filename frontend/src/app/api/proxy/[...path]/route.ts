@@ -41,6 +41,10 @@ async function proxyRequest(request: NextRequest): Promise<NextResponse> {
   // Build headers — forward everything except host.
   const headers = new Headers(request.headers);
   headers.delete("host");
+  // The site's own address, as this server was reached — set here rather than
+  // trusted from the client, so the backend can rely on it (the site index
+  // uses it to know which site to crawl, without any configuration).
+  headers.set("x-forwarded-host", url.host);
 
   // Build fetch options.
   const init: RequestInit = {

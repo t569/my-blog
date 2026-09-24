@@ -347,6 +347,7 @@ class IndexReport:
     chunks: int = 0
     embedded: int = 0
     crawled: bool = False
+    site_url: str | None = None
     finished_at: datetime | None = None
     error: str | None = None
 
@@ -423,15 +424,16 @@ last_report: IndexReport | None = None
 _lock = asyncio.Lock()
 
 
-async def rebuild(db: AsyncSession) -> IndexReport:
-    """Index every published post, then crawl SITE_URL (if set) for the rest."""
+async def rebuild(db: AsyncSession, site_url: str | None = None) -> IndexReport:
+    """Index every published post, then crawl the site (if an address is known) for the rest."""
     global last_report
-    report = IndexReport()
+    site = settings.SITE_URL or site_url
+    report = IndexReport(site_url=site)
     async with _lock:
         try:
             await index_pages(db, await posts_as_pages(db), report, prune_kinds={"post"})
-            if settings.SITE_URL:
-                pages = await crawl(settings.SITE_URL)
+            if site:
+                pages = await crawl(site)
                 report.crawled = True
                 await index_pages(db, pages, report, prune_kinds={"note", "lab", "series", "page"})
         except Exception as exc:

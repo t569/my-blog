@@ -59,10 +59,10 @@ export default function KnowledgePage() {
 				</button>
 			</header>
 
-			{!data.site_url && (
+			{last && !last.crawled && (
 				<p className="rounded-lg border border-warning bg-warning-muted px-4 py-3 text-sm text-text-primary">
-					SITE_URL isn&apos;t set on the backend, so only posts are indexed. Set it to the public address
-					of the site to include every other page.
+					The last rebuild indexed posts only: the backend couldn&apos;t confirm this site&apos;s address.
+					On the live site that is automatic; elsewhere, add the address to CORS_ORIGINS on the backend.
 				</p>
 			)}
 
