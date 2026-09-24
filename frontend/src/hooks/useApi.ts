@@ -99,6 +99,9 @@ export const queryKeys = {
     context: {
       all: ["admin", "context"] as const,
     },
+    characters: {
+      all: ["admin", "characters"] as const,
+    },
     features: {
       all: ["admin", "features"] as const,
     },
@@ -727,5 +730,26 @@ export function useHealthCheck(
     queryFn: api.healthCheck,
     retry: false,
     ...options,
+  });
+}
+
+/* ============================================================================
+  Characters
+============================================================================ */
+
+/** (Admin) Faces for the assistant and the agents. */
+export function useAdminCharacters() {
+  return useQuery<api.CharactersState, ApiError>({
+    queryKey: queryKeys.admin.characters.all,
+    queryFn: api.adminGetCharacters,
+  });
+}
+
+/** (Admin) Save face choices; the PUT returns the whole state. */
+export function useAdminUpdateCharacters() {
+  const queryClient = useQueryClient();
+  return useMutation<api.CharactersState, ApiError, api.CharactersState["characters"]>({
+    mutationFn: api.adminUpdateCharacters,
+    onSuccess: (data) => queryClient.setQueryData(queryKeys.admin.characters.all, data),
   });
 }

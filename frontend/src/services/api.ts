@@ -501,3 +501,29 @@ export async function healthCheck(): Promise<{ status: string }> {
   const { data } = await apiClient.get<{ status: string }>("/health");
   return data;
 }
+
+/* ============================================================================
+  Characters — faces for the assistant and the agents
+============================================================================ */
+
+export interface CharactersState {
+  /** False until the owners.characters migration has run. */
+  ready: boolean;
+  hint: string | null;
+  /** id → stored choice, or null for the built-in face. */
+  characters: Record<string, { style: string; seed: string; image_url?: string | null } | null>;
+}
+
+/** (Admin) Every character's stored face. */
+export async function adminGetCharacters(): Promise<CharactersState> {
+  const { data } = await apiClient.get<CharactersState>("/admin/characters");
+  return data;
+}
+
+/** (Admin) Merge face choices in; null for an id restores its built-in face. */
+export async function adminUpdateCharacters(
+  updates: CharactersState["characters"],
+): Promise<CharactersState> {
+  const { data } = await apiClient.put<CharactersState>("/admin/characters", updates);
+  return data;
+}

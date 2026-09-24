@@ -59,6 +59,22 @@ export const SITE = {
   theme: process.env.NEXT_PUBLIC_SITE_THEME ?? "system",
 } as const;
 
+/**
+ * The chat assistant. Off unless NEXT_PUBLIC_ASSISTANT_ENABLED=true, so a
+ * merge upstream adds no widget to his site. The backend has its own switch
+ * (ASSISTANT_ENABLED) and its own name setting for the prompt; set both.
+ */
+export const ASSISTANT = {
+  enabled: process.env.NEXT_PUBLIC_ASSISTANT_ENABLED === "true",
+  name: process.env.NEXT_PUBLIC_ASSISTANT_NAME ?? "Assistant",
+  /** Picks the face. Same seed, same face, on every device. */
+  seed: process.env.NEXT_PUBLIC_ASSISTANT_SEED ?? "assistant",
+  /** Shown before the first message. */
+  greeting:
+    process.env.NEXT_PUBLIC_ASSISTANT_GREETING ??
+    "Hi! Ask me about anything on this blog.",
+} as const;
+
 /** Pagination defaults. */
 export const PAGINATION = {
   defaultPage: 1,
