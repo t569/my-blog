@@ -728,7 +728,23 @@ Done:
       from `GET /admin/agent/runs/{id}/events` (replayed on reconnect).
 - [x] **Klein bottle in 3D** on /about, beside the static one (which still
       renders with no JS / reduced motion).
-- [x] **/lab** — modular-group tiling, Fourier epicycles, an ad as data.
+- [x] **/lab** — ten exhibits: a Brilliant-style curve puzzle (pure JSON),
+      the modular-group tiling, a 3D Laplace-transform surface, the Lorenz
+      attractor, a flowing vector field, a Mandelbrot dive, the Game of Life,
+      a Fibonacci sunflower, Fourier epicycles and an ad as data. Every scene
+      runs only while on screen. Pixel-heavy ones use `lib/scene.ts` (the
+      Marginalia canvas runtime); the rest are scene-engine.
+- [x] **scene-engine 0.3, the interactive layer** (Brilliant/Desmos-inspired):
+      `params`, a safe hand-written expression language (no `eval`), `bind`,
+      `plot`, `slider`, `control` handles, live text templates and
+      `visible_when` goals — all as data. Dragging is continuous: knobs and
+      handles follow the pointer, then glide onto the snapped value.
+- [x] **Feed as panels** (`NEXT_PUBLIC_SITE_FEED=panels`, off by default): lead
+      story across the top, picture posts as tall panels, text posts packed
+      round them (CSS grid, dense flow). A post's picture is `Post.cover_image`
+      — its first https image, read from content, no migration.
+- [x] Characters in the admin sidebar; the palette picker and Marginalia notes
+      are on this branch too (merged `feat/marginalia-skin`).
 - [x] Fixed on the way (generic, PR-able): the proxy buffered SSE; rate limits
       keyed on Vercel's address instead of the reader's; a manual agent trigger
       ran under a second, orphaned run row; `resolveAvatarStatus` found
@@ -743,7 +759,8 @@ To do:
 - [ ] **Set `GROQ_MODEL` on Render.** The code default `llama-3.3-70b-versatile`
       is retired by Groq — the agent pipeline fails with `model_not_found` until
       it is set. Worth a PR upstream too: his default is broken for him as well.
-- [ ] Set the new `ASSISTANT_*` / `NEXT_PUBLIC_ASSISTANT_*` / `NEXT_PUBLIC_SITE_LAB`
+- [ ] Set the new `ASSISTANT_*` / `NEXT_PUBLIC_ASSISTANT_*` / `NEXT_PUBLIC_SITE_LAB` /
+      `NEXT_PUBLIC_SITE_FEED`
       values on Render and Vercel (see both `.env.example` files).
 - [ ] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub and push the
       local repos (`gh` isn't installed here: `winget install GitHub.cli`).
