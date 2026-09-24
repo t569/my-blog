@@ -25,6 +25,7 @@ from app.routers import (
     debug,
     public_assistant,
     public_comments,
+    public_constellation,
     public_posts,
     public_search,
 )
@@ -102,6 +103,7 @@ API_V1 = "/api/v1"
 app.include_router(public_posts.router, prefix=API_V1)
 app.include_router(public_comments.router, prefix=API_V1)
 app.include_router(public_assistant.router, prefix=API_V1)
+app.include_router(public_constellation.router, prefix=API_V1)
 app.include_router(public_search.router, prefix=API_V1)
 app.include_router(admin_posts.router, prefix=API_V1)
 app.include_router(admin_categories.router, prefix=API_V1)

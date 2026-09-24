@@ -41,7 +41,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.post import Post
-from app.models.site_chunk import SiteChunk
+from app.models.site_chunk import SiteChunk, SiteLink
+from app.services import constellation
 from app.services.embedding_service import _strip_markdown, get_embeddings
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ logger = logging.getLogger(__name__)
 CHUNK_WORDS = 150
 OVERLAP_WORDS = 30
 EMBED_BATCH = 32
+#: Seconds a search waits for the query's embedding before falling back to keywords.
+EMBED_TIMEOUT = 4.0
 MAX_PAGES = 80
 
 #: Never crawled: private, machine-only, or already indexed from the database.
@@ -71,6 +74,7 @@ class Page:
     kind: str
     title: str
     sections: list[Section]
+    #: Same-site pages this one links to, as paths (with any #anchor).
     links: list[str] = field(default_factory=list)
     post_id: uuid.UUID | None = None
 
@@ -247,6 +251,8 @@ def page_hash(page: Page) -> str:
     h = hashlib.sha256(page.title.encode())
     for s in page.sections:
         h.update(f"\x00{s.heading}\x00{s.anchor}\x00{s.text}".encode())
+    for link in page.links:
+        h.update(f"\x01{link}".encode())
     return h.hexdigest()
 
 
@@ -260,6 +266,32 @@ def embed_text(page: Page, s: Section) -> str:
 # ------------------------------------------------------------------ gathering
 
 
+_MD_LINK = re.compile(r"\]\(\s*([^)\s]+)")
+_LOCAL = "http://site.local/"
+
+
+def link_target(base: str, href: str) -> str | None:
+    """Where a link on the site points, as a path with any #anchor — or None
+    for another site, a file, or somewhere private. Unlike `_site_path`, posts
+    count: a link to a post is a real edge even though posts aren't crawled."""
+    absolute = urljoin(base, href.strip())
+    u, b = urlparse(absolute), urlparse(base)
+    if u.scheme not in ("http", "https") or u.netloc != b.netloc:
+        return None
+    path = (u.path or "/").rstrip("/") or "/"
+    if any(path.startswith(p) for p in ("/admin", "/api", "/_next")):
+        return None
+    if "." in path.rsplit("/", 1)[-1] and not path.endswith(".html"):
+        return None
+    return f"{path}#{u.fragment}" if u.fragment else path
+
+
+def markdown_links(markdown: str) -> list[str]:
+    """Same-site links in Markdown: `[text](/notes/vol1.html#s2)`. Pure."""
+    found = (link_target(_LOCAL, m) for m in _MD_LINK.findall(markdown))
+    return sorted({t for t in found if t})
+
+
 async def posts_as_pages(db: AsyncSession) -> list[Page]:
     rows = (
         await db.execute(
@@ -269,7 +301,14 @@ async def posts_as_pages(db: AsyncSession) -> list[Page]:
         )
     ).all()
     return [
-        Page(path=f"/posts/{slug}", kind="post", title=title, sections=markdown_sections(content or ""), post_id=pid)
+        Page(
+            path=f"/posts/{slug}",
+            kind="post",
+            title=title,
+            sections=markdown_sections(content or ""),
+            links=markdown_links(content or ""),
+            post_id=pid,
+        )
         for pid, slug, title, content in rows
     ]
 
@@ -315,7 +354,8 @@ async def crawl(site_url: str, max_pages: int = MAX_PAGES) -> list[Page]:
                     seen.add(nxt)
                     queue.append(nxt)
             if path != "/" and sections:
-                pages.append(Page(path=path, kind=kind_for(path), title=title or path, sections=sections))
+                targets = sorted({t for t in (link_target(base, h) for h in links) if t and t.split("#")[0] != path})
+                pages.append(Page(path=path, kind=kind_for(path), title=title or path, sections=sections, links=targets))
     strip_site_suffix(pages)
     return pages
 
@@ -391,6 +431,9 @@ async def index_pages(db: AsyncSession, pages: list[Page], report: IndexReport, 
         passages = chunk_sections(page.sections)
         vectors = await _embed([embed_text(page, s) for s in passages])
         await db.execute(delete(SiteChunk).where(SiteChunk.page_url == page.path))
+        await db.execute(delete(SiteLink).where(SiteLink.from_url == page.path))
+        for target in page.links:
+            db.add(SiteLink(from_url=page.path, to_url=target))
         for i, (s, v) in enumerate(zip(passages, vectors)):
             db.add(
                 SiteChunk(
@@ -415,6 +458,7 @@ async def index_pages(db: AsyncSession, pages: list[Page], report: IndexReport, 
     gone = [url for url, kind in all_existing if kind in prune_kinds and url not in live]
     if gone:
         await db.execute(delete(SiteChunk).where(SiteChunk.page_url.in_(gone)))
+        await db.execute(delete(SiteLink).where(SiteLink.from_url.in_(gone)))
         report.removed = len(gone)
         await db.commit()
 
@@ -441,6 +485,7 @@ async def rebuild(db: AsyncSession, site_url: str | None = None) -> IndexReport:
             report.error = str(exc)
         report.finished_at = datetime.now()
         last_report = report
+        constellation.invalidate()  # the graph is drawn from the index
     return report
 
 
@@ -450,7 +495,10 @@ async def index_post(db: AsyncSession, post_id: uuid.UUID) -> None:
     if pages:
         await index_pages(db, pages, IndexReport(), prune_kinds=set())
     else:  # unpublished or deleted
+        paths = (await db.execute(select(SiteChunk.page_url).where(SiteChunk.post_id == post_id).distinct())).scalars().all()
         await db.execute(delete(SiteChunk).where(SiteChunk.post_id == post_id))
+        if paths:
+            await db.execute(delete(SiteLink).where(SiteLink.from_url.in_(paths)))
         await db.commit()
 
 
@@ -473,9 +521,12 @@ async def search(db: AsyncSession, query: str, limit: int = 5) -> list[Hit]:
     embedding call is unavailable. Empty when nothing is indexed yet."""
     vector = None
     try:
-        vector = (await get_embeddings([query]))[0]
+        # Only the network call is time-boxed. Cancelling a database query
+        # half-way leaves the session unusable (PendingRollbackError), so the
+        # deadline sits here, where giving up just means keyword search.
+        vector = (await asyncio.wait_for(get_embeddings([query]), timeout=EMBED_TIMEOUT))[0]
     except Exception:
-        logger.warning("[site-index] query embedding unavailable; keyword search", exc_info=True)
+        logger.warning("[site-index] query embedding slow or unavailable; keyword search")
 
     if vector is not None:
         distance = SiteChunk.embedding.cosine_distance(vector)

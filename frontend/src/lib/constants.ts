@@ -63,6 +63,11 @@ export const SITE = {
    */
   lab: process.env.NEXT_PUBLIC_SITE_LAB === "true",
   /**
+   * /constellation — the site index as a living graph. Off by default, like
+   * the lab, so upstream gets neither the page nor a link.
+   */
+  constellation: process.env.NEXT_PUBLIC_SITE_CONSTELLATION === "true",
+  /**
    * Home feed layout. "list" is upstream's single column, and the default.
    * "panels" lays posts out like a newspaper page or a comic: the lead story
    * across the top, posts with a picture as tall panels, text posts packed

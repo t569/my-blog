@@ -118,9 +118,10 @@ def _site_guide() -> str:
     return guide[:_GUIDE_MAX]
 
 
-async def _passages(db: AsyncSession, question: str) -> str:
-    """The post passages most relevant to the question, from the site's own
-    hybrid search (meaning + keywords, over post chunks).
+async def _passages(db: AsyncSession, question: str) -> tuple[str, list[str]]:
+    """The passages most relevant to the question — as prompt text, and as
+    the links they came from (the answer's sources). From the site-wide
+    index, else the posts-only hybrid search.
 
     Best-effort by design: the embedding call is a network round trip, so it
     gets a deadline, and anything that goes wrong means answering from the
@@ -130,7 +131,10 @@ async def _passages(db: AsyncSession, question: str) -> str:
     # anything, else from the posts-only search the search bar uses.
     found: list[tuple[str, str, str]] = []
     try:
-        hits = await asyncio.wait_for(site_index.search(db, question, limit=5), timeout=_RETRIEVAL_TIMEOUT)
+        # site_index.search time-boxes its own network call and falls back to
+        # keywords; not wrapped in a deadline here, because cancelling its
+        # database query mid-flight would poison the session for the reply.
+        hits = await site_index.search(db, question, limit=5)
         found = [(f"{h.title} — {h.heading}" if h.heading else h.title, h.url, h.text) for h in hits]
         if not found:
             results = await asyncio.wait_for(
@@ -139,8 +143,10 @@ async def _passages(db: AsyncSession, question: str) -> str:
             found = [(r.post.title, f"/posts/{r.post.slug}", r.matched_chunk or "") for r in results]
     except Exception:
         logger.warning("[assistant] retrieval unavailable; answering without passages", exc_info=True)
-        return ""
+        await db.rollback()  # leave the session usable for whatever comes next
+        return "", []
     out: list[str] = []
+    links: list[str] = []
     used = 0
     for title, link, body in found:
         chunk = " ".join(body.split())[:_PASSAGE_MAX]
@@ -150,8 +156,9 @@ async def _passages(db: AsyncSession, question: str) -> str:
         if used + len(entry) > _PASSAGES_MAX:
             break
         out.append(entry)
+        links.append(link)
         used += len(entry)
-    return "\n\n".join(out)
+    return "\n\n".join(out), links
 
 
 def _system_prompt(site: str, guide: str, passages: str) -> str:
@@ -177,8 +184,8 @@ def _system_prompt(site: str, guide: str, passages: str) -> str:
     return "\n\n".join(parts)
 
 
-def _frame(action_status: str, delta: str | None = None) -> str:
-    event: dict[str, object] = {"node": None, "actionStatus": action_status, "state": {}}
+def _frame(action_status: str, delta: str | None = None, state: dict | None = None) -> str:
+    event: dict[str, object] = {"node": None, "actionStatus": action_status, "state": state or {}}
     if delta:
         event["delta"] = delta
     return f"data: {json.dumps(event)}\n\n"
@@ -244,7 +251,7 @@ async def chat(
     # Read before streaming: the session dependency closes once the handler
     # returns, which is before the generator below finishes.
     site = await _site_context(db)
-    passages = await _passages(db, data.message)
+    passages, sources = await _passages(db, data.message)
     messages = [
         {"role": "system", "content": _system_prompt(site, _site_guide(), passages)},
         # The last few turns are plenty for a chat about blog posts, and every
@@ -254,7 +261,9 @@ async def chat(
     ]
 
     async def stream() -> AsyncIterator[str]:
-        yield _frame("processing")
+        # Which passages this answer draws on, first — so a page showing the
+        # site (the constellation) can light them up while the reply streams.
+        yield _frame("processing", state={"sources": sources})
         try:
             client = AsyncGroq(api_key=settings.GROQ_API_KEY)
             # Reasoning models (gpt-oss) think before answering and stream that

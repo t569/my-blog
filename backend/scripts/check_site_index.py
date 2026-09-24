@@ -117,6 +117,31 @@ check(site_from(origin("https://live.example", "live.example")) == "https://live
 check(site_from(origin("https://attacker.example", "live.example")) is None, "an origin the edge didn't see is refused")
 check(site_from(origin("http://live.example", "live.example")) is None, "plain http is not trusted that way")
 
+# ── links: the constellation's solid lines ──
+from app.services.site_index import link_target, markdown_links  # noqa: E402
+
+check(link_target(base, "/notes/vol1.html#s2") == "/notes/vol1.html#s2", "a link keeps its section anchor")
+check(link_target(base, "/posts/hello") == "/posts/hello", "links to posts count, though posts aren't crawled")
+check(all(link_target(base, x) is None for x in ("/admin", "https://else.example/", "/cv.pdf")), "private, foreign and file links don't")
+check(markdown_links("See [vol I](/notes/vol1.html#s1) and [x](https://else.example) and [a](/lab).") == ["/lab", "/notes/vol1.html#s1"],
+      "Markdown links resolved, foreign ones dropped")
+p1 = Page("/x", "page", "T", [Section("H", "h", "same")], links=["/a"])
+p2 = Page("/x", "page", "T", [Section("H", "h", "same")], links=["/b"])
+check(page_hash(p1) != page_hash(p2), "a page whose only change is a link is re-indexed")
+
+# ── "related by meaning" ──
+import numpy as np  # noqa: E402
+
+from app.services.constellation import similar_pairs  # noqa: E402
+
+ids = ["a1", "a2", "b1", "c1"]
+vec = np.array([[1, 0, 0], [0.9, 0.1, 0], [0.95, 0.05, 0], [0, 0, 1]], dtype=float)
+pairs = similar_pairs(ids, vec, {"a1": "A", "a2": "A", "b1": "B", "c1": "C"}, k=2, floor=0.5)
+names = {(a, b) for a, b, _ in pairs}
+check(("a1", "b1") in names and ("a2", "b1") in names, "close sections on different pages are joined")
+check(("a1", "a2") not in names, "sections of one page are never 'similar' — 'part' already ties them")
+check(all("c1" not in (a, b) for a, b, _ in pairs), "nothing below the floor is joined")
+
 # ── a real notes volume ──
 vol = Path(__file__).resolve().parents[2] / "frontend" / "public" / "notes" / "vol2-sieve-theory.html"
 if vol.exists():

@@ -762,8 +762,16 @@ To do:
 - [ ] Deploy (migration `5d1b7c9e2a31` runs), then Admin → Knowledge → Rebuild.
       No setting needed: it crawls the site it's pressed from (Origin, confirmed by
       Vercel's x-forwarded-host; CORS_ORIGINS for local dev).
-- [ ] The constellation: a 2D, Obsidian-style physical graph of the index
-      (links + nearest-by-meaning), as a scene-engine plugin, on /constellation.
+- [x] **The constellation** (`NEXT_PUBLIC_SITE_CONSTELLATION=true`, off by
+      default): pages and their sections as stars on /constellation, drawn by
+      scene-engine's graph plugin from `GET /constellation`. Lines: part
+      (section → page), link (real hyperlinks, recorded at index time in
+      `site_links`), similar (each section's 2 nearest on other pages by mean
+      embedding, cosine ≥ 0.45). No model calls; cached 10 min, cleared on
+      rebuild. Karlsefni's answers send their sources first, and the stars he
+      read from light up. Check: `python -m scripts.check_site_index`.
+- [ ] Deploy (migration `8e4f2a6c1b90` adds `site_links`), then Rebuild once so
+      links get recorded — until then the graph shows only part/similar lines.
 - [ ] The posts index's 750-word chunks (search bar) have the same truncation
       problem — upstream's code; worth a PR: ~150 words and a re-backfill.
 - [ ] **Run the migration**: `alembic upgrade head` in `backend/` (adds

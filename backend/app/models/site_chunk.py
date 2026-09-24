@@ -37,3 +37,16 @@ class SiteChunk(Base):
         ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
     )
     indexed_at: Mapped[datetime] = mapped_column(default=datetime.now, nullable=False)
+
+
+class SiteLink(Base):
+    """A hyperlink between two indexed pages — the constellation's solid lines.
+
+    Recorded when a page is indexed, from its HTML (crawled pages) or Markdown
+    (posts). `to_url` may carry an #anchor, so a link can land on a section.
+    """
+
+    __tablename__ = "site_links"
+
+    from_url: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    to_url: Mapped[str] = mapped_column(Text, nullable=False, index=True)

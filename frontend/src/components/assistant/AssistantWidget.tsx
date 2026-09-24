@@ -135,7 +135,16 @@ export default function AssistantWidget() {
 	const [choice, setChoice] = useState<CharacterChoice>(() => defaultChoice("assistant", ASSISTANT.seed));
 	const [spot, setSpot] = useState<Spot>(DEFAULT_SPOT);
 	const [viewport, setViewport] = useState({ vw: 0, vh: 0 });
-	const { messages, actionStatus, isStreaming, send } = useAssistantStream(ENDPOINT);
+	const { messages, actionStatus, isStreaming, send } = useAssistantStream(ENDPOINT, {
+		// Tell the page which passages an answer draws on — the constellation
+		// lights them up. A window event, so neither knows about the other.
+		onEvent: (event) => {
+			const sources = (event.state as { sources?: unknown }).sources;
+			if (Array.isArray(sources)) {
+				window.dispatchEvent(new CustomEvent("assistant:sources", { detail: sources.filter((s) => typeof s === "string") }));
+			}
+		},
+	});
 
 	// How much of the latest reply is on screen. Catches up at REVEAL_CPS.
 	const latest = messages[messages.length - 1];
@@ -238,7 +247,11 @@ export default function AssistantWidget() {
 
 	const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
 		drag.current = { dx: e.clientX - x, dy: e.clientY - y, startX: e.clientX, startY: e.clientY, moved: false };
-		e.currentTarget.setPointerCapture(e.pointerId);
+		try {
+			e.currentTarget.setPointerCapture(e.pointerId);
+		} catch {
+			// No active pointer with that id (lifted mid-event): the drag just can't leave the button.
+		}
 	};
 
 	const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
