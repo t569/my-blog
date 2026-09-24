@@ -74,6 +74,21 @@ async function proxyRequest(request: NextRequest): Promise<NextResponse> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
+
+    // A stream is passed through as it arrives. Reading it with `.text()` like
+    // everything else would hold every event until the backend finished, so a
+    // streamed reply would land in one lump at the end.
+    if (backendResponse.headers.get("content-type")?.startsWith("text/event-stream")) {
+      return new NextResponse(backendResponse.body, {
+        status: backendResponse.status,
+        headers: {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache, no-transform",
+          "x-accel-buffering": "no",
+        },
+      });
+    }
+
     const responseBody = await backendResponse.text();
 
     // Create a NextResponse that mirrors the backend response.

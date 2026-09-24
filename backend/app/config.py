@@ -126,10 +126,30 @@ class Settings(BaseSettings):
         "mechatronics, robotics, and embedded systems"
     )
 
+    # --- Assistant (public chat) ---
+    # Off by default, so a site that never sets it looks exactly as before.
+    # Needs GROQ_API_KEY as well; the two are separate for the same reason as
+    # AGENT_ENABLED — switch it off without deleting a credential.
+    ASSISTANT_ENABLED: bool = False
+    ASSISTANT_NAME: str = "the blog's assistant"
+    # One line of framing for the system prompt. The rest (what the blog is,
+    # which posts exist) is assembled per request.
+    ASSISTANT_PERSONA: str = "a friendly, concise guide to this blog and its posts"
+    # Groq bills per token and the endpoint is public. The per-IP limit is
+    # best-effort (forwarded addresses can be forged by anyone calling the
+    # backend directly); the total is the real ceiling on spend.
+    ASSISTANT_HOURLY_LIMIT_PER_IP: int = 30
+    ASSISTANT_HOURLY_LIMIT_TOTAL: int = 600
+
     @property
     def agent_ready(self) -> bool:
         """Whether the agent pipeline may run — switch on and key present."""
         return self.AGENT_ENABLED and bool(self.GROQ_API_KEY)
+
+    @property
+    def assistant_ready(self) -> bool:
+        """Whether the public chat endpoint answers — switch on and key present."""
+        return self.ASSISTANT_ENABLED and bool(self.GROQ_API_KEY)
 
     @property
     def cloudinary_ready(self) -> bool:
