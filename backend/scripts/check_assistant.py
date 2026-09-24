@@ -94,6 +94,61 @@ try:
 except ValidationError:
     check(True, "an over-long message is rejected")
 
+# ── free answers: no model call ──
+from app.config import settings  # noqa: E402
+from app.services import assistant_shortcuts as sc  # noqa: E402
+
+settings.ASSISTANT_AUTHOR_NAMES = "Ada,Lovelace"
+settings.ASSISTANT_CONTACT = "Write to ada@example.com."
+
+for q in [
+    "Can I hire you for a project?",
+    "What are your rates?",
+    "Is Ada available next month?",
+    "how do I contact the author",
+    "Would he be open to a collaboration?",
+    "What's your e-mail?",
+]:
+    check(sc.answer_without_model(q, has_history=True) == ("author", sc.contact_reply()), f"author-only: {q!r}")
+
+for q in [
+    "How does the job scheduler post work?",
+    "What did the SSD cost in the cloud IDE post?",
+    "Is the source code available?",
+    "Explain modular forms simply.",
+]:
+    check(sc.answer_without_model(q, has_history=False) is None, f"goes to the model: {q!r}")
+
+check(sc.answer_without_model("Hello!", has_history=False)[0] == "smalltalk", "a greeting is free")
+check(sc.answer_without_model("thanks", has_history=True) is None, "mid-conversation small talk still reaches the model")
+check("ada@example.com" in sc.contact_reply(), "the contact line is the configured one")
+
+sc.answer_cache.put(sc.normalize("What is a Klein bottle?"), "A surface with no inside.")
+check(sc.answer_without_model("what is a klein bottle", has_history=False) == ("cached", "A surface with no inside."), "a repeated opening question is answered from cache")
+check(sc.answer_without_model("what is a klein bottle", has_history=True) is None, "but not mid-conversation")
+
+tiny = sc.AnswerCache(max_entries=2)
+for k in ("a", "b", "c"):
+    tiny.put(k, k.upper())
+check(tiny.get("a") is None and tiny.get("c") == "C", "the cache evicts its oldest entry")
+
+# ── characters: what may be stored ──
+from app.services.character_service import clean  # noqa: E402
+
+
+def rejected(raw: dict) -> bool:
+    try:
+        clean(raw)
+    except HTTPException as e:
+        return e.status_code == 422
+    return False
+
+
+check(clean({"assistant": {"style": "personas", "seed": "K"}})["assistant"]["image_url"] is None, "a style-and-seed face is stored")
+check(rejected({"villain": {"style": "personas", "seed": "K"}}), "an unknown character id is refused")
+check(rejected({"assistant": {"style": "personas", "seed": "K", "image_url": "javascript:alert(1)"}}), "a non-https image is refused")
+check(rejected({"assistant": {"style": "../../etc", "seed": "K"}}), "a style that isn't a name is refused")
+
 print()
 if failed:
     print(f"{failed} assistant check(s) failed")

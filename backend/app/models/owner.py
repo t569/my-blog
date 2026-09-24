@@ -25,6 +25,17 @@ class Owner(Base):
         default=dict,
         server_default="{}",
     )
+    # Faces for the chat assistant and the agents, as
+    # {character_id: {style, seed, image_url?}}. Empty = built-in defaults.
+    # Deferred, and with no ORM-side default: it is never in an ordinary
+    # SELECT or INSERT, so every other owner query keeps working on a database
+    # the migration hasn't reached yet. See app/services/character_service.py.
+    characters: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default="{}",
+        deferred=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         default=datetime.now,
         nullable=False,

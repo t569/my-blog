@@ -7,8 +7,10 @@ frame format of ``@t569/ai-assistant``: one JSON object per ``data:`` line,
 next piece of the reply.
 """
 
+import asyncio
 import json
 import logging
+import re
 import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Literal
@@ -24,6 +26,8 @@ from app.config import settings
 from app.db.base import get_db
 from app.middleware.rate_limit import RateLimiter
 from app.models.post import Post
+from app.services import character_service
+from app.services.assistant_shortcuts import answer_cache, answer_without_model, normalize
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +104,42 @@ def _frame(action_status: str, delta: str | None = None) -> str:
     return f"data: {json.dumps(event)}\n\n"
 
 
+_HISTORY_TURNS = 6
+
+
+def _stream_text(text: str) -> StreamingResponse:
+    """A reply that needs no model, streamed word by word.
+
+    Paced like a real reply so the character still visibly speaks — sending it
+    in one frame would make a free answer look like a glitch.
+    """
+
+    async def stream() -> AsyncIterator[str]:
+        yield _frame("processing")
+        for piece in re.findall(r"\S+\s*", text):
+            yield _frame("speaking", piece)
+            await asyncio.sleep(0.03)
+        yield _frame("idle")
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/assistant/profile")
+async def profile(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    """The assistant's face for the public widget — null means the built-in one.
+
+    Only the assistant: the agents' faces are an admin concern.
+    """
+    if not settings.assistant_ready:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    choices, _ = await character_service.get_characters(db)
+    return {cid: choices.get(cid) for cid in character_service.PUBLIC_IDS}
+
+
 @router.post("/assistant/chat")
 async def chat(
     data: ChatRequest,
@@ -110,6 +150,14 @@ async def chat(
     if not settings.assistant_ready:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
+    # Free answers first: they cost no tokens, so they don't spend the limits
+    # either — the limits exist to protect the model bill.
+    free = answer_without_model(data.message, has_history=bool(data.messages))
+    if free:
+        kind, text = free
+        logger.info("[assistant] answered without a model (%s)", kind)
+        return _stream_text(text)
+
     _per_ip.check(request)
     _total.check(request, key="*")
 
@@ -118,7 +166,9 @@ async def chat(
     catalogue = await _post_catalogue(db)
     messages = [
         {"role": "system", "content": _system_prompt(catalogue)},
-        *({"role": t.role, "content": t.content} for t in data.messages),
+        # The last few turns are plenty for a chat about blog posts, and every
+        # turn sent is paid for again on every message.
+        *({"role": t.role, "content": t.content} for t in data.messages[-_HISTORY_TURNS:]),
         {"role": "user", "content": data.message},
     ]
 
@@ -130,20 +180,25 @@ async def chat(
             # separately as `reasoning`, which is never shown — it is the time
             # the character spends "processing". Kept short, and the token
             # budget leaves room for it; other models reject the parameter.
-            reasoning = {"reasoning_effort": "low"} if "gpt-oss" in settings.GROQ_MODEL else {}
+            model = settings.ASSISTANT_MODEL or settings.GROQ_MODEL
+            reasoning = {"reasoning_effort": "low"} if "gpt-oss" in model else {}
             completion = await client.chat.completions.create(
-                model=settings.GROQ_MODEL,
+                model=model,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=0.6,
                 max_tokens=900,
                 stream=True,
                 **reasoning,  # type: ignore[arg-type]
             )
+            reply: list[str] = []
             async for chunk in completion:
                 piece = chunk.choices[0].delta.content if chunk.choices else None
                 if piece:
+                    reply.append(piece)
                     yield _frame("speaking", piece)
             yield _frame("idle")
+            if not data.messages:
+                answer_cache.put(normalize(data.message), "".join(reply))
         except Exception:
             logger.exception("[assistant] chat completion failed")
             yield _frame("failed")

@@ -140,6 +140,15 @@ class Settings(BaseSettings):
     # backend directly); the total is the real ceiling on spend.
     ASSISTANT_HOURLY_LIMIT_PER_IP: int = 30
     ASSISTANT_HOURLY_LIMIT_TOTAL: int = 600
+    # Chat model; empty = GROQ_MODEL. A smaller model is usually plenty for
+    # "which post covers X", and it is the one billed per reader message.
+    ASSISTANT_MODEL: str = ""
+    # Sent, with no model call, when a question is one only the author can
+    # answer (hiring, rates, availability, contact). Empty = "see the footer".
+    ASSISTANT_CONTACT: str = ""
+    # Comma-separated names readers might use for the author, so "is <name>
+    # available?" is recognised as a question for them.
+    ASSISTANT_AUTHOR_NAMES: str = ""
 
     @property
     def agent_ready(self) -> bool:

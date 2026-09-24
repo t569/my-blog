@@ -13,6 +13,7 @@ from app.db.base import async_session_factory, engine
 from app.routers import (
     admin_agent,
     admin_categories,
+    admin_characters,
     admin_comments,
     admin_context,
     admin_features,
@@ -110,6 +111,7 @@ app.include_router(admin_comments.router, prefix=API_V1)
 app.include_router(admin_context.router, prefix=API_V1)
 app.include_router(admin_agent.router, prefix=API_V1)
 app.include_router(admin_features.router, prefix=API_V1)
+app.include_router(admin_characters.router, prefix=API_V1)
 app.include_router(debug.router)
 
 
