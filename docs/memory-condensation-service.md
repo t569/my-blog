@@ -74,15 +74,15 @@ itself).
 
 These block turning this doc into a ticket:
 
-1. **Where does the LangGraph backend run at all?** Nothing in this repo
-   hosts it yet (`backend/` is the Django e-commerce API, unrelated). Until
+1. **Where does the LangGraph backend run at all?** Nothing hosts it
+   yet. Until
    that's decided, "store a JSON profile" can't be pinned to a concrete
    table/service.
 2. **What identifies a shopper across sessions?** `threadId` today is a
    fresh `crypto.randomUUID()` per provider mount (`AiAssistantProvider.tsx`)
    — it does not survive a page reload or identify a logged-in user across
    devices. Condensation needs a stable key; the natural choice is the
-   authenticated user id from the existing Django/JWT session, passed to the
+   authenticated user id from the host's existing session, passed to the
    LangGraph backend some way not yet defined.
 3. **Condensation trigger policy** — event-count threshold, idle-timeout, or
    both? Affects cost (more frequent = more summarization calls) vs.

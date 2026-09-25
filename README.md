@@ -91,43 +91,8 @@ npm run typecheck
 npm run build       # → dist/
 ```
 
-## Migrating Quickuder
-
-Quickuder is where both packages were written. As of the extraction it still
-uses its own in-repo copies (`ai-assistant/`, `scene-engine/`), untouched.
-To switch it to these repositories:
-
-1. **Commit Quickuder's `scene-engine/` first** (and `docs/scene-engine-architecture.md`,
-   `prompts/SCENE_ENGINE.md`). At extraction time they had never been committed.
-   Those are the only copies of that history on that side.
-2. In `frontend-react/package.json`, replace
-   ```json
-   "@quickuder/ai-assistant": "file:../ai-assistant",
-   "@quickuder/scene-engine": "file:../scene-engine",
-   ```
-   with
-   ```json
-   "@t569/ai-assistant": "github:t569/ai-assistant",
-   "@t569/scene-engine": "github:t569/scene-engine",
-   ```
-   (or `git subtree add` them, as my-blog does, if you want to edit them in place).
-3. Rename the imports: `@quickuder/ai-assistant` → `@t569/ai-assistant` and
-   `@quickuder/scene-engine[/dicebear]` → `@t569/scene-engine[/dicebear]`. At
-   extraction the importers were `src/ai-assistant/*`, `src/avatars.ts`,
-   `src/components/ui/SceneCanvas.tsx`, `src/pages/profile/AvatarStudio.tsx`,
-   `src/types/data.d.ts` and `ai-assistant-mock-backend.js`. Re-check with
-   `grep -rl @quickuder/ frontend-react`.
-4. Nothing moved: the commerce provider, components and state machine are still
-   exported from the package root, so the import rename in step 3 is the whole change.
-5. Drop the `build:assistant` / `setup:assistant` / `build:scene` / `setup:scene`
-   scripts and the `prepare` / `predev` / `prebuild` hooks in `frontend-react/package.json`, then delete
-   the two in-repo folders.
-6. `AssistantAvatarScene.tsx` can then use the `character` plugin
-   (`@t569/scene-engine/character`) in place of its local `AvatarNode`. The motion
-   table was lifted from it verbatim.
-
 ## Origin
 
-Written for [Quickuder](https://github.com/yensama7/Quickuder)'s shopping
+Written for [Quickuder](https://quickuder-1.onrender.com/)'s shopping
 assistant, then extracted when a second consumer (a blog mascot and agent-swarm
 view) justified making it generic. MIT.

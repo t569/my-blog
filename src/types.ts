@@ -1,5 +1,5 @@
 /**
- * Boundary contract between Quickuder (host) and @t569/ai-assistant.
+ * Boundary contract between the host app and @t569/ai-assistant.
  * Nothing in this package may import host code; every interaction with the
  * host crosses this file's types. See specifications_and_architecture.md §5.
  */
@@ -35,7 +35,7 @@ export interface LiveAgentHandoff {
   messages: Array<{ role: string; content: string }>;
 }
 
-/** The core contract between the Library and Quickuder. Library calls out; host implements. */
+/** The core contract between the library and the host app. Library calls out; host implements. */
 export interface AssistantCallbacks {
   onCommitItem: (item: Item, quantity: number) => Promise<boolean>;
   onAddToWishlist: (item: Item) => Promise<boolean>;

@@ -21,9 +21,8 @@ Additive: every 0.1 export is unchanged and still at the root.
 
 ## 0.1.0 — extracted
 
-First release as a standalone repository. Extracted unchanged from Quickuder,
-where it drives the shopping assistant. Scope renamed
-`@quickuder/ai-assistant` → `@t569/ai-assistant`.
+First release as a standalone repository, extracted from [Quickuder](https://quickuder-1.onrender.com/)'s
+shopping assistant.
 
 - `createLangGraphRuntime`: zero-computation SSE relay to a LangGraph backend.
 - Table-driven avatar state machine (`AVATAR_STATE_TRANSITIONS`, `resolveAvatarStatus`).
