@@ -119,6 +119,10 @@ style**, and keep blog-specific code out of them.
   changed value needs a *redeploy*, and that is the platform's model, not the
   prefix's: deployments are immutable, so runtime-read env would behave the
   same. `frontend/.env.example` is the checklist of what a host must set.
+- Render deploys `main`, not `dev/t569`, and the local backend migrates the
+  production database. A migration applied locally but not yet on `main` makes
+  the next Render wake fail (`Can't locate revision`). Push it to `main`
+  promptly. See docs/deployment.md, "A migration must reach the deploy branch".
 - Don't rename theme names (`dark`/`light`) casually — `next-themes`, the
   navbar toggle, and BlockNote's `resolvedTheme` all key off them.
 

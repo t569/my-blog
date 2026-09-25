@@ -86,6 +86,27 @@ every wake from sleep, not only on deploy. At head that is one `SELECT` against
 takes ~15s to wake. `preDeployCommand` in `render.yaml` is the upgrade path,
 and it needs a paid instance type.
 
+### A migration must reach the deploy branch before it reaches the database
+
+If `backend/.env` points at the production database, a local `alembic upgrade
+head` stamps it with a revision the deployed code has never seen. Nothing
+breaks right away. The next deploy *or the next wake from sleep* runs `alembic
+upgrade head` with the old code, which fails with `Can't locate revision
+identified by '<id>'`, so the container never starts. Render shows the
+service as failed, and every page that needs the API fails with it. "The previous
+version stays up" only holds until the instance sleeps.
+
+The fix is to push the commit containing the migration to the
+[deploy branch](#4-push-to-deploy); the container then finds the revision and
+starts. Don't downgrade the database to match old code. To stay out of this state:
+
+- Migrate a local or Neon-branch database, not production, while a migration is
+  unmerged.
+- If production was migrated anyway, merge to the deploy branch right away. A
+  push to a feature or dev branch deploys nothing.
+- `alembic current` (against the database) versus `alembic heads` (in the
+  deploy branch's code) shows the mismatch before Render does.
+
 The seeds are still manual, because they are one-time fixtures rather than
 something a push invalidates. Both are idempotent, so re-running is safe:
 
