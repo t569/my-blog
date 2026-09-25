@@ -1,9 +1,9 @@
 # Specifications & Architecture: @t569/ai-assistant
 
 ## 1. System Architecture & Philosophy
-The `@t569/ai-assistant` is a production-grade, framework-agnostic UI and state library engineered specifically for Quickuder. It manages an AI avatar shopping assistant utilizing a Human-in-the-Loop (HITL) progressive autonomy model, where the AI handles recommendations but delegates sensitive cart or financial modifications to human approval.
+The `@t569/ai-assistant` is a production-grade, framework-agnostic UI and state library first built for [Quickuder](https://quickuder-1.onrender.com/). It manages an AI avatar shopping assistant utilizing a Human-in-the-Loop (HITL) progressive autonomy model, where the AI handles recommendations but delegates sensitive cart or financial modifications to human approval.
 
-To maintain a scalable and secure ecosystem, the library operates as a strict "black box." It is completely decoupled from Quickuder's internal routing and state management. All interactions with the core e-commerce engine occur through explicit, heavily typed TypeScript callbacks.
+To maintain a scalable and secure ecosystem, the library operates as a strict "black box." It is completely decoupled from the host's internal routing and state management. All interactions with the core e-commerce engine occur through explicit, heavily typed TypeScript callbacks.
 
 ## 2. Adaptive Behavior & Pattern Learning
 To ensure the assistant dynamically adapts to shifting customer behavior without micro-managing state on the client, the system implements an isolated feedback loop:
@@ -28,7 +28,7 @@ The backend architecture consists of 5 essential nodes that the frontend library
 5.  **`general_response`**: Handles standard product queries without pausing execution.
 
 ## 5. State Boundary Contract
-The assistant communicates exclusively through a rigid boundary layer. Quickuder injects the environment state, and the library emits side effects via lifecycle callbacks.
+The assistant communicates exclusively through a rigid boundary layer. The host injects the environment state, and the library emits side effects via lifecycle callbacks.
 
 ```typescript
 export interface Item {
@@ -65,7 +65,7 @@ export interface LiveAgentHandoff {
   messages: Array<{ role: string; content: string }>;
 }
 
-// The core contract between the Library and Quickuder
+// The core contract between the Library and the host
 export interface AssistantCallbacks {
   onCommitItem: (item: Item, quantity: number) => Promise<boolean>;
   onAddToWishlist: (item: Item) => Promise<boolean>;
@@ -103,7 +103,7 @@ The avatar UI component must react deterministically to the `action_status` upda
 
 ## 8. React & React Native Integration
 * **Context Preservation:** The library must export an `<AiAssistantProvider>` to encapsulate its own state management, thread history, and active animation tracking across both React (web) and React Native (mobile) environments.
-* **Navigation Isolation:** When a user interacts with an AI-recommended product link, the library must strictly fire `onNavigateToProduct`. It must not manage route stacks internally to ensure the Quickuder host application maintains an unbroken navigation back-stack.
+* **Navigation Isolation:** When a user interacts with an AI-recommended product link, the library must strictly fire `onNavigateToProduct`. It must not manage route stacks internally to ensure the host application maintains an unbroken navigation back-stack.
 
 ---
 
@@ -160,7 +160,7 @@ This section tracks implementation phases. Progress can be cross-compiled or man
 ### 11.1 Generalizing beyond e-commerce
 
 Decision made 2026-07-02: aim for a fully generic, publishable package rather
-than a Quickuder-only one. That's a two-tier change, not one:
+than a single-app one. That's a two-tier change, not one:
 
 - **Tier 1 — rename to vertical-neutral terms, keep the shape. DONE.**
   `Product` → `Item` (id/name/price/imageUrl/description still fits retail,
@@ -168,7 +168,7 @@ than a Quickuder-only one. That's a two-tier change, not one:
   `AssistantState.cart` → `AssistantState.selection`, `onAddToCart` →
   `onCommitItem`, `Recommendation.product` → `Recommendation.item`. No new
   abstraction, no behavior change — ships something usable outside
-  Quickuder immediately for any "browse → propose → approve → commit"
+  the original app immediately for any "browse → propose → approve → commit"
   vertical. `onNavigateToProduct`/`onAddToWishlist`/`onApplyPromoCode` were
   left as-is (not part of the agreed rename; still e-commerce-flavored
   naming for a callback that's really domain-agnostic under the hood).
