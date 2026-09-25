@@ -11,7 +11,7 @@ import { dicebearOptions } from "@t569/scene-engine/dicebear";
  *
  * Styles load on demand: the public widget downloads the one style its
  * assistant wears, and only the admin Characters page pulls in the catalogue.
- * Expression picking is ported from Quickuder's `avatarExpressions.ts`.
+ * Expression picking is ported from an earlier shopping-assistant avatar.
  */
 
 export interface CharacterChoice {

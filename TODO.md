@@ -698,7 +698,7 @@ Neon, the env tables for each, and a first-deploy checklist.
 
 ### 7. Karlsefni, the agent swarm, and the scene engine
 
-Extracted from Quickuder into their own repos, pulled back in as subtrees
+Extracted into their own repos, pulled back in as subtrees
 under `frontend/packages/` (see CLAUDE.md → "Packages are subtrees"):
 
 - `@t569/scene-engine` (`D:/Repos/scene-engine`) — SVG scene graph, one clock,
@@ -706,12 +706,11 @@ under `frontend/packages/` (see CLAUDE.md → "Packages are subtrees"):
   of time, `scene.seek`, Manim's rate functions (`smooth` default) + Blender's
   CONSTANT as `step`, `path`/`polyline`/`tex`/`space3d` nodes, a `character`
   plugin, and spec limits. **Four uses, none primary: advertising (it began as
-  Quickuder's campaign heroes), characters, explanations, generated pages.**
+  campaign heroes), characters, explanations, generated pages.**
   Manim code adapted with attribution (MIT); Blender is concepts only (GPL).
 - `@t569/ai-assistant` (`D:/Repos/ai-assistant`) — 0.2 added domain-free
   `useAssistantStream`, `useSwarm` and `createStatusResolver` *beside* the
-  commerce provider, so Quickuder still imports everything from the root. Its
-  README has the Quickuder migration steps.
+  commerce provider, so existing hosts still import everything from the root.
 
 Done:
 - [x] **Karlsefni** — public streaming chat (`POST /assistant/chat`), a
@@ -788,7 +787,6 @@ To do:
       local repos (`gh` isn't installed here: `winget install GitHub.cli`).
 - [ ] Watch a real pipeline run in the swarm view — only tested against a
       scripted stream so far, to avoid writing a draft into the production DB.
-- [ ] Quickuder: switch to the new repos (steps in the ai-assistant README).
 - [ ] Later, on evidence: Karlsefni running the swarm himself (tool calling);
       the scene engine's visual editor and export (see its ROADMAP.md).
 
