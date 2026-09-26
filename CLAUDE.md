@@ -105,6 +105,11 @@ style**, and keep blog-specific code out of them.
   `<SpecScene spec={fn} />` (`src/components/lab/SpecScene.tsx` handles theme
   colours, visibility and cleanup). See `CurvePuzzle.tsx`. Reach for a custom
   component only when React state has to drive the scene (`ModularTiling`).
+- **A simulation is registered in two places, on purpose:** its data in
+  `src/components/lab/registry.ts` (read by the server lab page) and its loader
+  in `src/components/lab/Sim.tsx`. A dynamic `import()` in a module the server
+  imports ships that component with the page. It appears in /lab, in posts as
+  ```` ```sim <id> ````, and in the editor's `/simulation` block.
 - **Upstream (DejusDevspace) never needs them:** everything that uses them is
   off unless an env var turns it on, so a merge leaves his site as it was.
 

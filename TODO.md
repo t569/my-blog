@@ -800,6 +800,54 @@ To do:
 - [ ] Later, on evidence: Karlsefni running the swarm himself (tool calling);
       the scene engine's visual editor and export (see its ROADMAP.md).
 
+### Lab v2 — scene-engine 0.6, deep Mandelbrot, simulations in posts
+
+- [x] **scene-engine 0.6 pulled** (3D on three.js). `three` added as a dependency.
+- [x] **Mandelbrot on the GPU, 10³² deep** — a dive into Seahorse Valley to the
+      period-8007 minibrot, then free exploration to 10⁻³⁴. Perturbation +
+      rebasing + BLA (`lib/mandelbrot.ts`); exact orbits and BLA tables in a Web
+      Worker (`lib/mandelbrot.worker.ts`), so the page never stalls on BigInt.
+      Stripe-average colouring, Blinn-Phong relief, distance-estimate lace.
+      Reference cycles are detected (Brent) and wrapped, and settled interior
+      pixels stop early, so views inside the set are cheap. A work governor
+      (`uGuard`, fed by ThreeNode.frameCost) keeps frames affordable near
+      parabolic points. Check: `npm run check:mandelbrot`.
+- [x] **Lorenz and Laplace on three.js** (ThreeNode): one draw call each,
+      draw-on-demand. FlowField redrawn with fading trails (7 → 55 fps).
+      Modular tiling: one path per ring (560 nodes → 21) and no anti-aliasing
+      while it builds (17 → 54 fps).
+- [x] **`lib/scene.ts` fitCanvas** reset every canvas every frame (cleared it,
+      forced a layout). Now only on a real size change — every canvas figure.
+- [x] **Simulations are a registry** (`components/lab/registry.ts`, data only)
+      shared by /lab, posts and the editor; code per scene in `Sim.tsx`,
+      loaded and mounted one at a time at idle. Keep the loaders out of the
+      registry: the server lab page imports it, and a server module holding
+      `import("./Mandelbrot")` ships every scene (and three.js) with the page.
+- [x] **/lab redesigned** as explorable explanations: hook, live scene, "Try",
+      the mathematics folded in `<details>`.
+- [x] **In posts**: ```` ```sim mandelbrot ```` renders the live scene (lab
+      flag on; otherwise a code block). **In the editor**: `/simulation` block
+      with a picker and live preview, round-tripping through the math-plugin
+      pipeline. Posts with sim fences open raw while the lab is off.
+- [x] **scene-engine, edited in place** (`packages/scene-engine`, CHANGELOG
+      "Unreleased"): `ThreeNode` `minResolution`, `moving()`, `frameCost` (GPU
+      timer queries where available), stepwise affordable sharpening.
+- [ ] **Push the scene-engine changes upstream**:
+      `git subtree push --prefix=frontend/packages/scene-engine scene-engine main`,
+      then run its tests in `D:/Repos/scene-engine` (`npm test`) — not yet run.
+- [ ] **Deeper than 10⁻³⁴** needs each delta as mantissa + exponent in the
+      shader; tried, ~100× slower per iteration on an Iris Plus. Only if a
+      deeper dive is wanted (see the `ponytail:` note in Mandelbrot.tsx).
+- [ ] **Reference at the nearest minibrot nucleus** when exploring (ball-period
+      + Newton, as Kalles Fraktaler does). Removes the remaining stutter near
+      parabolic points (the cusp, Seahorse Valley's neck: frames up to ~0.4 s
+      on an Iris Plus) and the 8× iteration cap for escaped references.
+- [ ] One ~270 ms task at page top while the scenes mount at idle (WebGL
+      context creation, ~150–250 ms each on Windows). Sharing one context
+      across ThreeNodes would remove it; a scene-engine change.
+- [ ] Test a real post with a ```` ```sim ```` fence end to end once the
+      backend is up (checked on a throwaway page; no writes to production).
+
 ---
 
 ## Explicitly skipped

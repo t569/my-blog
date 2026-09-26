@@ -16,7 +16,6 @@ import { observeScene } from "@/lib/scene";
  */
 
 const COUNT = 650;
-const TRAIL = 14;
 
 /** The field: two rotating families of waves, so it has sinks, sources and swirls. */
 function velocity(x: number, y: number, t: number): [number, number] {
@@ -32,13 +31,10 @@ export default function FlowField() {
 	useEffect(() => {
 		const canvas = ref.current;
 		if (!canvas) return;
-		// Positions in field units, over a 12 × 7 window; each with its recent trail.
+		// Positions in field units, over a 12 × 7 window.
 		const W = 12;
 		const H = 7;
-		const trails = Array.from({ length: COUNT }, () => {
-			const p = { x: Math.random() * W, y: Math.random() * H };
-			return Array.from({ length: TRAIL }, () => ({ ...p }));
-		});
+		const pts = Float64Array.from({ length: COUNT * 2 }, (_, i) => Math.random() * (i % 2 ? H : W));
 		let last = 0;
 
 		const handle = observeScene(canvas, {
@@ -46,34 +42,35 @@ export default function FlowField() {
 			draw: ({ ctx, width, height, palette, time }) => {
 				const dt = Math.min(0.05, Math.max(0, time - last));
 				last = time;
+				// Trails without storing them: the last frame fades a little, and only each
+				// particle's newest step is drawn, in one stroke. Cheap on any GPU.
+				ctx.globalAlpha = 0.09;
 				ctx.fillStyle = palette.surface;
 				ctx.fillRect(0, 0, width, height);
+				ctx.globalAlpha = 0.8;
+				ctx.strokeStyle = palette.accent;
+				ctx.lineWidth = 1.4;
+				ctx.lineCap = "round";
+				ctx.beginPath();
 				const sx = width / W;
 				const sy = height / H;
-				ctx.strokeStyle = palette.accent;
-				ctx.lineCap = "round";
-				for (const trail of trails) {
-					const head = trail[0]!;
-					const [vx, vy] = velocity(head.x, head.y, time);
-					const next = { x: head.x + vx * dt * 0.9, y: head.y + vy * dt * 0.9 };
+				for (let i = 0; i < pts.length; i += 2) {
+					const [x, y] = [pts[i]!, pts[i + 1]!];
+					const [vx, vy] = velocity(x, y, time);
+					const nx = x + vx * dt * 0.9;
+					const ny = y + vy * dt * 0.9;
 					// Leaving the window, or a very old particle, respawns somewhere random.
-					if (next.x < 0 || next.x > W || next.y < 0 || next.y > H || Math.random() < 0.002) {
-						const p = { x: Math.random() * W, y: Math.random() * H };
-						for (const q of trail) Object.assign(q, p);
+					if (nx < 0 || nx > W || ny < 0 || ny > H || Math.random() < 0.002) {
+						pts[i] = Math.random() * W;
+						pts[i + 1] = Math.random() * H;
 						continue;
 					}
-					trail.pop();
-					trail.unshift(next);
-					// Older segments fainter: the trail fades behind the particle.
-					for (let i = 0; i < trail.length - 1; i++) {
-						ctx.globalAlpha = 0.75 * (1 - i / trail.length);
-						ctx.lineWidth = 1.6 * (1 - i / trail.length) + 0.3;
-						ctx.beginPath();
-						ctx.moveTo(trail[i]!.x * sx, trail[i]!.y * sy);
-						ctx.lineTo(trail[i + 1]!.x * sx, trail[i + 1]!.y * sy);
-						ctx.stroke();
-					}
+					ctx.moveTo(x * sx, y * sy);
+					ctx.lineTo(nx * sx, ny * sy);
+					pts[i] = nx;
+					pts[i + 1] = ny;
 				}
+				ctx.stroke();
 				ctx.globalAlpha = 1;
 			},
 		});

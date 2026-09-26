@@ -139,6 +139,14 @@ export default function PostEditorClient({
 		[features],
 	);
 
+	/** The plugins the rich editor will run: switched-on features, plus the two not behind a
+	 *  feature switch (see activePlugins in editor/plugins/registry.ts, not imported here so
+	 *  BlockNote stays out of this chunk). What needsRawEditor must judge content against. */
+	const activePluginIds = useMemo(
+		() => [...enabledFeatures, "inline_math", ...(SITE.lab ? ["simulation"] : [])],
+		[enabledFeatures],
+	);
+
 	// Which editor is safe depends on which math plugins are switched on, so
 	// this stays null until the switches have loaded — opening one and swapping
 	// would mean guessing, and guessing wrong sends a post to an editor that
@@ -152,7 +160,7 @@ export default function PostEditorClient({
 		modeOverride ??
 		(features === undefined
 			? null
-			: needsRawEditor(initialData.content || "", enabledFeatures)
+			: needsRawEditor(initialData.content || "", activePluginIds)
 				? "raw"
 				: "rich");
 
@@ -681,7 +689,7 @@ export default function PostEditorClient({
 										</button>
 									))}
 								</div>
-								{needsRawEditor(data.content, enabledFeatures) && (
+								{needsRawEditor(data.content, activePluginIds) && (
 									<p className="font-mono text-[0.65rem] leading-snug text-text-tertiary">
 										{enabledFeatures.includes("display_math") ? (
 											<>

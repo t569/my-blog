@@ -54,6 +54,9 @@ export const DISPLAY_MATH = /(?<!\\)\$\$[ \t]*\r?\n([\s\S]+?)\r?\n[ \t]*\$\$/g;
  */
 export const FENCED_MATH = /```math[ \t]*\r?\n([\s\S]+?)\r?\n```/g;
 
+/** ```sim fence: a live simulation by id (components/lab/registry.ts). Same shape, same handling. */
+export const SIM_FENCE = /```sim[ \t]*\r?\n([\s\S]+?)\r?\n```/g;
+
 /**
  * `$$…$$` kept to a single line, which remark-math parses as *inline* math.
  *
@@ -124,8 +127,8 @@ const CODE_TOKEN = /\uE002(\d+)\uE003/g;
  */
 const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|(`+)[^`\n]+\1/g;
 
-/** A fence that is really display math, and so must survive masking intact. */
-const MATH_FENCE = /^```math[ \t]*\r?\n/;
+/** A fence a plugin claims (display math, a simulation), and so must survive masking intact. */
+const MATH_FENCE = /^```(?:math|sim)[ \t]*\r?\n/;
 
 /** Hides code from the math patterns, and hands back the key to put it back. */
 function maskCode(markdown: string): { text: string; code: string[] } {
@@ -290,6 +293,9 @@ export function needsRawEditor(
 	const { text } = maskCode(markdown);
 
 	if (UNSUPPORTED_MATH.test(text)) return true;
+	// A ```sim fence the simulation plugin isn't there to claim would become a code
+	// block, and come back out without its `sim` label.
+	if (!activePluginIds.includes("simulation") && new RegExp(SIM_FENCE.source).test(text)) return true;
 	if (activePluginIds.includes("display_math")) return false;
 	// Anything the display plugin would have claimed still forces the textarea
 	// while it is switched off. INLINE_DOUBLE_MATH is deliberately not in this

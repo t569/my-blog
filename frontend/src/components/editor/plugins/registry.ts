@@ -9,6 +9,8 @@ import {
 } from "@/lib/math";
 import { displayMathPlugin } from "./displayMath";
 import { inlineMathPlugin } from "./inlineMath";
+import { simulationPlugin } from "./simulation";
+import { SITE } from "@/lib/constants";
 import type { MathPlugin } from "./types";
 
 /** Every plugin that exists. What is *active* is decided by the feature
@@ -16,6 +18,7 @@ import type { MathPlugin } from "./types";
 export const ALL_PLUGINS: readonly MathPlugin[] = [
 	displayMathPlugin,
 	inlineMathPlugin,
+	simulationPlugin,
 ];
 
 /**
@@ -23,13 +26,19 @@ export const ALL_PLUGINS: readonly MathPlugin[] = [
  *
  * `inline_math` is unconditional: it shipped before the switch existed and is
  * not something the owner opted into, so it has no registry entry to consult.
- * Everything else must be explicitly enabled.
+ * `simulation` follows NEXT_PUBLIC_SITE_LAB. Everything else must be explicitly
+ * enabled.
  */
 export function activePlugins(
 	enabledFeatureIds: readonly string[],
 ): MathPlugin[] {
-	return ALL_PLUGINS.filter(
-		(p) => p.id === "inline_math" || enabledFeatureIds.includes(p.id),
+	return ALL_PLUGINS.filter((p) =>
+		p.id === "inline_math"
+			? true
+			: // Simulations follow the lab's own switch, like the fences in posts.
+				p.id === "simulation"
+				? SITE.lab
+				: enabledFeatureIds.includes(p.id),
 	).sort((a, b) => a.order - b.order);
 }
 
@@ -173,8 +182,11 @@ export function composePlugins(plugins: MathPlugin[]) {
 						(p) => p.kind === "block" && block.type in (p.blockSpecs ?? {}),
 					);
 					if (owner) {
+						// A one-form plugin names its source; display math has two.
 						const source =
-							block.props?.form === "fence" ? "fenced" : "display";
+							owner.patterns.length === 1
+								? owner.patterns[0].id
+								: block.props?.form === "fence" ? "fenced" : "display";
 						items.push({ source, latex: block.props?.latex ?? "" });
 						return {
 							type: "paragraph",

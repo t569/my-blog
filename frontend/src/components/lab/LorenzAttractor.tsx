@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { BaseObject, Scene, Space3D, type CurveItem, type Vec3 } from "@t569/scene-engine";
+import { Scene } from "@t569/scene-engine";
+import { ThreeNode } from "@t569/scene-engine/three";
+import { BufferAttribute, BufferGeometry, Color, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, SphereGeometry } from "three";
 import { runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
+
+type Vec3 = [number, number, number];
 
 /**
  * The Lorenz attractor: one path through a 3D vector field.
@@ -13,6 +17,9 @@ import { runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
  * never settles and never repeats, yet never leaves the butterfly. The path is
  * integrated once (RK4) and then drawn as a function of time, so the scene
  * seeks like any other.
+ *
+ * On the GPU (ThreeNode): all 9000 points are one line, revealed by draw
+ * range, so a frame costs one draw call and no geometry work.
  */
 
 const SIGMA = 10;
@@ -46,16 +53,8 @@ function integrate(n: number, h: number): Vec3[] {
 const PATH = integrate(9000, 0.006);
 const DRAW = 24; // seconds to draw the whole path
 const HOLD = 6; // then hold, then start again
-
-class Drawing extends BaseObject {
-	constructor(private readonly item: CurveItem) {
-		super(null);
-	}
-	override onUpdate(dt: number, t: number): void {
-		super.onUpdate(dt, t);
-		this.item.draw = Math.min(1, (t % (DRAW + HOLD)) / DRAW);
-	}
-}
+const W = 640;
+const H = 420;
 
 export default function LorenzAttractor() {
 	const hostRef = useRef<HTMLDivElement>(null);
@@ -64,38 +63,46 @@ export default function LorenzAttractor() {
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
-		const { accent } = themeColors(host);
-		const W = 640;
-		const H = 420;
+		const { accent, muted } = themeColors(host);
 		const scene = new Scene({ width: W, height: H }, host);
-		const space = new Space3D({ x: W / 2, y: H / 2, orbit: true, spin: 0.12, camera: { yaw: 0.4, pitch: 0.25, zoom: 58 }, bands: 12 });
-		const curve: CurveItem = {
-			kind: "curve",
-			// t ∈ [0, 1] over the stored path; linear between samples.
-			f: (t) => {
-				const x = t * (PATH.length - 1);
-				const i = Math.min(PATH.length - 2, Math.floor(x));
-				const a = PATH[i]!;
-				const b = PATH[i + 1]!;
-				const k = x - i;
-				return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-			},
-			t: [0, 1],
-			steps: 3000,
-			stroke: accent,
-			strokeWidth: 1,
-			draw: 0,
-		};
-		space.add(curve);
-		scene.add(new Drawing(curve));
-		scene.add(space);
+		const view = new ThreeNode({ x: W / 2, y: H / 2, width: W, height: H, shadows: "none", fov: 35 });
+		scene.add(view);
+
+		// z up in the equations, y up on screen: the butterfly stands on its tail.
+		const pos = new Float32Array(PATH.flatMap(([x, y, z]) => [x, z, y]));
+		// Older path in the muted ink, newest in the accent: time reads as colour.
+		const [from, to] = [new Color(muted), new Color(accent)];
+		const col = new Float32Array(PATH.length * 3);
+		const c = new Color();
+		for (let i = 0; i < PATH.length; i++) c.lerpColors(from, to, (i / PATH.length) ** 2).toArray(col, i * 3);
+		const geometry = new BufferGeometry();
+		geometry.setAttribute("position", new BufferAttribute(pos, 3));
+		geometry.setAttribute("color", new BufferAttribute(col, 3));
+		const head = new Mesh(new SphereGeometry(0.07, 12, 8), new MeshBasicMaterial({ color: to }));
+		view.world.add(new Line(geometry, new LineBasicMaterial({ vertexColors: true })), head);
+
+		view.camera.position.set(4.2, 1.2, 8.5);
+		const controls = view.orbit([0, 0, 0]);
+		controls.autoRotate = true;
+		controls.autoRotateSpeed = 0.7;
+		controls.enablePan = false;
+
+		let drawn = -1;
+		view.onFrame((_, t) => {
+			const k = Math.max(2, Math.round(Math.min(1, (t % (DRAW + HOLD)) / DRAW) * PATH.length));
+			if (k === drawn) return false;
+			drawn = k;
+			geometry.setDrawRange(0, k);
+			head.position.fromArray(pos, (k - 1) * 3);
+			return true;
+		});
 		scene.seek(DRAW * 0.6);
 		const stop = runWhileVisible(host, scene);
 		return () => {
 			stop();
-			scene.destroy();
+			scene.destroy(); // ThreeNode frees the geometry, materials and GL context
 		};
 	}, [themeKey]);
 
-	return <div ref={hostRef} className="w-full cursor-grab" style={{ aspectRatio: "640 / 420" }} />;
+	return <div ref={hostRef} className="w-full cursor-grab" style={{ aspectRatio: `${W} / ${H}` }} />;
 }

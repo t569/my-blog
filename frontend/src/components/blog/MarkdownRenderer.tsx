@@ -10,6 +10,9 @@ import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import "katex/dist/katex.min.css";
 import { Check, Copy } from "lucide-react";
+import { SITE } from "@/lib/constants";
+import Sim from "@/components/lab/Sim";
+import { simById } from "@/components/lab/registry";
 // No vendored highlight.js stylesheet: those hardcode one palette, so code
 // blocks stayed dark in light mode. The .hljs-* classes are styled from theme
 // tokens in globals.css instead.
@@ -25,6 +28,23 @@ const Pre = ({ children, ...props }: any) => {
 		if (match) {
 			language = match[1];
 		}
+	}
+
+	// ```sim mandelbrot``` → the live simulation. With the lab off, or an id that
+	// doesn't exist, it stays a code block: the source shows, nothing breaks.
+	const sim = language === "sim" && SITE.lab ? simById(String(children?.props?.children ?? "")) : undefined;
+	if (sim) {
+		return (
+			<figure className="my-8">
+				<Sim id={sim.id} />
+				<figcaption className="mt-2 font-mono text-xs text-text-tertiary">
+					{sim.title} ·{" "}
+					<a href={`/lab#${sim.id}`} className="text-accent hover:underline">
+						open in the lab
+					</a>
+				</figcaption>
+			</figure>
+		);
 	}
 
 	const handleCopy = () => {

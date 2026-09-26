@@ -105,9 +105,11 @@ export function fitCanvas(
 		? Math.round(width / aspect)
 		: canvas.clientHeight || 340;
 
-	if (aspect) canvas.style.height = `${height}px`;
-	canvas.width = Math.round(width * dpr);
-	canvas.height = Math.round(height * dpr);
+	// Write only on a real change. Called every frame, and assigning canvas.width —
+	// even the same value — reallocates and clears the canvas and forces a layout.
+	if (aspect && canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
+	const [w, h] = [Math.round(width * dpr), Math.round(height * dpr)];
+	if (canvas.width !== w || canvas.height !== h) [canvas.width, canvas.height] = [w, h];
 
 	const ctx = canvas.getContext("2d");
 	if (!ctx) return null;

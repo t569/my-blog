@@ -315,6 +315,9 @@ const rawCases: [string, string[], boolean, string][] = [
 	["\\(y\\)", ["display_math"], true, "no plugin renders these, ever"],
 	["\\[z\\]", ["display_math"], true, "same"],
 	["plain prose", [], false, "nothing to protect"],
+	["```sim\nmandelbrot\n```", ["simulation"], false, "a simulation with its plugin on"],
+	["```sim\nmandelbrot\n```", [], true, "a simulation with it off would lose its `sim` label"],
+	["```sim\nmandelbrot\n```", ["display_math"], true, "display math doesn't claim it either"],
 ];
 
 for (const [md, active, expected, why] of rawCases) {

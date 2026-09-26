@@ -13,8 +13,8 @@ import { prefersReducedMotion, runWhileVisible, themeColors, useThemeKey } from 
  * the picture behind modular forms, Marginalia vol. 1.
  *
  * Built as data: a breadth-first walk over words in S, T, T⁻¹ produces the
- * images ring by ring; each becomes a `polyline` whose stroke *draws itself*
- * (`animate.draw`) when its ring's turn comes. The whole construction is a
+ * images ring by ring; each ring becomes one path whose stroke *draws itself*
+ * (`animate.draw`) when its turn comes. The whole construction is a
  * function of time, so the slider seeks it.
  */
 
@@ -126,22 +126,30 @@ export default function ModularTiling() {
 		const list = tiles(9, view, 2 / SCALE);
 		setCount(list.length);
 
+		// One path per ring and shade, every tile of it a subpath: ~20 nodes, not 560. Each SVG node
+		// is rasterised on its own, and 560 animated ones held the page near 17 fps while it built.
+		const groups = new Map<string, { ring: number; shaded: boolean; d: string }>();
+		for (const tile of list) {
+			const k = `${tile.ring}${tile.shaded}`;
+			const g = groups.get(k) ?? { ring: tile.ring, shaded: tile.shaded, d: "" };
+			g.d += "M" + tile.pts.map((p) => toScene(p).map((v) => v.toFixed(1)).join(" ")).join("L") + "Z";
+			groups.set(k, g);
+		}
 		const objects: NodeSpec[] = [
 			// The real axis: where every tile's cusps land.
 			{ type: "path", d: `M0 ${H - 18} L${W} ${H - 18}`, stroke: muted, strokeWidth: 1 },
-			...list.map(
-				(tile): NodeSpec => ({
-					type: "polyline",
-					points: tile.pts.map(toScene),
-					closed: true,
-					fill: tile.shaded ? accent : "transparent",
+			...[...groups.values()].map(
+				(g): NodeSpec => ({
+					type: "path",
+					d: g.d,
+					fill: g.shaded ? accent : "transparent",
 					stroke: text,
 					strokeWidth: 0.5,
 					draw: 0,
 					opacity: 0,
 					animate: {
-						draw: [{ at: tile.ring * RING_GAP, dur: 0.9, to: 1 }],
-						opacity: [{ at: tile.ring * RING_GAP, dur: 0.6, to: tile.shaded ? 0.42 : 0.85 }],
+						draw: [{ at: g.ring * RING_GAP, dur: 0.9, to: 1 }],
+						opacity: [{ at: g.ring * RING_GAP, dur: 0.6, to: g.shaded ? 0.42 : 0.85 }],
 					},
 				}),
 			),
@@ -153,12 +161,16 @@ export default function ModularTiling() {
 			scene.seek(DURATION); // the finished picture, no construction
 		} else {
 			scene.seek(0);
+			// No anti-aliasing while it builds: raster was the cost (28 → 54 fps); crisp once it's done.
+			const svg = host.querySelector("svg");
+			svg?.setAttribute("shape-rendering", "optimizeSpeed");
 			// Builds itself when scrolled to, not on page load.
 			const stopWatching = runWhileVisible(host, scene);
 			// Keep the slider in step while it plays, then hand time over to it.
 			const tick = setInterval(() => {
 				setT(Math.min(DURATION, scene.elapsed));
 				if (scene.elapsed >= DURATION) {
+					svg?.removeAttribute("shape-rendering");
 					stopWatching();
 					scene.stop();
 					clearInterval(tick);
@@ -191,7 +203,8 @@ export default function ModularTiling() {
 					onChange={(e) => {
 						const v = Number(e.target.value);
 						setT(v);
-						// Scrubbing takes time over from the clock for good.
+						// Scrubbing takes time over from the clock for good, and draws crisp.
+						hostRef.current?.querySelector("svg")?.removeAttribute("shape-rendering");
 						sceneRef.current?.stop();
 						sceneRef.current?.seek(v);
 					}}
