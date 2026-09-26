@@ -194,7 +194,9 @@ hence doing the theme split *before* restyling, so both can coexist.
       `system` over any `defaultTheme` while that flag is on. The toggle still
       overrides and is remembered, so pinning never makes a mode unreachable.
       Verified in the built bundle: `skin:"garden",theme:"light"` is inlined.
-- [ ] Post cards get a cover-image slot (both references lead with visuals)
+- [x] ~~Post cards get a cover-image slot~~ — done by the panels feed
+      (`NEXT_PUBLIC_SITE_FEED=panels`): `lead`/`image` cards lead with
+      `Post.cover_image`. The default `list` card stays upstream's, without one.
 
 ### 2. Math notation (KaTeX)
 My Quartz already runs `Plugin.Latex({ renderEngine: "katex" })`, so existing
@@ -758,9 +760,9 @@ To do:
       invisible to it), each linking to its exact section. Unchanged pages
       cost nothing on rebuild. Admin → Knowledge shows it and rebuilds it.
       Karlsefni searches it. Check: `python -m scripts.check_site_index`.
-- [ ] Deploy (migration `5d1b7c9e2a31` runs), then Admin → Knowledge → Rebuild.
-      No setting needed: it crawls the site it's pressed from (Origin, confirmed by
-      Vercel's x-forwarded-host; CORS_ORIGINS for local dev).
+- [x] Deployed (migration `5d1b7c9e2a31`). The rebuild crawls the site it's
+      pressed from (Origin, confirmed by Vercel's x-forwarded-host; CORS_ORIGINS
+      for local dev), so no setting is needed.
 - [x] **The constellation** (`NEXT_PUBLIC_SITE_CONSTELLATION=true`, off by
       default): pages and their sections as stars on /constellation, drawn by
       scene-engine's graph plugin from `GET /constellation`. Lines: part
@@ -769,8 +771,11 @@ To do:
       embedding, cosine ≥ 0.45). No model calls; cached 10 min, cleared on
       rebuild. Karlsefni's answers send their sources first, and the stars he
       read from light up. Check: `python -m scripts.check_site_index`.
-- [ ] Deploy (migration `8e4f2a6c1b90` adds `site_links`), then Rebuild once so
-      links get recorded — until then the graph shows only part/similar lines.
+- [x] Deployed — `/health` reports `7be15f5`, so `5d1b7c9e2a31` and
+      `8e4f2a6c1b90` both ran.
+- [ ] **Admin → Knowledge → Rebuild, once.** As of 2026-09-25 the live
+      constellation has 55 part + 56 similar edges and **0 link edges**, so
+      `site_links` is still empty.
 - [ ] The posts index's 750-word chunks (search bar) have the same truncation
       problem — upstream's code; worth a PR: ~150 words and a re-backfill.
 - [ ] **Run the migration**: `alembic upgrade head` in `backend/` (adds
@@ -783,8 +788,13 @@ To do:
 - [ ] Set the new `ASSISTANT_*` / `NEXT_PUBLIC_ASSISTANT_*` / `NEXT_PUBLIC_SITE_LAB` /
       `NEXT_PUBLIC_SITE_FEED`
       values on Render and Vercel (see both `.env.example` files).
-- [ ] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub and push the
-      local repos (`gh` isn't installed here: `winget install GitHub.cli`).
+- [ ] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub (empty, no
+      README) and `git push -u origin main` from each local repo. The remotes are
+      already wired: `origin` in each package repo, and `scene-engine` /
+      `ai-assistant` in this one.
+- [x] **`SpecScene`** — one component mounts any data-only scene (theme,
+      on-screen-only play, reduced-motion still frame). CurvePuzzle and AdBanner
+      use it now, so a new custom scene is just a spec function.
 - [ ] Watch a real pipeline run in the swarm view — only tested against a
       scripted stream so far, to avoid writing a draft into the production DB.
 - [ ] Later, on evidence: Karlsefni running the swarm himself (tool calling);

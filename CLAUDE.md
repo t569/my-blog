@@ -92,13 +92,19 @@ style**, and keep blog-specific code out of them.
 - **Wired by tsconfig `paths`**, straight to `src/`. No build step, no `file:`
   dependency, no lockfile change. Their sources import `./x.ts` (rewritten to
   `.js` only in their own `dist/`) because Turbopack won't map `.js` → `.ts`.
-- **Edit in place, then send upstream:**
+- **Edit in place, then send upstream.** Each package is a named remote here
+  (`scene-engine`, `ai-assistant`); the standalone clones at `D:/Repos/<name>`
+  push to the same GitHub repos as `origin`.
   ```bash
-  git subtree push --prefix=frontend/packages/scene-engine <scene-engine remote> main
-  git subtree pull --prefix=frontend/packages/scene-engine <scene-engine remote> main --squash
+  git subtree push --prefix=frontend/packages/scene-engine scene-engine main
+  git subtree pull --prefix=frontend/packages/scene-engine scene-engine main --squash
   ```
   Same for `ai-assistant`. Run their tests in their own repo (`npm test`); the
   blog's `tsc` excludes `packages/**/*.test.ts`.
+- **A new scene that is only data** is a spec function plus
+  `<SpecScene spec={fn} />` (`src/components/lab/SpecScene.tsx` handles theme
+  colours, visibility and cleanup). See `CurvePuzzle.tsx`. Reach for a custom
+  component only when React state has to drive the scene (`ModularTiling`).
 - **Upstream (DejusDevspace) never needs them:** everything that uses them is
   off unless an env var turns it on, so a merge leaves his site as it was.
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { parseScene, type SceneSpec } from "@t569/scene-engine";
-import { runWhileVisible, themeColors, useThemeKey, type SceneColors } from "@/lib/sceneTheme";
+import type { SceneSpec } from "@t569/scene-engine";
+import type { SceneColors } from "@/lib/sceneTheme";
+import SpecScene from "./SpecScene";
 
 /**
  * A Brilliant-style puzzle, written only as scene-engine JSON.
@@ -42,19 +42,5 @@ export function puzzleSpec(c: SceneColors): SceneSpec {
 }
 
 export default function CurvePuzzle() {
-	const hostRef = useRef<HTMLDivElement>(null);
-	const themeKey = useThemeKey();
-
-	useEffect(() => {
-		const host = hostRef.current;
-		if (!host) return;
-		const scene = parseScene(puzzleSpec(themeColors(host)), host);
-		const stop = runWhileVisible(host, scene);
-		return () => {
-			stop();
-			scene.destroy();
-		};
-	}, [themeKey]);
-
-	return <div ref={hostRef} className="w-full" style={{ aspectRatio: "640 / 420" }} />;
+	return <SpecScene spec={puzzleSpec} />;
 }

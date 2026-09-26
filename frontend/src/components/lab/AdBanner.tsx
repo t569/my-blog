@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { parseScene, type SceneSpec } from "@t569/scene-engine";
-import { prefersReducedMotion, runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
+import { useMemo } from "react";
+import type { SceneSpec } from "@t569/scene-engine";
+import SpecScene from "./SpecScene";
 
 /**
  * A campaign banner that is only data.
@@ -41,21 +41,6 @@ export function bannerSpec(c: { text: string; accent: string; surface: string })
 }
 
 export default function AdBanner() {
-	const hostRef = useRef<HTMLDivElement>(null);
-	const themeKey = useThemeKey();
-
-	useEffect(() => {
-		const host = hostRef.current;
-		if (!host) return;
-		const scene = parseScene(bannerSpec(themeColors(host)), host);
-		if (prefersReducedMotion()) scene.seek(2); // mid-loop: everything on screen, nothing moving
-		const stop = runWhileVisible(host, scene);
-		return () => {
-			stop();
-			scene.destroy();
-		};
-	}, [themeKey]);
-
 	// Shown verbatim beside the banner: the point is that this is all there is.
 	const json = useMemo(
 		() => JSON.stringify(bannerSpec({ text: "…", accent: "…", surface: "…" }), null, 1).replace(/\n\s*/g, " "),
@@ -64,7 +49,8 @@ export default function AdBanner() {
 
 	return (
 		<figure className="m-0">
-			<div ref={hostRef} className="w-full overflow-hidden rounded-xl border border-border-subtle" style={{ aspectRatio: "900 / 260" }} />
+			{/* still at 2s: mid-loop, everything on screen, nothing moving */}
+			<SpecScene spec={bannerSpec} still={2} className="w-full overflow-hidden rounded-xl border border-border-subtle" />
 			<details className="mt-3">
 				<summary className="cursor-pointer font-mono text-xs text-text-tertiary">the whole ad, as JSON</summary>
 				<pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg-elevated p-3 font-mono text-[0.7rem] text-text-secondary">
