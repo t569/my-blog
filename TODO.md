@@ -788,7 +788,7 @@ To do:
 - [ ] Set the new `ASSISTANT_*` / `NEXT_PUBLIC_ASSISTANT_*` / `NEXT_PUBLIC_SITE_LAB` /
       `NEXT_PUBLIC_SITE_FEED`
       values on Render and Vercel (see both `.env.example` files).
-- [ ] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub (empty, no
+- [x] Create `t569/scene-engine` and `t569/ai-assistant` on GitHub (empty, no
       README) and `git push -u origin main` from each local repo. The remotes are
       already wired: `origin` in each package repo, and `scene-engine` /
       `ai-assistant` in this one.
@@ -832,6 +832,11 @@ To do:
 - [x] **scene-engine, edited in place** (`packages/scene-engine`, CHANGELOG
       "Unreleased"): `ThreeNode` `minResolution`, `moving()`, `frameCost` (GPU
       timer queries where available), stepwise affordable sharpening.
+- [x] **Card art** (Axiom-style): posts without a cover get a seeded, slowly
+      turning polyhedron (`feed/PostArt.tsx`, a pure spec). Lead card: in the
+      picture slot; text panels: a small mark beside the title. Needed the
+      engine's new `space3d` polyhedra (`tetrahedron` … `dodecahedron`).
+      Text-panel variant untested live: production has one post.
 - [ ] **Push the scene-engine changes upstream**:
       `git subtree push --prefix=frontend/packages/scene-engine scene-engine main`,
       then run its tests in `D:/Repos/scene-engine` (`npm test`) — not yet run.

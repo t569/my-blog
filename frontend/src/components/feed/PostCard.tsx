@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Clock, Layers } from "lucide-react";
 import type { PostListItem } from "@/types";
+import PostArt from "./PostArt";
 
 /**
  * How a card sits in the feed.
@@ -36,6 +37,8 @@ const SPAN: Record<CardVariant, string> = {
 export default function PostCard({ post, variant = "list" }: PostCardProps) {
 	const cover = variant !== "list" && variant !== "text" ? post.cover_image : null;
 	const lead = variant === "lead";
+	// Panels only: a lead story without a picture, and the compact text panels, get a figure.
+	const art = !cover && (lead || variant === "text");
 
 	return (
 		// data-flip-key lets the feed animate this card between filter states
@@ -45,7 +48,7 @@ export default function PostCard({ post, variant = "list" }: PostCardProps) {
 			data-flip-key={post.id}
 			data-variant={variant}
 			className={`post-card group relative flex overflow-hidden rounded-xl border border-border-subtle bg-bg-surface transition-colors duration-300 hover:border-border-default ${SPAN[variant]} ${
-				lead && cover ? "flex-col md:flex-row" : "flex-col"
+				lead && (cover || art) ? "flex-col md:flex-row" : "flex-col"
 			}`}
 		>
 			{cover && (
@@ -62,6 +65,11 @@ export default function PostCard({ post, variant = "list" }: PostCardProps) {
 						decoding="async"
 						className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
 					/>
+				</div>
+			)}
+			{art && lead && (
+				<div className="relative aspect-[16/9] shrink-0 bg-bg-elevated md:aspect-auto md:w-1/2">
+					<PostArt seed={post.slug} className="absolute inset-0 h-full w-full" />
 				</div>
 			)}
 
@@ -99,6 +107,7 @@ export default function PostCard({ post, variant = "list" }: PostCardProps) {
 
 				{/* Title & Excerpt */}
 				<div className="flex-1">
+					{art && !lead && <PostArt seed={post.slug} className="float-right -mt-1 ml-3 w-20" />}
 					<h2
 						className={`mb-2 font-display font-semibold text-text-primary transition-colors group-hover:text-accent ${
 							lead ? "line-clamp-3 text-h2 leading-tight" : "line-clamp-2 text-h4"
