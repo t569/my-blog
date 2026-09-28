@@ -76,7 +76,7 @@ export const SIMS: Sim[] = [
 		id: "delta",
 		title: "A modular form as a landscape",
 		hook: "One function, the same hills on every tile, forever shrinking toward the edge.",
-		tryThis: "Drag to fly around it. Every tile of the tiling above holds a copy of the same terrain.",
+		tryThis: "Scroll: the camera flies down over the central tiles and out to the rim, where the copies crowd. Every tile of the tiling above holds the same terrain.",
 		maths:
 			"The discriminant Δ(z) = q∏(1 − qⁿ)²⁴, q = e^{2πiz}, is a modular form of weight 12: Δ((az + b)/(cz + d)) = (cz + d)¹²Δ(z). So y⁶|Δ(z)| is unchanged by the whole modular group, and plotted as height it repeats across every tile. Drawn on the Poincaré disk, the cusps become points on the rim, where the terrain sinks flat. Colour is the phase of Δ. Each point is moved into the fundamental domain first, where |q| < 0.005 and eight factors of the product are exact.",
 		aspect: 640 / 440,

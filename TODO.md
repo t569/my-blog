@@ -869,10 +869,28 @@ solver, bloom/post chain, zero-GC frames, workers.
       carried back; agrees with the raw product to 1e-14 (`npm run check:modular`).
       Hills scaled by 1 − r² so the copies shrink with their tiles.
       Built on the CPU once (~200 ms at idle, 130k points), then a static mesh.
-- [ ] **Phase 2: glow and flight.** Engine: bloom/post chain on `ThreeNode`;
-      a scroll → `scene.seek` helper. Scene: camera flies through the terrain
-      as you scroll; evaluation moves to a shader (detail on demand) or a Worker.
-      A real phase palette once bloom can carry it (the theme ramp reads monochrome).
+- [~] **Phase 2: glow and flight** — built, verified in the browser, paused
+      2026-09-28 mid-wrap-up. Done:
+      - Engine: `ThreeNode` `bloom: { strength, radius, threshold }`. three's
+        EffectComposer + UnrealBloomPass + OutputPass, **imported only when set**
+        (ads pay nothing); sized with the resolution governor; disposed on destroy.
+      - Scene: deep-space stage (#05050a, both themes), cosine phase palette,
+        peaks glow. 260vh section with the view pinned (sticky, top 96px); the
+        camera follows two CatmullRom curves (position, gaze) by scroll progress,
+        read each frame. Not `scene.seek`: seeking renders every call, so the
+        resolution governor never sees idle frames and never sharpens.
+      - Reduced motion: no tall section, a still view you can drag. Verified.
+      - Flight holds 30 fps with no drops (the test browser is capped at 30).
+      Left before committing it upstream:
+      - [ ] Document `bloom` in the scene-engine README (§ three, near
+            `minResolution`) and CHANGELOG "Unreleased"; run its tests
+            (`D:/Repos/scene-engine`, `npm test`); `git subtree push`.
+      - [ ] `npm run build` from `frontend/` (last green build was before phase 2).
+      - [ ] Push dev/t569 + main: **held by request** — phase 1 (`3f96e78`)
+            and phase 2 are local only.
+      Later, on evidence: evaluate in a shader or Worker when detail must follow
+      the camera (mesh is ~200 ms on the main thread, once); bloom in `scene3d`
+      specs when an ad needs it as data.
 - [ ] **Phase 3: GPU particles.** Engine: ping-pong float-texture GPGPU.
       Scene: geodesic flow on the modular surface, whose closed orbits are the
       Lorenz knots (Ghys): the terrain hands over to the existing Lorenz scene.
