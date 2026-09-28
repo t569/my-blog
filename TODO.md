@@ -855,6 +855,32 @@ To do:
 - [ ] Test a real post with a ```` ```sim ```` fence end to end once the
       backend is up (checked on a throwaway page; no writes to production).
 
+### 8. The vision: Lusion / Active Theory, for mathematics and physics
+
+The engine grows to that studio level, one capability per scene that needs it
+(the engine's own "add on evidence" rule), and never at an ad's expense.
+Research: Lusion is three.js plus Houdini-baked motion, scroll as the timeline, noise;
+Active Theory's Hydra is GPU particles in ping-pong float textures, a GPU fluid
+solver, bloom/post chain, zero-GC frames, workers.
+
+- [x] **Phase 1: modular terrain** (`lab/ModularTerrain.tsx`, `lib/modular.ts`):
+      y⁶|Δ(z)| as height on the Poincaré disk, phase as colour. Each point
+      reduced to the fundamental domain, 8 product terms, automorphy factor
+      carried back; agrees with the raw product to 1e-14 (`npm run check:modular`).
+      Hills scaled by 1 − r² so the copies shrink with their tiles.
+      Built on the CPU once (~200 ms at idle, 130k points), then a static mesh.
+- [ ] **Phase 2: glow and flight.** Engine: bloom/post chain on `ThreeNode`;
+      a scroll → `scene.seek` helper. Scene: camera flies through the terrain
+      as you scroll; evaluation moves to a shader (detail on demand) or a Worker.
+      A real phase palette once bloom can carry it (the theme ramp reads monochrome).
+- [ ] **Phase 3: GPU particles.** Engine: ping-pong float-texture GPGPU.
+      Scene: geodesic flow on the modular surface, whose closed orbits are the
+      Lorenz knots (Ghys): the terrain hands over to the existing Lorenz scene.
+- [ ] **Phase 4: an ad hero** using all of it, proving it stays light:
+      lazy, one context, reduced-motion still frame.
+- [ ] **Phase 5: fluid** on the phase-3 GPGPU base, for physics posts.
+- [ ] Other forms (E₄, E₆, j) once one form is right: j has poles, needs clipping.
+
 ---
 
 ## Explicitly skipped
