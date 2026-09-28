@@ -837,7 +837,9 @@ To do:
       picture slot; text panels: a small mark beside the title. Needed the
       engine's new `space3d` polyhedra (`tetrahedron` … `dodecahedron`).
       Text-panel variant untested live: production has one post.
-- [ ] **Push the scene-engine changes upstream**:
+      The lead card's figure can be dragged (`orbit`); a drag doesn't open the post,
+      and on touch only horizontal drags turn it, so the page still scrolls.
+- [x] **Push the scene-engine changes upstream** (`99eae56`, 76 tests pass there):
       `git subtree push --prefix=frontend/packages/scene-engine scene-engine main`,
       then run its tests in `D:/Repos/scene-engine` (`npm test`) — not yet run.
 - [ ] **Deeper than 10⁻³⁴** needs each delta as mantissa + exponent in the

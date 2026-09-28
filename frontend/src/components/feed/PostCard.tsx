@@ -69,7 +69,7 @@ export default function PostCard({ post, variant = "list" }: PostCardProps) {
 			)}
 			{art && lead && (
 				<div className="relative aspect-[16/9] shrink-0 bg-bg-elevated md:aspect-auto md:w-1/2">
-					<PostArt seed={post.slug} className="absolute inset-0 h-full w-full" />
+					<PostArt seed={post.slug} orbit className="absolute inset-0 h-full w-full" />
 				</div>
 			)}
 
