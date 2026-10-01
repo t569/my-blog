@@ -15,7 +15,8 @@
 		"check:mandelbrot": "node --experimental-strip-types --no-warnings scripts/check-mandelbrot.ts",
 		"check:modular": "node --experimental-strip-types --no-warnings scripts/check-modular.ts",
 		"check:riemann": "node --experimental-strip-types --no-warnings scripts/check-riemann.ts",
-		"check:hyperbolic": "node --experimental-strip-types --no-warnings scripts/check-hyperbolic.ts"
+		"check:hyperbolic": "node --experimental-strip-types --no-warnings scripts/check-hyperbolic.ts",
+		"check:sl2": "node --experimental-strip-types --no-warnings scripts/check-sl2.ts"
 	},
 	"dependencies": {
 		"@blocknote/code-block": "^0.49.0",

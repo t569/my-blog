@@ -100,6 +100,15 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 420,
 	},
 	{
+		id: "sl2",
+		title: "Inside the knot's complement",
+		hook: "The space the particles above flow through, seen from inside: corridors that twist, and a glow where the knot is.",
+		tryThis: "Drag to look around as you drift. Watch the colour along a wall: it turns as you move, because the space itself twists.",
+		maths:
+			"SL(2,ℝ) geometry, one of Thurston's eight: the group of 2×2 matrices of determinant 1, with a metric that left multiplication preserves. Dividing by the modular group gives the unit tangent bundle of the modular surface — the 3-sphere minus the trefoil, where the particles above flow. Geodesics here are closed-form: g · exp(t(X − cK)) · exp(t·cK), the velocity turning about the fibre at twice its fibre component (checked by bending one and finding its length unchanged to first order). The walls are the modular tiling's edges, lifted along the fibres and coloured by the fibre's angle; the bright ends of the corridors are the cusp, where every lattice degenerates — the trefoil itself.",
+		aspect: 640 / 420,
+	},
+	{
 		id: "lorenz",
 		title: "One path through a vector field",
 		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",

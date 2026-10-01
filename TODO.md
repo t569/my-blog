@@ -953,6 +953,19 @@ solver, bloom/post chain, zero-GC frames, workers.
       when a third scene wants one. Next, on evidence: S³ and the other Thurston
       geometries (Nil, Sol, SL₂ℝ — where phase 3's flow lives), and inside a
       closed hyperbolic manifold (Seifert–Weber: identify faces, not reflect).
+      - [x] **Inside SL₂ℝ** (`lab/SL2Space.tsx`, sim `sl2`, `lib/sl2.ts`, `npm run
+        check:sl2`; 2026-10-01): Γ\SL₂ℝ, Γ the modular group — phase 3's space (the
+        trefoil's complement) from inside. Left-invariant metric on the basis H/2,
+        P/2, K/2; Euler–Arnold makes geodesics closed-form, g·exp(t(X−cK))·exp(tcK),
+        checked by the first variation of length (a wrong-way control fails it).
+        Sphere-traced, safe because g ↦ g·i is a Riemannian submersion onto H².
+        Walls = the modular tiling's edges lifted along the fibres, translucent,
+        coloured by fibre angle; the flight's shadow on H² is a closed circle
+        (fibre component c, curvature 2c/√(1−c²) > 1) so it never leaves for the
+        cusp. Three shader bugs found by colouring rays by why they stopped:
+        det drift + too few reduction steps; far opaque corners; the cusp
+        overwriting colour. 60 fps median, p95 ~33 ms (fill-bound; minResolution
+        0.5). Next: Nil, Sol, S³ — the same recipe needs only their geodesics.
       (a) **done** (`lab/TorusGeodesics.tsx`, sim
       `torus`, `lib/riemann.ts`, `npm run check:riemann`; 2026-10-01): a geodesic spray
       on a curvature-coloured torus, 12k dots RK4-stepped on the GPU, click to move
