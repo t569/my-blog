@@ -13,7 +13,8 @@
 		"check:flip": "node --experimental-strip-types --no-warnings scripts/check-flip.ts",
 		"check:slug": "node --experimental-strip-types --no-warnings scripts/check-slug.ts",
 		"check:mandelbrot": "node --experimental-strip-types --no-warnings scripts/check-mandelbrot.ts",
-		"check:modular": "node --experimental-strip-types --no-warnings scripts/check-modular.ts"
+		"check:modular": "node --experimental-strip-types --no-warnings scripts/check-modular.ts",
+		"check:riemann": "node --experimental-strip-types --no-warnings scripts/check-riemann.ts"
 	},
 	"dependencies": {
 		"@blocknote/code-block": "^0.49.0",

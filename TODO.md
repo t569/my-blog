@@ -944,7 +944,11 @@ solver, bloom/post chain, zero-GC frames, workers.
       - Found on the way (engine): a stopped scene that mounted off screen never
         drew — under reduced motion the terrain was a black box. ThreeNode now
         repaints when it scrolls into view.
-- [ ] **Phase 6: Riemannian manifolds.** (a) Embedded surfaces (torus, saddle,
+- [~] **Phase 6: Riemannian manifolds.** (a) **done** (`lab/TorusGeodesics.tsx`, sim
+      `torus`, `lib/riemann.ts`, `npm run check:riemann`; 2026-10-01): a geodesic spray
+      on a curvature-coloured torus, 12k dots RK4-stepped on the GPU, click to move
+      the source; conjugate points on the warm side, spreading in the hole. Engine:
+      nothing. (a) as planned: Embedded surfaces (torus, saddle,
       surfaces of revolution): mesh coloured by Gaussian curvature, a geodesic
       spray on the phase-3 GPGPU base — state (u, v, u′, v′) is one RGBA texel,
       stepped by ẍᵏ = −Γᵏᵢⱼẋⁱẋʲ; parallel transport and geodesic circles.

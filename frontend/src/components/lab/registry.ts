@@ -82,6 +82,15 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 440,
 	},
 	{
+		id: "torus",
+		title: "Straight lines on a curved surface",
+		hook: "Fire paths in every direction from one point. On the outside they meet again; in the hole they never do.",
+		tryThis: "Click anywhere on the torus to fire from there. Drag to turn it. Try the warm outside, then the cool inside.",
+		maths:
+			"A geodesic is a path that never turns, as seen from the surface itself: u″ + Γᵘᵢⱼ u′ⁱu′ʲ = 0. On a torus with radii R and r the metric is ds² = (R + r cos v)² du² + r² dv², and the Christoffel symbols Γ tell each path how to bend with the surface. Colour is Gaussian curvature K = cos v / (r(R + r cos v)): where K > 0 (warm), nearby geodesics bend toward each other and refocus — conjugate points; where K < 0 (cool), they spread apart exponentially. Each dot is stepped on the GPU with Runge–Kutta; the float64 reference keeps the speed and Clairaut's (R + r cos v)²u′ constant to 10⁻¹².",
+		aspect: 640 / 440,
+	},
+	{
 		id: "lorenz",
 		title: "One path through a vector field",
 		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",
