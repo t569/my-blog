@@ -91,6 +91,15 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 440,
 	},
 	{
+		id: "h3",
+		title: "Inside hyperbolic space",
+		hook: "Dodecahedra that meet at right angles: impossible here, and they fill the whole space there.",
+		tryThis: "Drag to look around while you drift through it. Every cell is the same size; the far ones only look small.",
+		maths:
+			"Hyperbolic 3-space, seen from inside: the {5,3,4} honeycomb, where regular dodecahedra meet four to an edge with right dihedral angles. Each pixel follows its geodesic in the hyperboloid model, p(t) = cosh t · p + sinh t · d with ⟨p, p⟩ = −1. Leaving the cell through a face, the ray is reflected in it and carries on, so one dodecahedron's twelve planes draw all of space. The number of cells within distance r grows like e^{2r}: the edges dissolve into a haze of exponentially many cells, where flat space would show a few.",
+		aspect: 640 / 420,
+	},
+	{
 		id: "lorenz",
 		title: "One path through a vector field",
 		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",

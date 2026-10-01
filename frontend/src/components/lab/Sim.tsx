@@ -17,6 +17,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	delta: () => import("./ModularTerrain"),
 	knots: () => import("./ModularFlow"),
 	torus: () => import("./TorusGeodesics"),
+	h3: () => import("./HyperbolicSpace"),
 	flow: () => import("./FlowField"),
 	fluid: () => import("./FluidStir"),
 	life: () => import("./GameOfLife"),

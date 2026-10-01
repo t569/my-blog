@@ -944,7 +944,16 @@ solver, bloom/post chain, zero-GC frames, workers.
       - Found on the way (engine): a stopped scene that mounted off screen never
         drew — under reduced motion the terrain was a black box. ThreeNode now
         repaints when it scrolls into view.
-- [~] **Phase 6: Riemannian manifolds.** (a) **done** (`lab/TorusGeodesics.tsx`, sim
+- [x] **Phase 6: Riemannian manifolds.** (b) **done** (`lab/HyperbolicSpace.tsx`, sim
+      `h3`, `lib/hyperbolic.ts`, `npm run check:hyperbolic`; 2026-10-01): a flight
+      through the {5,3,4} honeycomb of H³, per-pixel geodesics in the hyperboloid
+      model reflected at the fundamental dodecahedron's faces; drag to look; 60 fps.
+      Camera a Lorentz matrix kept in the cell (exact to 1e-16 after 1000 units).
+      Engine: nothing — a full-screen quad is three lines (fluid, H³); a helper
+      when a third scene wants one. Next, on evidence: S³ and the other Thurston
+      geometries (Nil, Sol, SL₂ℝ — where phase 3's flow lives), and inside a
+      closed hyperbolic manifold (Seifert–Weber: identify faces, not reflect).
+      (a) **done** (`lab/TorusGeodesics.tsx`, sim
       `torus`, `lib/riemann.ts`, `npm run check:riemann`; 2026-10-01): a geodesic spray
       on a curvature-coloured torus, 12k dots RK4-stepped on the GPU, click to move
       the source; conjugate points on the warm side, spreading in the hole. Engine:
