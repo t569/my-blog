@@ -55,15 +55,6 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 400,
 	},
 	{
-		id: "lorenz",
-		title: "One path through a vector field",
-		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",
-		tryThis: "Drag to look around it while it draws. The bright dot is now; the faded path is its past.",
-		maths:
-			"The Lorenz system ẋ = σ(y − x), ẏ = x(ρ − z) − y, ż = xy − βz gives every point of space an arrow. A particle following them never settles, never repeats, and never leaves the butterfly. Integrated once with fourth-order Runge–Kutta.",
-		aspect: 640 / 420,
-	},
-	{
 		id: "modular",
 		title: "The modular group tiles the half-plane",
 		hook: "Two moves — shift and flip — are enough to tile an infinite plane.",
@@ -80,6 +71,24 @@ export const SIMS: Sim[] = [
 		maths:
 			"The discriminant Δ(z) = q∏(1 − qⁿ)²⁴, q = e^{2πiz}, is a modular form of weight 12: Δ((az + b)/(cz + d)) = (cz + d)¹²Δ(z). So y⁶|Δ(z)| is unchanged by the whole modular group, and plotted as height it repeats across every tile. Drawn on the Poincaré disk, the cusps become points on the rim, where the terrain sinks flat. Colour is the phase of Δ. Each point is moved into the fundamental domain first, where |q| < 0.005 and eight factors of the product are exact.",
 		aspect: 640 / 440,
+	},
+	{
+		id: "knots",
+		title: "Every path on the modular surface, around a knot",
+		hook: "Sixty-five thousand particles slide along the landscape above, and turn out to be living around a trefoil.",
+		tryThis: "Drag to turn it. The white knot is where the landscape goes flat at the rim; the coloured loops are paths that come back to where they started.",
+		maths:
+			"A point of the modular surface with a direction is a lattice in the plane: shapes up to the modular group, sizes fixed. Send the lattice to its two Eisenstein invariants (g₂, g₃) and the space of all of them is the 3-sphere with a trefoil removed (g₂³ = 27g₃², where Δ = 0: the cusp). Each particle follows its geodesic, a matrix multiplied a little every frame on the GPU and folded back into the fundamental domain. Ghys proved that the closed geodesics, drawn here, are knotted exactly like the periodic orbits of the Lorenz equations, next. Colour is the phase of Δ, as on the landscape.",
+		aspect: 640 / 440,
+	},
+	{
+		id: "lorenz",
+		title: "One path through a vector field",
+		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",
+		tryThis: "Drag to look around it while it draws. The bright dot is now; the faded path is its past.",
+		maths:
+			"The Lorenz system ẋ = σ(y − x), ẏ = x(ρ − z) − y, ż = xy − βz gives every point of space an arrow. A particle following them never settles, never repeats, and never leaves the butterfly. Integrated once with fourth-order Runge–Kutta.",
+		aspect: 640 / 420,
 	},
 	{
 		id: "flow",

@@ -890,9 +890,22 @@ solver, bloom/post chain, zero-GC frames, workers.
       Later, on evidence: evaluate in a shader or Worker when detail must follow
       the camera (mesh is ~200 ms on the main thread, once); bloom in `scene3d`
       specs when an ad needs it as data.
-- [ ] **Phase 3: GPU particles.** Engine: ping-pong float-texture GPGPU.
-      Scene: geodesic flow on the modular surface, whose closed orbits are the
-      Lorenz knots (Ghys): the terrain hands over to the existing Lorenz scene.
+- [x] **Phase 3: GPU particles** (`lab/ModularFlow.tsx`, sim `knots`, 2026-10-01).
+      65 536 particles, each g ∈ SL(2,ℝ) in one RGBA float texel; a shader flows
+      them (g·diag(e^{dt/2}, e^{−dt/2})) and folds them back into the fundamental
+      domain, ping-ponged by three's GPUComputationRenderer. Ghys's map (lattice →
+      (g₂, g₃) → S³ minus the trefoil → ℝ³) in the vertex shader; the trefoil (the
+      cusp) and four closed geodesics (LR, LLR, LLLR, LLRLR: Lorenz knots) drawn
+      from the float64 reference in `lib/modular.ts`. `check:modular` proves the map
+      SL(2,ℤ)-invariant and the orbits closed (1e-14). /lab order: terrain → knots →
+      Lorenz. 60 fps steady with bloom (Iris Plus test browser).
+      - Engine: **nothing new** — GPUComputationRenderer is the ping-pong. Wrap it in
+        the engine when phase 5 (fluid) is its second user.
+      - Engine fix found on the way: an overlay ThreeNode placed its canvas before its
+        transform was written; a seek-then-paused scene (Lorenz) drew half a box off,
+        over the page text. CHANGELOG "Unreleased". Not yet subtree-pushed.
+      Later, on evidence: particle trails; a scroll morph from the terrain (the
+      particles on the disk) into the knot picture.
 - [ ] **Phase 4: an ad hero** using all of it, proving it stays light:
       lazy, one context, reduced-motion still frame.
 - [ ] **Phase 5: fluid** on the phase-3 GPGPU base, for physics posts.

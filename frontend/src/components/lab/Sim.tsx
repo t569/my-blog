@@ -15,6 +15,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	lorenz: () => import("./LorenzAttractor"),
 	modular: () => import("./ModularTiling"),
 	delta: () => import("./ModularTerrain"),
+	knots: () => import("./ModularFlow"),
 	flow: () => import("./FlowField"),
 	life: () => import("./GameOfLife"),
 	fibonacci: () => import("./Phyllotaxis"),
