@@ -21,6 +21,8 @@ export interface RayScene {
 	/** Turn by a drag: yaw and pitch in radians. */
 	look?: (yaw: number, pitch: number) => void;
 	bloom?: ThreeOptions["bloom"];
+	/** Handed a redraw, for controls outside the canvas (a slider) that change uniforms. */
+	onReady?: (redraw: () => void) => void;
 }
 
 export function mountRayView(host: HTMLElement, width: number, height: number, s: RayScene): () => void {
@@ -64,6 +66,11 @@ export function mountRayView(host: HTMLElement, width: number, height: number, s
 			view.canvas.removeEventListener("pointerup", pu);
 		});
 	}
+
+	s.onReady?.(() => {
+		view.invalidate();
+		if (!scene.playing) scene.seek(scene.elapsed);
+	});
 
 	const fly = s.fly;
 	if (still || !fly) scene.seek(0);

@@ -145,6 +145,15 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 420,
 	},
 	{
+		id: "kerr",
+		title: "A spinning black hole",
+		hook: "Spin it up and the shadow stops being round.",
+		tryThis: "Slide the spin from 0 to nearly 1. The shadow flattens on one side into a D, and the glowing gas creeps inward. Drag to fly over the pole.",
+		maths:
+			"The Kerr metric, mass M = 1, spin a. No orbit equation separates as neatly as Schwarzschild's, so each pixel integrates a whole photon geodesic as a Hamiltonian system in Boyer–Lindquist coordinates — 2ΣH = Δp_r² + p_θ² + (L/sinθ − a sinθ)² − (r² + a² − aL)²/Δ, and light has H = 0 — backwards from your eye with Runge–Kutta. Spacetime is dragged round with the spin, so light going with it can skim closer before being lost (the photon orbit at r = 1.56 for a = 0.9, against 3.91 going the other way; Bardeen's values, checked). The gas is a thick torus emitting and absorbing along every ray, orbiting at Ω = 1/(R^{3/2} + a), its light shifted by g = 1/(uᵗ(1 − ΩL)) and brightened as g⁴.",
+		aspect: 640 / 460, // the scene plus its slider
+	},
+	{
 		id: "lorenz",
 		title: "One path through a vector field",
 		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",

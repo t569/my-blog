@@ -23,6 +23,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	nil: () => import("./NilSpace"),
 	sol: () => import("./SolSpace"),
 	blackhole: () => import("./BlackHole"),
+	kerr: () => import("./KerrBlackHole"),
 	flow: () => import("./FlowField"),
 	fluid: () => import("./FluidStir"),
 	life: () => import("./GameOfLife"),
