@@ -198,3 +198,84 @@ export function word(w: string): G {
 	}
 	return m;
 }
+
+/* ------------------------------------------------- the terrain, as raw arrays */
+
+export interface TerrainOptions {
+	rings: number;
+	spokes: number;
+	/** Disk radius of the last ring (past ~0.985 the tiles are smaller than a pixel). */
+	rim: number;
+	/** World size: disk radius and hill height. */
+	radius: number;
+	relief: number;
+	/** max log(y⁶|Δ|), to normalise heights to 0–1. */
+	peak: number;
+}
+
+/** sRGB → linear, as three's Color.setRGB(…, SRGBColorSpace) does. */
+const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+
+/**
+ * y⁶|Δ| over the Poincaré disk as a mesh: positions, linear vertex colours (phase of
+ * Δ on a cosine palette, greying with the tile, brightening with height), normals and
+ * triangles. Pure and three-free, so it runs in a Worker (modular.worker.ts): ~130k
+ * points took 200–650 ms of the main thread. Normals as three's computeVertexNormals.
+ */
+export function terrainMesh({ rings, spokes, rim, radius, relief, peak }: TerrainOptions) {
+	const n = (rings + 1) * spokes;
+	const pos = new Float32Array(n * 3);
+	const col = new Float32Array(n * 3);
+	const grey = [0.32, 0.34, 0.42];
+	for (let i = 0; i <= rings; i++) {
+		const r = rim * (1 - (1 - i / rings) ** 2); // rings crowd toward the rim, where the tiles shrink
+		for (let j = 0; j < spokes; j++) {
+			const t = (j / spokes) * Math.PI * 2;
+			const [a, b] = [r * Math.cos(t), r * Math.sin(t)];
+			const [x, y] = fromDisk(a, b);
+			const [logAbs, phase] = logDelta(x, y);
+			const h = Math.exp(6 * Math.log(y) + logAbs - peak); // y⁶|Δ|, 0–1
+			const s = 1 - r * r;
+			const k = (i * spokes + j) * 3;
+			pos[k] = a * radius;
+			pos[k + 1] = h * relief * s; // hills shrink with their tile (the disk's conformal factor)
+			pos[k + 2] = b * radius;
+			// Near the rim the phase turns faster than the mesh can sample (moiré): it greys out with
+			// the tile. Brightness follows height, so the peaks cross the glow threshold.
+			const u = phase / (2 * Math.PI);
+			for (let c = 0; c < 3; c++) {
+				const v = linear(0.5 + 0.5 * Math.cos(2 * Math.PI * (u + 0.15 * c)));
+				col[k + c] = (v + (grey[c]! - v) * (1 - s)) * (0.12 + 0.8 * h);
+			}
+		}
+	}
+	const index = new Uint32Array(rings * spokes * 6);
+	let w = 0;
+	for (let i = 0; i < rings; i++) {
+		for (let j = 0; j < spokes; j++) {
+			const a = i * spokes + j;
+			const b = i * spokes + ((j + 1) % spokes);
+			index.set([a, b, a + spokes, b, b + spokes, a + spokes], w); // counter-clockwise from above
+			w += 6;
+		}
+	}
+	const nrm = new Float32Array(n * 3);
+	for (let f = 0; f < index.length; f += 3) {
+		const [ia, ib, ic] = [index[f]! * 3, index[f + 1]! * 3, index[f + 2]! * 3];
+		const [e1x, e1y, e1z] = [pos[ic]! - pos[ib]!, pos[ic + 1]! - pos[ib + 1]!, pos[ic + 2]! - pos[ib + 2]!];
+		const [e2x, e2y, e2z] = [pos[ia]! - pos[ib]!, pos[ia + 1]! - pos[ib + 1]!, pos[ia + 2]! - pos[ib + 2]!];
+		const [cx, cy, cz] = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x];
+		for (const v of [ia, ib, ic]) {
+			nrm[v] += cx;
+			nrm[v + 1] += cy;
+			nrm[v + 2] += cz;
+		}
+	}
+	for (let v = 0; v < nrm.length; v += 3) {
+		const l = Math.hypot(nrm[v]!, nrm[v + 1]!, nrm[v + 2]!) || 1;
+		nrm[v] /= l;
+		nrm[v + 1] /= l;
+		nrm[v + 2] /= l;
+	}
+	return { pos, col, nrm, index };
+}

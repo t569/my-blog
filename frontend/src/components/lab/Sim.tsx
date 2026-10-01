@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { simById } from "./registry";
 
 /**
@@ -24,13 +24,17 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	ad: () => import("./AdBanner"),
 	hero: () => import("./AdHero"),
 };
-/** Made once: React.lazy must not be recreated per render. */
-const SCENES: Record<string, ComponentType> = Object.fromEntries(Object.entries(LOAD).map(([id, load]) => [id, lazy(load)]));
 
 /** Idle mounts, in page order, one after another. */
 let queue = Promise.resolve();
 
 const Box = ({ aspect }: { aspect: number }) => <div className="w-full rounded-xl bg-bg-surface" style={{ aspectRatio: String(aspect) }} />;
+
+/** Rendered after the scene, so its effect runs once the scene's own (the mount) have. */
+function Mounted({ then }: { then: () => void }) {
+	useEffect(then, [then]);
+	return null;
+}
 
 /**
  * A simulation by id, loaded and mounted in the first idle moment, or as it nears
@@ -39,7 +43,16 @@ const Box = ({ aspect }: { aspect: number }) => <div className="w-full rounded-x
 export default function Sim({ id }: { id: string }) {
 	const sim = simById(id);
 	const box = useRef<HTMLDivElement>(null);
-	const [near, setNear] = useState(false);
+	// The loaded component itself, not React.lazy: lazy suspends once more after the chunk is in,
+	// and React batches Suspense reveals, so scenes queued one at a time still mounted several to a
+	// commit (one 714 ms task in production). Rendered directly, each mounts in a commit of its own.
+	const [Scene, setScene] = useState<{ C: ComponentType } | null>(null);
+	const release = useRef(() => {});
+	const isMounted = useRef(false);
+	const [onMounted] = useState(() => () => {
+		isMounted.current = true;
+		release.current();
+	});
 
 	// Load and mount in an idle moment, not when it scrolls near. The one-off costs — evaluating
 	// three.js (~300 ms), creating a WebGL context (150–250 ms on Windows) — are hitches mid-scroll
@@ -50,20 +63,23 @@ export default function Sim({ id }: { id: string }) {
 		if (!load) return;
 		const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
 		const cancel = window.cancelIdleCallback ?? window.clearTimeout;
-		// One at a time, each in its own idle moment: mounted together, they made one 477 ms task.
 		let live = true;
 		let handle = 0;
-		let release = () => {};
+		let free = () => {};
 		queue = queue.then(
 			() =>
 				new Promise<void>((done) => {
-					if (!live) return done();
-					release = done; // unmounted while waiting: free the queue, or it stalls for everyone after
+					free = done; // unmounted while waiting: free the queue, or it stalls for everyone after
+					if (!live || isMounted.current) return done();
+					// The next scene waits until this one has mounted, not merely loaded.
+					release.current = () => window.setTimeout(done, 50);
 					handle = idle(
 						() =>
-							void load()
-								.then(() => live && setNear(true))
-								.finally(() => window.setTimeout(done, 50)),
+							void load().then(
+								// Already mounted (scrolled near first): nothing will render, so nothing would release.
+								(m) => (live && !isMounted.current ? setScene((s) => s ?? { C: m.default }) : done()),
+								() => done(),
+							),
 						{ timeout: 4000 },
 					);
 				}),
@@ -71,26 +87,37 @@ export default function Sim({ id }: { id: string }) {
 		return () => {
 			live = false;
 			cancel(handle);
-			release();
+			free();
 		};
 	}, [id]);
 
+	// Scrolled near before its idle turn came: load it now, out of the queue.
 	useEffect(() => {
 		const el = box.current;
-		if (!el || near) return;
-		const io = new IntersectionObserver(([e]) => e?.isIntersecting && setNear(true), { rootMargin: "600px" });
+		const load = LOAD[id.trim()];
+		if (!el || Scene || !load) return;
+		let live = true;
+		const io = new IntersectionObserver(
+			([e]) => {
+				if (e?.isIntersecting) void load().then((m) => live && setScene((s) => s ?? { C: m.default }));
+			},
+			{ rootMargin: "600px" },
+		);
 		io.observe(el);
-		return () => io.disconnect();
-	}, [near]);
+		return () => {
+			live = false;
+			io.disconnect();
+		};
+	}, [id, Scene]);
 
-	const Scene = sim && SCENES[sim.id];
-	if (!sim || !Scene) return null;
+	if (!sim || !LOAD[sim.id]) return null;
 	return (
 		<div ref={box} className="w-full">
-			{near ? (
-				<Suspense fallback={<Box aspect={sim.aspect} />}>
-					<Scene />
-				</Suspense>
+			{Scene ? (
+				<>
+					<Scene.C />
+					<Mounted then={onMounted} />
+				</>
 			) : (
 				<Box aspect={sim.aspect} />
 			)}

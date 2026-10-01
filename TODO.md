@@ -930,12 +930,20 @@ solver, bloom/post chain, zero-GC frames, workers.
         users now; still no wrapper earns its place. Revisit with a third.
       Later, on evidence: obstacles / boundaries; fluid coupled to the terrain or
       particles; compile shaders ahead (`compileAsync`, KHR_parallel_shader_compile).
-- [ ] **/lab mounts cost more than they did.** Production /lab now has one
-      ~1.2 s long task while scenes mount at idle (TODO above said ~270 ms).
-      Probed per scene (dev, effects only): `delta` 650 ms (130k-point mesh on the
-      main thread — move to a Worker, see its ponytail note), `laplace` ~150 ms,
-      `knots`/`hero` ~100 ms; the rest is likely shader compiles on first draw,
-      which an effect probe can't see. Profile with a trace before fixing.
+- [x] **/lab's mount freeze: 728–792 ms → 145–179 ms worst task** (2026-10-01,
+      production build, three runs each). Traced: one React commit held several
+      scenes' mounts. Sim queued them one at a time, but `React.lazy` suspends
+      again after the chunk is in, and React batches Suspense reveals, so they
+      landed together. Sim now renders the loaded component itself (no lazy, no
+      Suspense) and releases the queue only once a scene has *mounted*. The
+      terrain mesh (130k points, the biggest single cost) moved to a Worker
+      (`lib/modular.worker.ts`, `terrainMesh` — bit-identical to the old build).
+      Left: one ~100–180 ms task per 3D scene, mostly WebGL context + first
+      shader compile, each in its own idle moment. Sharing one context (see Lab
+      v2) or `compileAsync` would shave those.
+      - Found on the way (engine): a stopped scene that mounted off screen never
+        drew — under reduced motion the terrain was a black box. ThreeNode now
+        repaints when it scrolls into view.
 - [ ] **Phase 6: Riemannian manifolds.** (a) Embedded surfaces (torus, saddle,
       surfaces of revolution): mesh coloured by Gaussian curvature, a geodesic
       spray on the phase-3 GPGPU base — state (u, v, u′, v′) is one RGBA texel,
