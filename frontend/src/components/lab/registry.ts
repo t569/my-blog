@@ -100,6 +100,15 @@ export const SIMS: Sim[] = [
 		aspect: 12 / 7,
 	},
 	{
+		id: "fluid",
+		title: "Stir a fluid",
+		hook: "Ink in water, solved forty thousand times a second.",
+		tryThis: "Sweep the pointer through it. Fast strokes leave curls; slow ones barely ripple.",
+		maths:
+			"The incompressible Navier–Stokes equations, ∂u/∂t = −(u·∇)u − ∇p + f with ∇·u = 0, on a 128 × 84 grid. Each frame, on the GPU: put back the swirl that the grid smears out (vorticity confinement), solve for the pressure that makes the flow divergence-free (twenty Jacobi sweeps) and subtract its gradient, then carry velocity and ink along the flow by tracing each cell backwards — Stam's semi-Lagrangian step, stable at any time step. The ink lives on a finer 512 × 336 grid.",
+		aspect: 640 / 420,
+	},
+	{
 		id: "life",
 		title: "The Game of Life",
 		hook: "Two rules. From them: gliders, oscillators, and a gun that fires forever.",

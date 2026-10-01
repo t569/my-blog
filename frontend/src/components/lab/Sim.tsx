@@ -17,6 +17,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	delta: () => import("./ModularTerrain"),
 	knots: () => import("./ModularFlow"),
 	flow: () => import("./FlowField"),
+	fluid: () => import("./FluidStir"),
 	life: () => import("./GameOfLife"),
 	fibonacci: () => import("./Phyllotaxis"),
 	fourier: () => import("./FourierEpicycles"),

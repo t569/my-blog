@@ -918,7 +918,24 @@ solver, bloom/post chain, zero-GC frames, workers.
         models): ThreeNode.repaint() at the scene's time.
       Later, on evidence: a real CTA link (the engine has no `href` yet — ads
       wrap the scene in a link for now); a softer bloom for busy scenes.
-- [ ] **Phase 5: fluid** on the phase-3 GPGPU base, for physics posts.
+- [x] **Phase 5: fluid** (`lab/FluidStir.tsx`, sim `fluid`, 2026-10-01). Stam's
+      stable fluids as Dobryakov runs them: vorticity confinement, divergence,
+      20 Jacobi pressure sweeps, gradient subtract, semi-Lagrangian advection;
+      half-float textures, velocity 128×84, ink 512×336. Two emitters keep it
+      alive; the pointer stirs. 60 fps steady; mount ~20 ms of CPU. Reduced
+      motion: 2 s pre-simulated at 1/30 s, one still frame (coarse steps blow up:
+      vorticity confinement isn't unconditionally stable, advection is).
+      - Engine: **nothing** again — GPUComputationRenderer's createRenderTarget,
+        createShaderMaterial and doRenderTarget are the multi-pass toolkit. Two
+        users now; still no wrapper earns its place. Revisit with a third.
+      Later, on evidence: obstacles / boundaries; fluid coupled to the terrain or
+      particles; compile shaders ahead (`compileAsync`, KHR_parallel_shader_compile).
+- [ ] **/lab mounts cost more than they did.** Production /lab now has one
+      ~1.2 s long task while scenes mount at idle (TODO above said ~270 ms).
+      Probed per scene (dev, effects only): `delta` 650 ms (130k-point mesh on the
+      main thread — move to a Worker, see its ponytail note), `laplace` ~150 ms,
+      `knots`/`hero` ~100 ms; the rest is likely shader compiles on first draw,
+      which an effect probe can't see. Profile with a trace before fixing.
 - [ ] **Phase 6: Riemannian manifolds.** (a) Embedded surfaces (torus, saddle,
       surfaces of revolution): mesh coloured by Gaussian curvature, a geodesic
       spray on the phase-3 GPGPU base — state (u, v, u′, v′) is one RGBA texel,
