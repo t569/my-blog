@@ -906,9 +906,29 @@ solver, bloom/post chain, zero-GC frames, workers.
         over the page text. CHANGELOG "Unreleased". Not yet subtree-pushed.
       Later, on evidence: particle trails; a scroll morph from the terrain (the
       particles on the disk) into the knot picture.
-- [ ] **Phase 4: an ad hero** using all of it, proving it stays light:
-      lazy, one context, reduced-motion still frame.
+- [x] **Phase 4: an ad hero** (`lab/AdHero.tsx`, sim `hero`, 2026-10-01). Pure
+      data: one `scene3d` (bloom, two particle clouds, emissive rings) under an
+      SVG headline and button. Light, checked: one WebGL context; three.js and the
+      bloom code absent from /lab's initial chunks (they come with the scene, at
+      idle); points move in the vertex shader from time alone (no CPU per frame);
+      60 fps steady; under reduced motion one still frame at 3 s, glow included.
+      - Engine: `scene3d.bloom`; `particles` object (count/radius/shape/size/
+        speed/colors, ≤ 50 000 per scene, seeded so stills repeat).
+      - Engine fix: a stopped scene never drew async arrivals (bloom code,
+        models): ThreeNode.repaint() at the scene's time.
+      Later, on evidence: a real CTA link (the engine has no `href` yet — ads
+      wrap the scene in a link for now); a softer bloom for busy scenes.
 - [ ] **Phase 5: fluid** on the phase-3 GPGPU base, for physics posts.
+- [ ] **Phase 6: Riemannian manifolds.** (a) Embedded surfaces (torus, saddle,
+      surfaces of revolution): mesh coloured by Gaussian curvature, a geodesic
+      spray on the phase-3 GPGPU base — state (u, v, u′, v′) is one RGBA texel,
+      stepped by ẍᵏ = −Γᵏᵢⱼẋⁱẋʲ; parallel transport and geodesic circles.
+      (b) Intrinsic 3-manifolds from the inside (H³, S³, Thurston geometries,
+      incl. SL₂ℝ, where phase 3's flow lives): per-pixel geodesic ray marching,
+      fill-bound like the Mandelbrot, so ThreeNode's minResolution/frameCost
+      already fit. Engine: nothing for (a); a full-screen ray-march helper for
+      (b) when it lands. Metrics as data (expressions → GLSL) only once a few
+      hand-written ones exist. Prior art: Coulon–Matsumoto–Segerman–Trettel.
 - [ ] Other forms (E₄, E₆, j) once one form is right: j has poles, needs clipping.
 
 ---

@@ -132,6 +132,15 @@ export const SIMS: Sim[] = [
 		maths: "A headline that pops, a rule that draws itself, a badge that pulses. Change the JSON and the campaign changes, without a deploy. What the engine was first built for.",
 		aspect: 900 / 260,
 	},
+	{
+		id: "hero",
+		title: "A 3D hero, as data",
+		hook: "Glow, a galaxy, a headline — and still nothing but a description.",
+		tryThis: "Hover the button. Then open the JSON: the 3D stage, the light, eleven and a half thousand drifting points, all of it is there.",
+		maths:
+			"The same idea as the banner above, carried into 3D: one WebGL canvas under the text, never two. Each point circles its own ring at a speed that falls off with radius, worked out on the GPU from the time alone, so the CPU does nothing per frame and the scene can be stopped at any instant. Under reduced motion that is what you get: one still frame, glow and all. three.js arrives only when the hero nears the screen.",
+		aspect: 1200 / 500,
+	},
 ];
 
 export const simById = (id: string): Sim | undefined => SIMS.find((s) => s.id === id.trim());

@@ -21,6 +21,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	fibonacci: () => import("./Phyllotaxis"),
 	fourier: () => import("./FourierEpicycles"),
 	ad: () => import("./AdBanner"),
+	hero: () => import("./AdHero"),
 };
 /** Made once: React.lazy must not be recreated per render. */
 const SCENES: Record<string, ComponentType> = Object.fromEntries(Object.entries(LOAD).map(([id, load]) => [id, lazy(load)]));
