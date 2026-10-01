@@ -882,10 +882,9 @@ solver, bloom/post chain, zero-GC frames, workers.
       - Reduced motion: no tall section, a still view you can drag. Verified.
       - Flight holds 30 fps with no drops (the test browser is capped at 30).
       Left before committing it upstream:
-      - [ ] Document `bloom` in the scene-engine README (§ three, near
-            `minResolution`) and CHANGELOG "Unreleased"; run its tests
-            (`D:/Repos/scene-engine`, `npm test`); `git subtree push`.
-      - [ ] `npm run build` from `frontend/` (last green build was before phase 2).
+      - [x] Document `bloom` in the scene-engine README (§ three) and CHANGELOG
+            "Unreleased"; tests pass in place (76). `git subtree push`: held.
+      - [x] `npm run build` from `frontend/`: green (2026-10-01).
       - [ ] Push dev/t569 + main: **held by request** — phase 1 (`3f96e78`)
             and phase 2 are local only.
       Later, on evidence: evaluate in a shader or Worker when detail must follow
