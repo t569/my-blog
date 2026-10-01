@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Scene } from "@t569/scene-engine";
-import { ThreeNode } from "@t569/scene-engine/three";
-import { Matrix4, Mesh, PlaneGeometry, ShaderMaterial, Vector4 } from "three";
+import { Matrix4, Vector4 } from "three";
 import { FACES, forward, identity, look, settle } from "@/lib/hyperbolic";
-import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
+import { mountRayView } from "./rayView";
 
 /**
  * Inside hyperbolic space: a flight through the {5,3,4} honeycomb, H³ tiled by
@@ -83,67 +81,22 @@ export default function HyperbolicSpace() {
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
-		const still = prefersReducedMotion();
-		const scene = new Scene({ width: W, height: H }, host);
-		// Every pixel marches: all fill rate. Let the resolution drop further while moving.
-		const view = new ThreeNode({ x: W / 2, y: H / 2, width: W, height: H, shadows: "none", minResolution: 0.5, bloom: { strength: 0.5, radius: 0.3, threshold: 0.7 } });
-		scene.add(view);
-
 		const cam = new Matrix4();
 		let m = look(identity(), 0.35, 0.2); // not straight at a face: a corner reads better
-		const mat = new ShaderMaterial({
-			uniforms: { cam: { value: cam }, N: { value: FACES.map((n) => new Vector4(...n)) }, aspect: { value: W / H }, fov: { value: FOV } },
-			vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-			fragmentShader: FRAG,
-			depthTest: false,
-		});
-		const quad = new Mesh(new PlaneGeometry(2, 2), mat);
-		quad.frustumCulled = false;
-		view.world.add(quad);
-		const upload = () => cam.fromArray(m);
-		upload();
-
-		// Drag to look around; the flight carries on along wherever you face.
-		let drag: { x: number; y: number } | null = null;
-		const pd = (e: PointerEvent) => {
-			drag = { x: e.clientX, y: e.clientY };
-			view.canvas.setPointerCapture?.(e.pointerId);
-		};
-		const pm = (e: PointerEvent) => {
-			if (!drag) return;
-			const k = 2.2 / view.canvas.getBoundingClientRect().height;
-			m = settle(look(m, (e.clientX - drag.x) * k, (e.clientY - drag.y) * k));
-			drag = { x: e.clientX, y: e.clientY };
-			upload();
-			view.moving();
-			if (!scene.playing) scene.seek(scene.elapsed); // reduced motion: still, but it answers
-		};
-		const pu = () => (drag = null);
-		view.canvas.addEventListener("pointerdown", pd);
-		view.canvas.addEventListener("pointermove", pm);
-		view.canvas.addEventListener("pointerup", pu);
-		view.onCleanup(() => {
-			view.canvas.removeEventListener("pointerdown", pd);
-			view.canvas.removeEventListener("pointermove", pm);
-			view.canvas.removeEventListener("pointerup", pu);
-		});
-
-		if (still) {
-			scene.seek(0);
-		} else {
-			view.onFrame((dt) => {
-				if (dt === 0) return false;
+		cam.fromArray(m);
+		return mountRayView(host, W, H, {
+			frag: FRAG,
+			uniforms: { cam: { value: cam }, N: { value: FACES.map((n) => new Vector4(...n)) }, fov: { value: FOV } },
+			bloom: { strength: 0.5, radius: 0.3, threshold: 0.7 },
+			fly: (dt) => {
 				m = settle(look(forward(m, dt * SPEED), dt * 0.05, 0)); // a slow drift sideways, so the flight curves
-				upload();
-				return true;
-			});
-		}
-
-		const stop = runWhileVisible(host, scene);
-		return () => {
-			stop();
-			scene.destroy(); // ThreeNode frees the quad and the GL context
-		};
+				cam.fromArray(m);
+			},
+			look: (yaw, pitch) => {
+				m = settle(look(m, yaw, pitch));
+				cam.fromArray(m);
+			},
+		});
 	}, []);
 
 	return <div ref={hostRef} className="w-full cursor-grab overflow-hidden rounded-xl" style={{ aspectRatio: `${W} / ${H}`, background: STAGE }} />;

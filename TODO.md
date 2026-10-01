@@ -965,7 +965,22 @@ solver, bloom/post chain, zero-GC frames, workers.
         cusp. Three shader bugs found by colouring rays by why they stopped:
         det drift + too few reduction steps; far opaque corners; the cusp
         overwriting colour. 60 fps median, p95 ~33 ms (fill-bound; minResolution
-        0.5). Next: Nil, Sol, S³ — the same recipe needs only their geodesics.
+        0.5).
+      - [x] **Inside S³, Nil, Sol, and a black hole** (2026-10-01). One shared frame,
+        `lab/rayView.ts` (quad, drag-look, flight, reduced-motion still) — H³ and
+        SL₂ℝ moved onto it too. References `lib/thurston.ts`, `lib/blackhole.ts`;
+        `npm run check:thurston`, `check:blackhole`.
+        - S³ (`s3`): great circles; balls at the 24-cell's vertices (exactly 60°).
+        - Nil (`nil`): helices in closed form, checked by first variation (the
+          mirror helix fails); columns on the integer grid, stripes = height.
+        - Sol (`sol`): no closed form, so RK4 per ray (momenta kept to 1e-14);
+          coordinate sheets with their grid lines, so the stretch shows.
+        - Black hole (`blackhole`): Binet u″ = −u + 3u² per pixel; checked on b_c =
+          3√3, the photon sphere and 4M/b (the residual is the 2nd-order 15πM²/4b²).
+          Disk redshift g = √(1−3/r)/(1 − ΩL) — derived, after a first version had
+          the sign backwards (it would have reddened the approaching side).
+        Next, on evidence: Kerr (spin), a thick/volumetric disk; S²×ℝ and H²×ℝ
+        to complete the eight; closed manifolds (identify faces, not reflect).
       (a) **done** (`lab/TorusGeodesics.tsx`, sim
       `torus`, `lib/riemann.ts`, `npm run check:riemann`; 2026-10-01): a geodesic spray
       on a curvature-coloured torus, 12k dots RK4-stepped on the GPU, click to move

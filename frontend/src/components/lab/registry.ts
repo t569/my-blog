@@ -109,6 +109,42 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 420,
 	},
 	{
+		id: "s3",
+		title: "Inside the 3-sphere",
+		hook: "A space with no edge and no outside, where every straight line comes home.",
+		tryThis: "Drag to look around. Find a ball that is far away but looks huge: it is past the equator, and its light is refocusing on you.",
+		maths:
+			"The 3-sphere, the unit sphere in four dimensions: finite, with no boundary. Its geodesics are great circles, p(t) = cos t · p + sin t · d, so a ray returns to your eye after 2π, and you see every ball twice, once each way round. There is a ball at each vertex of the 24-cell — the 24 unit Hurwitz quaternions, nearest neighbours exactly 60° apart. Beyond a quarter-turn away, things look bigger as they get farther: the lines from them reconverge toward you, as meridians do toward a pole.",
+		aspect: 640 / 420,
+	},
+	{
+		id: "nil",
+		title: "Inside Nil",
+		hook: "Walk a loop and come back higher than you started, by exactly the area you went round.",
+		tryThis: "Drag to look around. The stripes on the columns mark height; watch them slant as you look along a row.",
+		maths:
+			"Nil is the Heisenberg group: (x, y, z)·(x′, y′, z′) = (x + x′, y + y′, z + z′ + (xy′ − yx′)/2), with a metric left multiplication preserves. Its geodesics are helices, in closed form: seen from above, circles; and they climb. A horizontal loop rises by the area it encloses, the same twist that turns quantum mechanics' position and momentum into a Heisenberg pair. The columns stand on the integer grid; the stripes mark z. The first variation of length checks the helices are geodesics, and that their mirror images are not.",
+		aspect: 640 / 420,
+	},
+	{
+		id: "sol",
+		title: "Inside Sol",
+		hook: "Go up, and one direction stretches while the other shrinks.",
+		tryThis: "Drag to look up, then down. Amber sheets (x) thin out above you and crowd in below; blue (y) does the opposite.",
+		maths:
+			"Sol has the metric ds² = e^{2z}dx² + e^{−2z}dy² + dz²: climbing z stretches x and squeezes y, and nothing in it is round. Its geodesics need elliptic functions, so each ray is stepped with Runge–Kutta through x″ = −2x′z′, y″ = 2y′z′, z″ = e^{2z}x′² − e^{−2z}y′², which keep e^{2z}x′ and e^{−2z}y′ fixed (checked to 10⁻¹⁴). The sheets are the coordinate planes x, y, z ∈ ℤ: amber x, blue y, violet z.",
+		aspect: 640 / 420,
+	},
+	{
+		id: "blackhole",
+		title: "A black hole",
+		hook: "The disk you see above the shadow is the far side, its light bent over the top.",
+		tryThis: "Drag to fly over and under the disk. Watch the bright side: gas coming toward you, blueshifted.",
+		maths:
+			"Schwarzschild spacetime, mass M = 1. Light keeps to the plane of its position and direction, and there u = 1/r obeys u″ = −u + 3u²; the 3u² is general relativity. Each pixel integrates it with Runge–Kutta, backwards from your eye. Rays with impact parameter below 3√3 fall in: the shadow. Light can circle at r = 3, the photon sphere, giving the thin bright ring. The disk runs from the last stable orbit, r = 6, outward; its light is shifted by g = √(1 − 3/r)/(1 − ΩL) and brightened as g⁴, so the approaching side blazes. Checked: the critical 3√3, the photon sphere, and Einstein's 4M/b bending (with its second-order term).",
+		aspect: 640 / 420,
+	},
+	{
 		id: "lorenz",
 		title: "One path through a vector field",
 		hook: "Perfectly determined, never repeating: the shape that named the butterfly effect.",

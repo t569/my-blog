@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Scene } from "@t569/scene-engine";
-import { ThreeNode } from "@t569/scene-engine/three";
-import { Matrix3, Mesh, PlaneGeometry, ShaderMaterial, Vector4 } from "three";
+import { Matrix3, Vector4 } from "three";
 import { reduceG, type G } from "@/lib/modular";
-import { step, type Lie } from "@/lib/sl2";
-import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
+import { step } from "@/lib/sl2";
+import { orthonormal, turn, type V3 } from "@/lib/thurston";
+import { mountRayView } from "./rayView";
 
 /**
  * Inside SL(2,ℝ) geometry: the space of phase 3's particles, seen from within.
@@ -91,33 +90,18 @@ void main() {
 	gl_FragColor = vec4(1.0 - exp(-1.1 * col), 1.0); // many walls compress, not clip to white
 }`;
 
-/** Rotate frame column vectors about `axis` by `ang` (Rodrigues). */
-function turn(frame: Lie[], axis: Lie, ang: number): Lie[] {
-	const [c, s] = [Math.cos(ang), Math.sin(ang)];
-	return frame.map((v) => {
-		const d = v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
-		const cr: Lie = [axis[1] * v[2] - axis[2] * v[1], axis[2] * v[0] - axis[0] * v[2], axis[0] * v[1] - axis[1] * v[0]];
-		return v.map((x, i) => x * c + cr[i]! * s + axis[i]! * d * (1 - c)) as Lie;
-	});
-}
-
 export default function SL2Space() {
 	const hostRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
-		const still = prefersReducedMotion();
-		const scene = new Scene({ width: W, height: H }, host);
-		const view = new ThreeNode({ x: W / 2, y: H / 2, width: W, height: H, shadows: "none", minResolution: 0.5 }); // no bloom: the light is many faint sheets, and glow turned them to a white fog
-		scene.add(view);
-
 		// Start inside the domain (0.12 + 1.5i), facing mostly up the fibre. With fibre component c the
 		// path's shadow on H² is a circle of curvature 2c/√(1 − c²); above 1 it closes, so the flight
 		// spirals in place instead of heading off up the cusp (pure e₁ goes straight up it).
 		const y0 = 1.5;
 		let g: G = [Math.sqrt(y0), 0.12 / Math.sqrt(y0), 0, 1 / Math.sqrt(y0)];
-		let frame: Lie[] = turn([[0, 1, 0], [0, 0, 1], [1, 0, 0]], [0, 1, 0], -1.1); // right, up, forward: c = sin 1.1
+		let frame: V3[] = turn([[0, 1, 0], [0, 0, 1], [1, 0, 0]], [0, 1, 0], -1.1); // right, up, forward: c = sin 1.1
 
 		const g0 = new Vector4();
 		const Q = new Matrix3();
@@ -126,65 +110,26 @@ export default function SL2Space() {
 			Q.set(...([0, 1, 2].flatMap((i) => frame.map((v) => v[i]!)) as [number, number, number, number, number, number, number, number, number]));
 		};
 		upload();
-		const mat = new ShaderMaterial({
-			uniforms: { g0: { value: g0 }, Q: { value: Q }, aspect: { value: W / H }, fov: { value: FOV } },
-			vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-			fragmentShader: FRAG,
-			depthTest: false,
-		});
-		const quad = new Mesh(new PlaneGeometry(2, 2), mat);
-		quad.frustumCulled = false;
-		view.world.add(quad);
-
-		/** Fly the camera along its forward geodesic; its frame turns with the velocity, as geodesics do here. */
-		const fly = (h: number) => {
-			const f = frame[2]!;
-			const { g: next } = step(g, f, h);
-			g = reduceG(next); // the modular group on the left: same view, small numbers
-			const det = g[0] * g[3] - g[1] * g[2];
-			g = g.map((v) => v / Math.sqrt(det)) as G; // float drift off det 1
-			frame = turn(frame, [0, 0, 1], -2 * f[2] * h);
-		};
-
-		let drag: { x: number; y: number } | null = null;
-		const pd = (e: PointerEvent) => {
-			drag = { x: e.clientX, y: e.clientY };
-			view.canvas.setPointerCapture?.(e.pointerId);
-		};
-		const pm = (e: PointerEvent) => {
-			if (!drag) return;
-			const k = 2 / view.canvas.getBoundingClientRect().height;
-			frame = turn(frame, frame[1]!, -(e.clientX - drag.x) * k);
-			frame = turn(frame, frame[0]!, -(e.clientY - drag.y) * k);
-			drag = { x: e.clientX, y: e.clientY };
-			upload();
-			view.moving();
-			if (!scene.playing) scene.seek(scene.elapsed);
-		};
-		const pu = () => (drag = null);
-		view.canvas.addEventListener("pointerdown", pd);
-		view.canvas.addEventListener("pointermove", pm);
-		view.canvas.addEventListener("pointerup", pu);
-		view.onCleanup(() => {
-			view.canvas.removeEventListener("pointerdown", pd);
-			view.canvas.removeEventListener("pointermove", pm);
-			view.canvas.removeEventListener("pointerup", pu);
-		});
-
-		if (still) scene.seek(0);
-		else
-			view.onFrame((dt) => {
-				if (dt === 0) return false;
-				fly(dt * SPEED);
+		// No bloom: the light is many faint sheets, and glow turned them to a white fog.
+		return mountRayView(host, W, H, {
+			frag: FRAG,
+			uniforms: { g0: { value: g0 }, Q: { value: Q }, fov: { value: FOV } },
+			// Fly along the forward geodesic; the frame turns with the velocity, as geodesics do here.
+			fly: (dt) => {
+				const h = dt * SPEED;
+				const f = frame[2]!;
+				g = reduceG(step(g, f, h).g); // the modular group on the left: same view, small numbers
+				const det = g[0] * g[3] - g[1] * g[2];
+				g = g.map((v) => v / Math.sqrt(det)) as G; // float drift off det 1
+				frame = turn(frame, [0, 0, 1], -2 * f[2] * h);
 				upload();
-				return true;
-			});
-
-		const stop = runWhileVisible(host, scene);
-		return () => {
-			stop();
-			scene.destroy(); // ThreeNode frees the quad and the GL context
-		};
+			},
+			look: (yaw, pitch) => {
+				frame = turn(frame, frame[1]!, -yaw);
+				frame = orthonormal(turn(frame, frame[0]!, -pitch));
+				upload();
+			},
+		});
 	}, []);
 
 	return <div ref={hostRef} className="w-full cursor-grab overflow-hidden rounded-xl" style={{ aspectRatio: `${W} / ${H}`, background: STAGE }} />;
