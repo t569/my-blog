@@ -197,6 +197,11 @@ html {
 	scrollbar-width: none;
 }
 
+/* Lenis (the lab) scrolls by setting the position every frame; native smoothing would chase each one. */
+html.lenis {
+	scroll-behavior: auto;
+}
+
 body {
 	font-family: var(--font-body);
 	color: var(--color-text-primary);

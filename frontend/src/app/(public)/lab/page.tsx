@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SITE } from "@/lib/constants";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import Sim from "@/components/lab/Sim";
+import LabStage from "@/components/lab/LabStage";
 import { SIMS } from "@/components/lab/registry";
 
 export const metadata: Metadata = {
@@ -26,6 +31,7 @@ export default function LabPage() {
 
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-20 px-4 py-12 md:px-6">
+			<LabStage />
 			<header className="flex flex-col gap-4">
 				<p className="font-mono text-xs uppercase tracking-widest text-text-tertiary">Lab</p>
 				<h1 className="font-display text-h1 font-bold text-text-primary">Scenes you can touch</h1>
@@ -67,7 +73,12 @@ export default function LabPage() {
 							<summary className="cursor-pointer list-none font-mono text-xs text-text-tertiary hover:text-accent">
 								<span className="inline-block transition-transform group-open:rotate-90">▸</span> The mathematics
 							</summary>
-							<p className="mt-2">{s.maths}</p>
+							{/* On the server: KaTeX's HTML ships, not KaTeX. */}
+							<div className="mt-2">
+								<ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+									{s.maths}
+								</ReactMarkdown>
+							</div>
 						</details>
 					</div>
 				</section>

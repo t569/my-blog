@@ -36,6 +36,14 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 /** Idle mounts, in page order, one after another. */
 let queue = Promise.resolve();
 
+/** LabStage while it sets up: scenes load after it, so their 3D is made on its shared renderer. */
+let stage: Promise<unknown> = Promise.resolve();
+export const awaitStage = (setUp: Promise<unknown>) => void (stage = setUp);
+const loader = (id: string) => {
+	const load = LOAD[id.trim()];
+	return load && (() => stage.then(load));
+};
+
 const Box = ({ aspect }: { aspect: number }) => <div className="w-full rounded-xl bg-bg-surface" style={{ aspectRatio: String(aspect) }} />;
 
 /** Rendered after the scene, so its effect runs once the scene's own (the mount) have. */
@@ -67,7 +75,7 @@ export default function Sim({ id }: { id: string }) {
 	// and invisible while the reader is still at the top. Mounted early costs nothing per frame:
 	// every scene pauses while off screen. Scrolling near (below) still mounts it if idle never came.
 	useEffect(() => {
-		const load = LOAD[id.trim()];
+		const load = loader(id);
 		if (!load) return;
 		const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
 		const cancel = window.cancelIdleCallback ?? window.clearTimeout;
@@ -102,7 +110,7 @@ export default function Sim({ id }: { id: string }) {
 	// Scrolled near before its idle turn came: load it now, out of the queue.
 	useEffect(() => {
 		const el = box.current;
-		const load = LOAD[id.trim()];
+		const load = loader(id);
 		if (!el || Scene || !load) return;
 		let live = true;
 		const io = new IntersectionObserver(

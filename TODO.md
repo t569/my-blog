@@ -997,6 +997,93 @@ solver, bloom/post chain, zero-GC frames, workers.
       hand-written ones exist. Prior art: Coulon–Matsumoto–Segerman–Trettel.
 - [ ] Other forms (E₄, E₆, j) once one form is right: j has poles, needs clipping.
 
+### 9. The lab as a stage: one canvas, pinned chapters
+
+/lab stops being a document of boxes and becomes a stage: one fixed WebGL
+canvas behind the page, one scene full-bleed at a time, scroll moving between
+chapters with a shader transition, and the words floating over it. Inspired by
+Lusion and Active Theory. Decided 2026-10-01:
+
+- **Layout: pinned chapters.** One full-screen scene at a time; scroll advances.
+- **Acts** (title card each, progress rail shows acts):
+  | Act | Scenes | Transition into it |
+  |---|---|---|
+  | I Chaos & pattern | mandelbrot, lorenz, flow, fluid, life, fibonacci, fourier | fluid displacement |
+  | II Surfaces | puzzle, laplace, torus | surface ripple / fold |
+  | III The modular world | modular, delta, knots | hyperbolic-tiling dissolve |
+  | IV Inside geometries | h3, sl2, s3, nil, sol | geodesic tunnel |
+  | V Black holes | blackhole, kerr | gravitational lens |
+  | Coda: the engine | ad, hero | CSS wipe |
+- **Input: per scene.** `immersive: true` in the registry: click to take all
+  input, Esc gives it back (proposed: black holes, the five geometries,
+  mandelbrot, fluid). Others: drag goes to the scene, the wheel scrolls.
+- **Non-WebGL scenes** (SVG, 2D canvas) keep their DOM; any transition touching
+  one is a CSS mask wipe styled to match. Not ported.
+- **Theme:** follows the site skin (scenes already read `sceneTheme`).
+- **Deps:** `lenis` (smooth scroll), `framer-motion` (kinetic type, phase 4).
+- **Maths in LaTeX**, rendered by KaTeX on the server (it's already a dependency).
+- **The old list stays** (extend by preserving): the layout under reduced
+  motion, without WebGL and on small phones, and behind a "list view" toggle.
+  Posts and the editor keep using `Sim` exactly as now.
+- **The stage is /lab only**, not the root layout: the rest of the blog never
+  pays for three.js.
+
+**The seam.** Every WebGL scene already goes through the engine's `ThreeNode`,
+which made its own `WebGLRenderer` (one context each; ~15 of the browser's ~16).
+Given a shared renderer instead, a node draws into its own render target and
+the stage composites the targets onto the one canvas. That one change gives the
+global canvas, ends the context ceiling and the 150–250 ms context creation per
+scene, and is what makes FBO transitions possible (both scenes' pixels in one
+context). It's generic, so it goes upstream to `t569/scene-engine`.
+
+- [x] **Phase 1: engine seam + stage** (list layout unchanged, so the seam is
+      verified on a page whose look is known)
+  - [x] `ThreeNode` shared mode: `ThreeNode.sharedRenderer` set → nodes borrow it
+        and render into a render target (MSAA, half float); resolution governor
+        sizes the target, not the canvas; never disposes the borrowed renderer.
+        The node's `<canvas>` stays as the DOM box for pointer events and layout.
+        Colour: three skips tone mapping/sRGB when drawing to a target, so a node
+        reports `outputLinear` (built-in materials, no bloom) and the stage encodes.
+        The mount's opaque background is lifted into `node.backdrop` so the stage
+        shows through. README + CHANGELOG.
+  - [x] `LabStage`: fixed canvas behind the page, composites every visible shared
+        node into its box (rounded corners kept), only when something changed;
+        drives Lenis from the same rAF so the boxes don't lag the scroll.
+  - [x] Lenis on /lab, off under reduced motion.
+  - [x] Maths text as LaTeX (registry `maths` → `$…$`, KaTeX on the server).
+  - [x] Verify (2026-10-02): one WebGL context on /lab (was ~15); `tsc`,
+        `build`, engine tests 77/77; three.js still absent from /lab's initial
+        chunks (stage + Lenis: 46 KB). All 15 WebGL scenes pixel-diffed against
+        a worktree of the last commit, frozen under reduced motion, light, dark
+        and a live switch: mean difference < 2.5/255 each, colours identical.
+        Leaving /lab frees the context and unsets `sharedRenderer`, so pages
+        after it (posts) make their own (not checked on a real post: backend
+        was down). Found and fixed on the way:
+        - `scene3d` background set on the renderer, lost when shared: the
+          hero went black. Now `ThreeNode.setClearColor`, re-applied per frame.
+        - `PointsMaterial` sizes points by the renderer's canvas (three), so on
+          the stage canvas the hero's particles were 2.6× too big.
+        - The composite didn't clamp: half-float targets hold > 1 where an
+          8-bit canvas clips, and alpha > 1 subtracted the backdrop (knots).
+        - Boxes at half pixels drew a pixel off (h3's fine detail, knots).
+          Snapped as the browser snaps a canvas. h3 still differs by 4.6
+          because the *original* is resampled (557 px buffer in a 556.5 px
+          box); the stage draws it 1:1.
+        - `LabStage` disposed twice when unmounted before setup finished.
+        Known ceiling until phase 2: native scrolling (touch, scrollbar drag)
+        is composited a frame late, so boxes can trail the page; pinned
+        chapters don't move with scroll, so this goes away there.
+- [ ] **Phase 2: pinned chapters.** Chapters, acts, title cards, progress rail,
+      glass panel; scene fitted to cover the viewport; only active ± 1 mounted
+      (so leaks in a shared context now matter: audit `dispose`); the list as
+      fallback + toggle; `immersive` flag and `data-lenis-prevent`.
+- [ ] **Phase 3: transitions.** Outgoing and incoming targets mixed by one
+      shader per act, driven by scroll progress between chapters; CSS wipe
+      whenever an SVG/2D scene is on either side.
+- [ ] **Phase 4: polish.** framer-motion kinetic type for titles and panels;
+      spring cursor that reacts to scenes and text (none on touch); immersive
+      mode's enter/exit.
+
 ---
 
 ## Explicitly skipped

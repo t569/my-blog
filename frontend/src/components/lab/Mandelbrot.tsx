@@ -286,7 +286,9 @@ export default function Mandelbrot() {
 		const quad = new Mesh(new PlaneGeometry(2, 2), material);
 		quad.frustumCulled = false;
 		const size = new Vector2();
-		quad.onBeforeRender = (renderer) => void (uniforms.uPx.value = (2 * uniforms.uH.value) / renderer.getDrawingBufferSize(size).y);
+		// The height of what is being drawn into: a render target when the view shares the lab's renderer.
+		quad.onBeforeRender = (renderer) =>
+			void (uniforms.uPx.value = (2 * uniforms.uH.value) / (renderer.getRenderTarget()?.height ?? renderer.getDrawingBufferSize(size).y));
 		view.world.add(quad);
 
 		// ---- palette, from the skin or a fixed one
