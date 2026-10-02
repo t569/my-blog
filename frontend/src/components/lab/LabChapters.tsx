@@ -3,7 +3,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Sim from "./Sim";
 import LabLoader from "./LabLoader";
-import { easeMove, setTransition, smooth } from "./LabStage";
+import { easeMove, fadeIn, fadeOut, setTransition, smooth } from "./LabStage";
 import { ACTS, IMMERSIVE, SCROLL, groupOf, simById } from "./registry";
 import { ScrollProgress, StageChapter } from "./scrollProgress";
 
@@ -150,9 +150,10 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			setTransition(out || inc ? { from: out, to: inc, t } : null);
 			// One scene drawing at a time: the leaving one holds its frame, the arriving one runs light.
 			easeMove(out, inc ?? morph, t < 1 ? MOVE_MS - (now - start) + 150 : null);
-			// What the stage can't dissolve (SVG, 2D canvas, the text over a 3D scene) cross-fades here.
-			if (out) Object.assign(out.style, { opacity: String(1 - t), transform: `scale(${1 + 0.03 * t})` });
-			if (inc) Object.assign(inc.style, { opacity: String(t), transform: `scale(${1.04 - 0.04 * t})` });
+			// What the stage can't dissolve (SVG, 2D canvas, the text over a 3D scene) fades here: out by
+			// half way, then in. A cross-fade showed both at once, the next scene through the last.
+			if (out) Object.assign(out.style, { opacity: String(fadeOut(t)), transform: `scale(${1 + 0.03 * t})` });
+			if (inc) Object.assign(inc.style, { opacity: String(fadeIn(t)), transform: `scale(${1.04 - 0.04 * t})` });
 			if (t < 1) return void requestAnimationFrame(frame);
 			setTransition(null);
 			for (const el of [out, inc]) if (el) Object.assign(el.style, { opacity: "", transform: "" });

@@ -22,10 +22,10 @@ void main() {
 // A view's frame over the colour lifted off its box, clipped to the box's rounded corners.
 // Output is premultiplied, as the canvas expects.
 //
-// Between chapters (setTransition) the incoming view is drawn slightly enlarged (`zoom`), and the
-// outgoing one over it through a dissolve (`dissolve` = progress): a moving noise field eats it
-// away as progress passes each point's value, pushing it along the noise's slope and splitting its
-// channels a little as it goes, with a faint bright edge where it burns.
+// Between chapters (setTransition) the outgoing view is drawn over the incoming one through a
+// dissolve (`dissolve` = progress): a moving noise field eats it away as progress passes each
+// point's value, pushing it along the noise's slope and splitting its channels a little as it goes,
+// with a faint bright edge where it burns. An incoming view with nothing dissolving over it fades.
 const FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float drawn;
@@ -33,7 +33,7 @@ uniform vec4 bg;
 uniform vec2 size;
 uniform float radius;
 uniform float dissolve;
-uniform float zoom;
+uniform float fade;
 uniform float time;
 uniform vec2 used;
 varying vec2 vUv;
@@ -49,12 +49,12 @@ float fbm(vec2 p) { return 0.5 * noise(p) + 0.25 * noise(p * 2.03) + 0.25 * nois
 // A reduced-resolution frame fills only the bottom-left \`used\` part of the target (ThreeNode.outputScale);
 // kept half a texel inside it, so filtering never reaches the stale rest.
 vec4 frame(vec2 uv) {
-	vec2 half = 0.5 / vec2(textureSize(map, 0));
-	uv = clamp(uv * used, half, used - half);
+	vec2 texel = 0.5 / vec2(textureSize(map, 0));
+	uv = clamp(uv * used, texel, used - texel);
 	return drawn > 0.5 ? clamp(texture2D(map, uv), 0.0, 1.0) : vec4(0.0);
 }
 void main() {
-	vec2 uv = 0.5 + (vUv - 0.5) / zoom;
+	vec2 uv = vUv;
 	float mask = 1.0;
 	vec4 c;
 	if (dissolve > 0.0) {
@@ -72,7 +72,7 @@ void main() {
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 	float inside = clamp(0.5 - d, 0.0, 1.0);
 	float edge = dissolve > 0.0 ? mask * (1.0 - mask) * 1.4 : 0.0;
-	gl_FragColor = ((c + under) * mask + vec4(vec3(edge), edge)) * inside;
+	gl_FragColor = ((c + under) * mask + vec4(vec3(edge), edge)) * inside * fade;
 }`;
 
 /**
@@ -81,6 +81,13 @@ void main() {
  */
 let transition: { from: Element | null; to: Element | null; t: number } | null = null;
 export const setTransition = (next: typeof transition) => void (transition = next);
+
+/**
+ * A move with a 2D scene (SVG, canvas) on either side can't dissolve one scene through the other:
+ * the leaving one is gone by half way, then the arriving one comes in. Two 3D scenes dissolve.
+ */
+export const fadeOut = (t: number) => Math.max(0, 1 - 2 * t);
+export const fadeIn = (t: number) => Math.max(0, 2 * t - 1);
 
 /** The engine's view class, once the stage has loaded it (three.js stays out of the page until then). */
 let views: typeof import("@t569/scene-engine/three").ThreeNode | null = null;
@@ -162,7 +169,7 @@ async function setUp(host: HTMLElement) {
 			size: { value: new THREE.Vector2() },
 			radius: { value: 0 },
 			dissolve: { value: 0 },
-			zoom: { value: 1 },
+			fade: { value: 1 },
 			time: { value: 0 },
 			used: { value: new THREE.Vector2(1, 1) },
 		},
@@ -246,10 +253,18 @@ async function setUp(host: HTMLElement) {
 			const views: [InstanceType<typeof ThreeNode>, DOMRect, "in" | "out" | null][] = [];
 			const move = transition;
 			let key = `${w}x${h}@${dpr}${move ? `~${move.t}` : ""}`;
+			// Which sides of a move are 3D, drawn yet or not: an arriving view's first frame comes a few
+			// frames into the move, and the leaving one shouldn't take the 2D timing meanwhile.
+			let leaving = false;
+			let entering = false;
 			for (const view of ThreeNode.shared) {
+				const role = move?.from?.contains(view.canvas) ? "out" : move?.to?.contains(view.canvas) ? "in" : null;
+				leaving ||= role === "out";
+				entering ||= role === "in";
+				// Never drawn: its canvas isn't placed yet either (just shown; it places itself as it draws).
+				if (!view.version) continue;
 				const r = view.canvas.getBoundingClientRect();
 				if (!r.width || r.bottom <= 0 || r.top >= h || r.right <= 0 || r.left >= w) continue;
-				const role = move?.from?.contains(view.canvas) ? "out" : move?.to?.contains(view.canvas) ? "in" : null;
 				views.push([view, r, role]);
 				key += `|${view.version},${r.left},${r.top},${r.width},${r.height},${view.background}`;
 			}
@@ -269,8 +284,11 @@ async function setUp(host: HTMLElement) {
 			const bufferH = renderer.getDrawingBufferSize(buffer).y;
 			for (const [view, r, role] of views) {
 				const t = move?.t ?? 0;
-				material.uniforms.dissolve.value = role === "out" ? Math.max(t, 1e-3) : 0;
-				material.uniforms.zoom.value = role === "in" ? 1.04 - 0.04 * t : 1;
+				// Into a 2D scene, the burn is over by half way, as that scene's fades are (fadeOut).
+				material.uniforms.dissolve.value = role === "out" ? Math.max(entering ? t : 1 - fadeOut(t), 1e-3) : 0;
+				// Its enlargement is the wrapper's CSS scale, already in `r`. With no 3D scene leaving to dissolve
+				// over it (a 2D one is leaving, in CSS), it fades in itself, as CSS opacity can't reach this canvas.
+				material.uniforms.fade.value = role === "in" && !leaving ? fadeIn(t) : 1;
 				material.uniforms.time.value = performance.now() / 1000;
 				// Over what is already there (premultiplied) while dissolving; otherwise each box is its own.
 				material.blending = role === "out" ? THREE.CustomBlending : THREE.NoBlending;

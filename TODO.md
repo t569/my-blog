@@ -1178,6 +1178,22 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
 - [ ] **Phase 3: transitions.** Outgoing and incoming targets mixed by one
       shader per act, driven by scroll progress between chapters; CSS wipe
       whenever an SVG/2D scene is on either side.
+  - [x] Fixes on the way (2026-10-02):
+        - Every 3D scene blank: the composite shader named a variable `half`,
+          a GLSL reserved word, so it never compiled.
+        - The next scene flashed in a corner on arrival. Chrome answers
+          getScreenCTM inside `display: none` with an identity matrix, so a
+          neighbour that drew while hidden (a `seek` at mount) placed its canvas
+          640×400, half a box up-left, with a real frame in it. The engine no
+          longer draws a view that isn't laid out; the stage skips undrawn views.
+        - A 2D scene on either side cross-faded, showing both at once. Now the
+          leaving one is gone by half way, then the arriving one comes in
+          (`fadeOut`/`fadeIn`), in CSS and for 3D views on the stage alike. Two
+          3D scenes still dissolve.
+        - An arriving 3D scene was zoomed twice (shader and CSS scale).
+        - The coda hero's "Open the lab →" button did nothing, in the lab: removed.
+  - [ ] Opening `/lab#<scene>` sometimes lands a chapter or two off (seen in
+        headless Chrome: #fluid → Life, #laplace → Torus).
 - [ ] **Phase 4: polish.** framer-motion kinetic type for titles and panels;
       spring cursor that reacts to scenes and text (none on touch); immersive
       mode's enter/exit.

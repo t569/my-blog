@@ -53,8 +53,6 @@ export function heroSpec(): SceneSpec {
 			{ type: "text", text: "Mathematics", x: 300, y: 185, fontSize: 68, fill: "#f4f1ea", scale: 0, animate: popIn(0.2) },
 			{ type: "text", text: "you can touch.", x: 300, y: 260, fontSize: 68, fill: GOLD, scale: 0, animate: popIn(0.45) },
 			{ type: "text", text: "Live scenes. Nothing to install.", x: 300, y: 322, fontSize: 22, fill: "#9aa3b8", scale: 0, animate: popIn(0.8) },
-			{ type: "rect", x: 300, y: 400, width: 240, height: 58, rx: 29, fill: GOLD, hover_scale: 1.06, scale: 0, animate: popIn(1.1) },
-			{ type: "text", text: "Open the lab →", x: 300, y: 402, fontSize: 22, fill: NIGHT, scale: 0, animate: popIn(1.1) },
 		],
 	};
 }

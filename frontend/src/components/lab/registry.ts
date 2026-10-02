@@ -241,7 +241,7 @@ export const SIMS: Sim[] = [
 		id: "hero",
 		title: "A 3D hero, as data",
 		hook: "Glow, a galaxy, a headline — and still nothing but a description.",
-		tryThis: "Hover the button. Then open the JSON: the 3D stage, the light, eleven and a half thousand drifting points, all of it is there.",
+		tryThis: "Watch the headline pop in. Then open the JSON: the 3D stage, the light, eleven and a half thousand drifting points, all of it is there.",
 		maths:
 			"The same idea as the banner above, carried into 3D: one WebGL canvas under the text, never two. Each point circles its own ring at a speed that falls off with radius, worked out on the GPU from the time alone, so the CPU does nothing per frame and the scene can be stopped at any instant. Under reduced motion that is what you get: one still frame, glow and all. three.js arrives only when the hero nears the screen.",
 		aspect: 1200 / 500,
