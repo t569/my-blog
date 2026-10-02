@@ -207,10 +207,10 @@ export const SIMS: Sim[] = [
 	},
 	{
 		id: "ad",
-		title: "An ad, as data",
-		hook: "No code — a whole animated banner is a description.",
-		tryThis: "Watch the four-second loop; every part of it is a line of JSON.",
-		maths: "A headline that pops, a rule that draws itself, a badge that pulses. Change the JSON and the campaign changes, without a deploy. What the engine was first built for.",
+		title: "Euler's identity, as data",
+		hook: "Five constants, one equation, and not a line of code to animate it.",
+		tryThis: "Watch the point walk half way round the circle; the identity assembles as it arrives. Then open the JSON: that is the whole scene.",
+		maths: String.raw`$e^{i\theta} = \cos\theta + i\sin\theta$ is the point at angle $\theta$ on the unit circle. Turn by $\theta = \pi$ and it reaches $-1$, so $e^{i\pi} + 1 = 0$: $e$, $i$, $\pi$, $1$ and $0$ in one line. Here the circle draws itself, the point's position is an expression of the time, and each term pops in on cue, all as data. Change the JSON and the scene changes, without a deploy: what the engine was first built for.`,
 		aspect: 900 / 260,
 	},
 	{

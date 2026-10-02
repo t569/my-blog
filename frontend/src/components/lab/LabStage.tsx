@@ -21,24 +21,59 @@ void main() {
 
 // A view's frame over the colour lifted off its box, clipped to the box's rounded corners.
 // Output is premultiplied, as the canvas expects.
+//
+// Between chapters (setTransition) the incoming view is drawn slightly enlarged (`zoom`), and the
+// outgoing one over it through a dissolve (`dissolve` = progress): a moving noise field eats it
+// away as progress passes each point's value, pushing it along the noise's slope and splitting its
+// channels a little as it goes, with a faint bright edge where it burns.
 const FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float drawn;
 uniform vec4 bg;
 uniform vec2 size;
 uniform float radius;
+uniform float dissolve;
+uniform float zoom;
+uniform float time;
 varying vec2 vUv;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+	vec2 i = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) { return 0.5 * noise(p) + 0.25 * noise(p * 2.03) + 0.25 * noise(p * 4.01); }
+// Clamped as the view's own 8-bit canvas would have stored it: additive layers leave a half-float
+// target above 1 (alpha too, which would make the backdrop below subtract).
+vec4 frame(vec2 uv) { return drawn > 0.5 ? clamp(texture2D(map, uv), 0.0, 1.0) : vec4(0.0); }
 void main() {
-	// Clamped as the view's own 8-bit canvas would have stored it: additive layers leave a half-float
-	// target above 1 (alpha too, which would make the backdrop below subtract).
-	vec4 c = drawn > 0.5 ? clamp(texture2D(map, vUv), 0.0, 1.0) : vec4(0.0);
+	vec2 uv = 0.5 + (vUv - 0.5) / zoom;
+	float mask = 1.0;
+	vec4 c;
+	if (dissolve > 0.0) {
+		vec2 p = vUv * vec2(size.x / size.y, 1.0) * 3.0 + time * 0.05;
+		float n = fbm(p);
+		mask = smoothstep(dissolve * 1.25 - 0.25, dissolve * 1.25, n);
+		vec2 slope = vec2(fbm(p + vec2(0.04, 0.0)) - n, fbm(p + vec2(0.0, 0.04)) - n) * 25.0;
+		vec2 off = slope * 0.04 * dissolve;
+		vec4 g = frame(uv + off);
+		c = vec4(frame(uv + off * 1.6).r, g.g, frame(uv + off * 0.4).b, g.a);
+	} else c = frame(uv);
 	vec4 under = vec4(bg.rgb * bg.a, bg.a) * (1.0 - c.a);
 	// Signed distance to the rounded box, in pixels; the min() term is what makes the inside negative.
 	vec2 q = abs((vUv - 0.5) * size) - (0.5 * size - radius);
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 	float inside = clamp(0.5 - d, 0.0, 1.0);
-	gl_FragColor = (c + under) * inside;
+	float edge = dissolve > 0.0 ? mask * (1.0 - mask) * 1.4 : 0.0;
+	gl_FragColor = ((c + under) * mask + vec4(vec3(edge), edge)) * inside;
 }`;
+
+/**
+ * Between two chapters: the elements holding the outgoing and incoming scenes, and how far
+ * along (0–1). Set every frame of the move by the chapters; null when still.
+ */
+let transition: { from: Element | null; to: Element | null; t: number } | null = null;
+export const setTransition = (next: typeof transition) => void (transition = next);
 
 /**
  * The lab's one WebGL canvas, fixed behind the page, and its smooth scroll.
@@ -103,11 +138,17 @@ async function setUp(host: HTMLElement) {
 			bg: { value: new THREE.Vector4() },
 			size: { value: new THREE.Vector2() },
 			radius: { value: 0 },
+			dissolve: { value: 0 },
+			zoom: { value: 1 },
+			time: { value: 0 },
 		},
 		vertexShader: VERTEX,
 		fragmentShader: FRAGMENT,
 		toneMapped: false,
 		blending: THREE.NoBlending,
+		// Used while a view dissolves over another (CustomBlending): premultiplied "over".
+		blendSrc: THREE.OneFactor,
+		blendDst: THREE.OneMinusSrcAlphaFactor,
 		depthTest: false,
 		depthWrite: false,
 	});
@@ -151,15 +192,19 @@ async function setUp(host: HTMLElement) {
 			const w = canvas.clientWidth;
 			const h = canvas.clientHeight;
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
-			const views: [InstanceType<typeof ThreeNode>, DOMRect][] = [];
-			let key = `${w}x${h}@${dpr}`;
+			const views: [InstanceType<typeof ThreeNode>, DOMRect, "in" | "out" | null][] = [];
+			const move = transition;
+			let key = `${w}x${h}@${dpr}${move ? `~${move.t}` : ""}`;
 			for (const view of ThreeNode.shared) {
 				const r = view.canvas.getBoundingClientRect();
 				if (!r.width || r.bottom <= 0 || r.top >= h || r.right <= 0 || r.left >= w) continue;
-				views.push([view, r]);
+				const role = move?.from?.contains(view.canvas) ? "out" : move?.to?.contains(view.canvas) ? "in" : null;
+				views.push([view, r, role]);
 				key += `|${view.version},${r.left},${r.top},${r.width},${r.height},${view.background}`;
 			}
 			if (key === drawn) return;
+			// The outgoing scene last: it dissolves over the incoming one.
+			views.sort((a, b) => Number(a[2] === "out") - Number(b[2] === "out"));
 			drawn = key;
 
 			if (renderer.getPixelRatio() !== dpr) renderer.setPixelRatio(dpr);
@@ -171,7 +216,13 @@ async function setUp(host: HTMLElement) {
 			renderer.clear();
 			renderer.setScissorTest(true);
 			const bufferH = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
-			for (const [view, r] of views) {
+			for (const [view, r, role] of views) {
+				const t = move?.t ?? 0;
+				material.uniforms.dissolve.value = role === "out" ? Math.max(t, 1e-3) : 0;
+				material.uniforms.zoom.value = role === "in" ? 1.04 - 0.04 * t : 1;
+				material.uniforms.time.value = performance.now() / 1000;
+				// Over what is already there (premultiplied) while dissolving; otherwise each box is its own.
+				material.blending = role === "out" ? THREE.CustomBlending : THREE.NoBlending;
 				// Snapped to device pixels as the browser snaps a canvas: the corner rounded, then the size.
 				// Unsnapped, a box at a half pixel lands a pixel off, which fine detail shows at once.
 				const x = Math.round(r.left * dpr);
