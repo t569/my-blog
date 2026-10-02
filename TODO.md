@@ -1218,8 +1218,8 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
   - [x] Bug found on the way: `disposeObject` on a model copy disposed
         geometry and materials shared with the cached glTF. Now it skips the
         glTF's geometry and whatever `parser.associations` records (materials,
-        textures, variants). Test in `three.test.ts`; not yet pushed to the
-        scene-engine subtree.
+        textures, variants). Test in `three.test.ts`; subtree pushed (`07b2ea8`), 79/79 pass in
+        `D:/Repos/scene-engine`.
   - Skipped: worker index transfer (already zero-copy); graph force buffers
     (dozens of nodes); OffscreenCanvas (no gain for a shared compositor).
 
