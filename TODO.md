@@ -1215,9 +1215,11 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
           stage's rect sweep, `steer()`).
         - Space3D/SVG re-projection; Phyllotaxis's 620 circles.
         - Contexts per sim in posts.
-  - [ ] Bug found on the way: `disposeObject` on a model copy disposes
-        geometry and materials shared with the cached glTF (`node.ts` model
-        cache). The next instance of that URL re-uploads, or renders broken.
+  - [x] Bug found on the way: `disposeObject` on a model copy disposed
+        geometry and materials shared with the cached glTF. Now it skips the
+        glTF's geometry and whatever `parser.associations` records (materials,
+        textures, variants). Test in `three.test.ts`; not yet pushed to the
+        scene-engine subtree.
   - Skipped: worker index transfer (already zero-copy); graph force buffers
     (dozens of nodes); OffscreenCanvas (no gain for a shared compositor).
 
