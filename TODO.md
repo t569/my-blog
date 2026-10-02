@@ -1153,6 +1153,25 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
         terrain at a quarter of the points, intro in portrait on portrait.
         Hydration made cheap: maths as one HTML string per scene (KaTeX on the
         server, 137 formulas checked), panels rendered only near the stage.
+  - [x] Fixes from a first look (2026-10-02, measured in front, production):
+        - One flick moved two chapters: trackpad coasting decays and thins out,
+          and its tail outlived the 220 ms "gesture over" gap. A new gesture is
+          now a 500 ms pause or a delta that jumps up (coasting never does).
+          Inertia tails up to 3 s: one chapter; two deliberate flicks: two.
+        - The wheel over a panel scrolled the page freely (no panel scroll to
+          take it), stopping between chapters: a panel keeps the wheel only
+          while it can scroll that way; `overscroll-contain`.
+        - Moves stuttered (18–30 fps into 3D scenes): both scenes drew at once,
+          the arriving one at full resolution, and hidden neighbours compiled
+          their shaders on first draw. Now the leaving view holds its frame
+          (`view.hold`), the arriving one draws at its floor for the move
+          (`moving`), neighbours mount once settled and are compiled in idle
+          time (`view.warm()`): 37–57 fps, p95 17 ms on most moves.
+        - Left: one 100–180 ms frame at the start of some moves (likely the
+          React commit of the arriving chapter); Mandelbrot → Lorenz and
+          puzzle → Laplace at ~37 fps.
+        - "Couldn't load page" on a phone: not the site. Windows had the Wi-Fi
+          as a Public network and no firewall rule for Node: inbound blocked.
   - [ ] **Measure on a real phone, and with the tab in front.** A background
         tab (even "visible") is throttled to ~1 frame/s and its timers slowed:
         every timing taken that way was an artifact, /about included.

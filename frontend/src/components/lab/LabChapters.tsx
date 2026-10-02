@@ -3,7 +3,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Sim from "./Sim";
 import LabLoader from "./LabLoader";
-import { setTransition, smooth } from "./LabStage";
+import { easeMove, setTransition, smooth } from "./LabStage";
 import { ACTS, IMMERSIVE, SCROLL, groupOf, simById } from "./registry";
 import { ScrollProgress, StageChapter } from "./scrollProgress";
 
@@ -59,8 +59,14 @@ function Rise({ on, as: Tag, delay = 0, className, children }: { on: boolean; as
 /** A chapter change: the scroll and the dissolve share this length and curve. */
 const MOVE_MS = 1100;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-/** A wheel gesture is over once the wheel has been quiet this long (trackpads coast for a while). */
-const GESTURE_GAP_MS = 220;
+/**
+ * When a wheel event starts a new gesture. Trackpads and smooth-scrolling wheels coast for seconds
+ * after a flick, ever weaker and ever sparser: any fixed gap is eventually exceeded by the tail, and
+ * a second chapter goes by. Coasting only decays, though. So a new gesture is a real pause, or a
+ * delta that jumps up (a fresh flick on top of the tail).
+ */
+const QUIET_MS = 500;
+const FRESH = 1.6;
 const SWIPE_PX = 50;
 
 /**
@@ -88,13 +94,16 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 	}, []);
 	const [active, setActive] = useState(0);
 	const [leaving, setLeaving] = useState<number | null>(null);
+	// Where the neighbours are mounted around: the chapter on stage once a move has settled and the
+	// page is idle. Mounting a scene (its objects, Worker, shaders) during the move made it stutter.
+	const [settled, setSettled] = useState(0);
 	const [immersed, setImmersed] = useState(false);
 	const root = useRef<HTMLDivElement>(null);
 	const sections = useRef<(HTMLElement | null)[]>([]);
 	const wrappers = useRef<Record<string, HTMLDivElement | null>>({});
 	const layer = useRef<HTMLDivElement>(null);
 	// Read by the input handlers, which are bound once.
-	const state = useRef({ active: 0, moving: false, gestureUntil: 0, immersed: false });
+	const state = useRef({ active: 0, moving: false, immersed: false });
 	state.current.active = active;
 	state.current.immersed = immersed;
 
@@ -137,6 +146,8 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			// Within a group the scene stays and changes itself (StageChapter): nothing to dissolve.
 			if (out && out === inc) out = inc = null;
 			setTransition(out || inc ? { from: out, to: inc, t } : null);
+			// One scene drawing at a time: the leaving one holds its frame, the arriving one runs light.
+			easeMove(out, inc, t < 1 ? MOVE_MS - (now - start) + 150 : null);
 			// What the stage can't dissolve (SVG, 2D canvas, the text over a 3D scene) cross-fades here.
 			if (out) Object.assign(out.style, { opacity: String(1 - t), transform: `scale(${1 + 0.03 * t})` });
 			if (inc) Object.assign(inc.style, { opacity: String(t), transform: `scale(${1.04 - 0.04 * t})` });
@@ -169,7 +180,11 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 		const last = CHAPTERS.length - 1;
 		/** Whether this input should move chapters, given its direction (1 down, −1 up). */
 		const steer = (dir: number, target: EventTarget | null) => {
-			if (s.immersed || (target instanceof Element && target.closest("[data-lenis-prevent], input, textarea, select, [contenteditable]"))) return false;
+			if (s.immersed || (target instanceof Element && target.closest("input, textarea, select, [contenteditable]"))) return false;
+			// A panel keeps the wheel only while it can scroll that way itself (long mathematics, open).
+			// Otherwise the page would scroll freely through it and stop between two chapters.
+			const panel = target instanceof Element ? target.closest<HTMLElement>("[data-lenis-prevent]") : null;
+			if (panel && (dir > 0 ? panel.scrollTop + panel.clientHeight < panel.scrollHeight - 1 : panel.scrollTop > 0)) return false;
 			const box = root.current?.getBoundingClientRect();
 			// Only while the stage fills the screen: above it is the page's header, below it the footer.
 			if (!box || box.top > 1 || box.bottom < innerHeight - 1) return false;
@@ -182,11 +197,15 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			}
 			return true;
 		};
-		const step = (dir: number) => {
+		let lastWheel = 0;
+		let lastSize = 0;
+		/** One chapter per gesture. `size`: the wheel's |delta|, or Infinity for a swipe or a key. */
+		const step = (dir: number, size = Infinity) => {
 			const now = performance.now();
-			const quiet = now > s.gestureUntil;
-			s.gestureUntil = now + GESTURE_GAP_MS;
-			if (quiet && !s.moving) goto(Math.min(last, Math.max(0, s.active + dir)));
+			const fresh = now - lastWheel > QUIET_MS || size > Math.max(8, lastSize * FRESH);
+			lastWheel = now;
+			lastSize = size === Infinity ? 0 : size;
+			if (fresh && !s.moving) goto(Math.min(last, Math.max(0, s.active + dir)));
 		};
 
 		const wheel = (e: WheelEvent) => {
@@ -204,7 +223,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			}
 			e.preventDefault();
 			e.stopPropagation(); // ahead of Lenis, which would scroll freely
-			step(dir);
+			step(dir, Math.abs(e.deltaY) * (e.deltaMode === 1 ? 16 : 1));
 		};
 		let touchY: number | null = null;
 		const touchStart = (e: TouchEvent) => void (touchY = e.touches.length === 1 ? e.touches[0]!.clientY : null);
@@ -218,7 +237,6 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			const dy = touchY - e.changedTouches[0]!.clientY;
 			touchY = null;
 			if (Math.abs(dy) > SWIPE_PX && steer(Math.sign(dy), e.target)) {
-				s.gestureUntil = 0;
 				step(Math.sign(dy));
 			}
 		};
@@ -226,7 +244,6 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			const dir = { ArrowDown: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1, ArrowUp: -1, PageUp: -1 }[e.key];
 			if (!dir || e.altKey || e.ctrlKey || e.metaKey || !steer(dir, e.target)) return;
 			e.preventDefault();
-			s.gestureUntil = 0;
 			step(dir);
 		};
 		const opts = { capture: true, passive: false } as const;
@@ -245,6 +262,14 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 	}, [goto, progress]);
 
 	useEffect(() => setImmersed(false), [active]);
+	// The neighbours of a chapter come once it has settled, in the next idle moment.
+	useEffect(() => {
+		if (leaving !== null) return;
+		const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 200));
+		const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+		const h = idle(() => setSettled(active), { timeout: 800 });
+		return () => cancel(h);
+	}, [active, leaving]);
 	useEffect(() => {
 		if (!immersed) return;
 		smooth?.stop();
@@ -261,7 +286,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			{!loaded && <LabLoader onDone={opened} />}
 			<div ref={layer} className="sticky top-(--nav-height) h-[calc(100vh-var(--nav-height))] overflow-hidden">
 				{SLOTS.map(({ key, members }) => {
-					const near = members.some((i) => Math.abs(i - active) <= 1 || i === leaving);
+					const near = members.some((i) => i === active || i === leaving || Math.abs(i - settled) <= 1);
 					const intro = key === INTRO;
 					const sim = near && !intro ? simById(key) : null;
 					if (!near || (!sim && !intro)) return null;
@@ -360,7 +385,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 								data-lenis-prevent
 								// Rises into place once its chapter has arrived; settles back as it leaves.
 								// On a phone a bottom sheet: full width, at most 45% of the screen, the scene above it.
-								className={`sticky bottom-4 mt-auto max-h-[45vh] w-full overflow-y-auto rounded-2xl border md:bottom-12 md:max-h-[calc(100vh-6rem)] md:max-w-md border-border-subtle bg-bg-page/70 p-5 shadow-lg backdrop-blur-md transition-[opacity,translate] duration-700 ease-out ${
+								className={`sticky bottom-4 mt-auto max-h-[45vh] w-full overflow-y-auto overscroll-contain rounded-2xl border md:bottom-12 md:max-h-[calc(100vh-6rem)] md:max-w-md border-border-subtle bg-bg-page/70 p-5 shadow-lg backdrop-blur-md transition-[opacity,translate] duration-700 ease-out ${
 									immersed && i === active
 										? "pointer-events-none opacity-0"
 										: i === active && leaving === null

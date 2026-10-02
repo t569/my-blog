@@ -75,6 +75,21 @@ void main() {
 let transition: { from: Element | null; to: Element | null; t: number } | null = null;
 export const setTransition = (next: typeof transition) => void (transition = next);
 
+/** The engine's view class, once the stage has loaded it (three.js stays out of the page until then). */
+let views: typeof import("@t569/scene-engine/three").ThreeNode | null = null;
+
+/**
+ * A move between chapters starts (`ms` its length) or ends (null). Two scenes drawing at once was
+ * what made a move stutter: the leaving one keeps its last frame (it is dissolving; a still can't be
+ * told from motion), and the arriving one draws at its resolution floor until the move is over.
+ */
+export function easeMove(from: Element | null, to: Element | null, ms: number | null) {
+	for (const view of views?.shared ?? []) {
+		if (from?.contains(view.canvas)) view.hold = ms !== null;
+		else if (ms !== null && to?.contains(view.canvas)) view.moving(ms);
+	}
+}
+
 /**
  * The lab's one WebGL canvas, fixed behind the page, and its smooth scroll.
  *
@@ -129,6 +144,7 @@ async function setUp(host: HTMLElement) {
 	host.appendChild(canvas);
 	const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "high-performance" });
 	ThreeNode.sharedRenderer = renderer;
+	views = ThreeNode;
 
 	// Frames arrive in final colours (see ThreeNode.output): copied, never converted.
 	const material = new THREE.ShaderMaterial({
@@ -191,6 +207,21 @@ async function setUp(host: HTMLElement) {
 		});
 	};
 	ThreeNode.onDraw = composite;
+	// Neighbours wait hidden, never drawn: compile their shaders in idle time, so revealing one in a
+	// move doesn't stall on a program link. Once each; content they add later compiles when drawn.
+	const warmed = new WeakSet<object>();
+	const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 300));
+	let warming = true;
+	(function warm() {
+		if (!warming) return;
+		for (const view of ThreeNode.shared) {
+			if (view.version || warmed.has(view)) continue;
+			warmed.add(view);
+			void view.warm();
+			break; // one per idle moment
+		}
+		setTimeout(() => idle(warm, { timeout: 2000 }), 500);
+	})();
 	const stage = {
 		/** Every frame: composite the views on screen, if anything about them changed. */
 		draw() {
@@ -253,6 +284,7 @@ async function setUp(host: HTMLElement) {
 			if (ThreeNode.sharedRenderer === renderer) ThreeNode.sharedRenderer = null;
 			if (ThreeNode.onDraw === composite) ThreeNode.onDraw = null;
 			ThreeNode.pixelRatioCap = null; // posts and the editor render as before
+			warming = false;
 			// After this commit's other cleanups: the scenes being unmounted with the page still hold it.
 			setTimeout(() => {
 				material.dispose();
