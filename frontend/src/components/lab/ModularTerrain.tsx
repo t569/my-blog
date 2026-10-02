@@ -16,27 +16,34 @@ import {
 	MeshStandardMaterial,
 	Vector3,
 } from "three";
-import type { terrainMesh } from "@/lib/modular";
+import type { Form, terrainMesh } from "@/lib/modular";
 import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
-import { ScrollProgress } from "./scrollProgress";
+import { ScrollProgress, StageChapter } from "./scrollProgress";
 
 /**
- * The modular discriminant Δ as a landscape on the Poincaré disk, flown
- * through as you scroll.
+ * A modular form as a landscape on the Poincaré disk: the discriminant Δ, the
+ * Eisenstein series E₄ and E₆, or the j-invariant.
  *
- * Height is y⁶|Δ(z)|, which the whole modular group leaves unchanged, so the
- * terrain repeats the same range of hills across every tile of the tiling. Each
- * hill is scaled by 1 − r², how much its tile has shrunk on the disk, so the
- * copies shrink toward the rim with the tiles instead of standing full height
- * as a wall of spikes. Colour is the phase of Δ; the brightest peaks glow.
+ * Height is y^{k/2}|f(z)| (k the weight; |j| for j), which the whole modular
+ * group leaves unchanged, so the terrain repeats the same range of hills across
+ * every tile of the tiling. Each hill is scaled by 1 − r², how much its tile has
+ * shrunk on the disk, so the copies shrink toward the rim with the tiles instead
+ * of standing full height at the edge. Δ vanishes at the cusp (the rim's points),
+ * so it sinks flat there; the others plateau, and E₄, E₆ and j have pits at
+ * their zeros (ρ, i, ρ), copied across every tile. Colour is the phase.
  *
- * Heights come from lib/modular.ts in float64, once, in a Worker (lib/modular.worker.ts):
- * the same code `npm run check:modular` verifies, kept off the main thread, where its
- * ~130k points were most of /lab's mount freeze. On the GPU it is one static lit mesh.
+ * Heights come from lib/modular.ts in float64, in a Worker (lib/modular.worker.ts):
+ * the same code `npm run check:modular` verifies, kept off the main thread. On the
+ * GPU it is one static lit mesh.
  *
- * A night stage in either theme, deliberately: glow needs the dark. The page
- * scrolls a tall section with the canvas pinned; the camera reads the scroll
- * each frame. Under reduced motion it's a still view you can drag instead.
+ * On the lab's stage the four forms are one scene across four chapters: the mesh
+ * holds all four (each built in turn, the one on show first) and blends from one
+ * to the next on the GPU as the chapter changes, the camera gliding to each view. Δ's chapter keeps the flight:
+ * the camera follows the chapter's scroll (ScrollProgress). Elsewhere (the list,
+ * posts) one form, and Δ is flown by the page's scroll as before.
+ *
+ * A night stage in either theme, deliberately: glow needs the dark. Under reduced
+ * motion it's a still view you can drag instead.
  */
 
 const RINGS = 180;
@@ -49,6 +56,7 @@ const W = 640;
 const H = 440;
 const STAGE = "#05050a";
 const PIN = 96; // px: the sticky offset, clear of the navbar (top-24)
+const MORPH_MS = 1100; // as long as the stage's chapter change
 
 // The flight: high overview → round and down over the central tiles → skimming the rim,
 // where the copies crowd. Camera and gaze each follow a smooth curve through these.
@@ -57,12 +65,30 @@ const PATH = new CatmullRomCurve3([v(0, 5.2, 7.4), v(4.4, 3.0, 3.4), v(3.4, 1.8,
 const GAZE = new CatmullRomCurve3([v(0, 0.3, 0), v(0, 0.4, 0), v(-1.6, 0.4, -0.6), v(-2.2, 0.2, -1.6), v(-2.8, 0.05, 0.2)]);
 const ease = (t: number) => t * t * (3 - 2 * t);
 
-export default function ModularTerrain() {
+/** Where the camera stands for each of the other forms, and what it looks at. */
+const POSE: Record<Exclude<Form, "delta">, [Vector3, Vector3]> = {
+	e4: [v(5.4, 3.6, 4.2), v(0, 0.3, 0)],
+	e6: [v(-5.2, 3.2, 4.6), v(0, 0.3, 0)],
+	j: [v(0.4, 6.6, 4.4), v(0, 0.2, 0)],
+};
+/** The stage's chapter for each form (the registry's ids). */
+const FORM_OF: Record<string, Form> = { delta: "delta", e4: "e4", e6: "e6", jinv: "j" };
+const ORDER: Form[] = ["delta", "e4", "e6", "j"];
+
+type Built = ReturnType<typeof terrainMesh>;
+
+export default function ModularTerrain({ form = "delta" }: { form?: Form }) {
 	const outerRef = useRef<HTMLDivElement>(null);
 	const hostRef = useRef<HTMLDivElement>(null);
 	const still = prefersReducedMotion(); // client-only: Sim mounts this after hydration
 	// On the lab's stage the box is already pinned, and the chapter's scroll is handed in.
 	const staged = useContext(ScrollProgress);
+	// On the stage, the four forms are one scene: which one is on stage now.
+	const chapter = useContext(StageChapter);
+	const shown = chapter ? (FORM_OF[chapter] ?? "delta") : form;
+	const target = useRef<Form>(shown);
+	target.current = shown;
+	const morphs = chapter !== null;
 
 	useEffect(() => {
 		const [outer, host] = [outerRef.current, hostRef.current];
@@ -72,21 +98,59 @@ export default function ModularTerrain() {
 		scene.add(view);
 		view.world.background = new Color(STAGE);
 
-		// The rim, light and camera now; the terrain when the Worker hands it over.
-		// ponytail: built once; evaluate in a shader when detail must follow the camera.
-		const worker = new Worker(new URL("../../lib/modular.worker.ts", import.meta.url), { type: "module" });
-		worker.onmessage = ({ data: m }: MessageEvent<ReturnType<typeof terrainMesh>>) => {
-			worker.terminate();
-			const g = new BufferGeometry();
-			g.setAttribute("position", new BufferAttribute(m.pos, 3));
-			g.setAttribute("color", new BufferAttribute(m.col, 3));
-			g.setAttribute("normal", new BufferAttribute(m.nrm, 3));
-			g.setIndex(new BufferAttribute(m.index, 1));
-			view.world.add(new Mesh(g, new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 })));
-			view.invalidate();
-			if (!scene.playing) scene.seek(scene.elapsed); // a stopped scene (reduced motion) paints only when told
+		// Every form's positions, normals and colours live on the one geometry under their own names (so
+		// disposing it frees them all); the shader blends them by a weight each. A form not built yet is
+		// absent, which WebGL reads as zeros, and has weight 0.
+		const weights = { value: [1, 0, 0, 0] };
+		const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 });
+		const sum = (p: string) => ORDER.map((f, i) => `${p}_${f} * weights[${i}]`).join(" + ");
+		material.onBeforeCompile = (shader) => {
+			shader.uniforms.weights = weights;
+			const decl = ORDER.map((f) => `attribute vec3 p_${f}, n_${f}, c_${f};`).join("\n");
+			shader.vertexShader = `${decl}\nuniform float weights[4];\n${shader.vertexShader}`
+				.replace("#include <beginnormal_vertex>", `vec3 objectNormal = normalize(${sum("n")});`)
+				.replace("#include <begin_vertex>", `vec3 transformed = ${sum("p")};`)
+				.replace("#include <color_vertex>", `#include <color_vertex>\n\tvColor.xyz = ${sum("c")};`);
 		};
-		worker.postMessage({ rings: RINGS, spokes: SPOKES, rim: RIM, radius: RADIUS, relief: RELIEF, peak: PEAK });
+		const geometry = new BufferGeometry();
+		let mesh: Mesh | null = null;
+		let showing: Form | null = null;
+		let tween: { from: Form; to: Form; start: number } | null = null;
+		const weigh = (from: Form, to: Form, k: number) =>
+			(weights.value = ORDER.map((f) => (f === to ? k : 0) + (f === from ? 1 - k : 0)));
+
+		// The rim, light and camera now; the terrain as the Worker hands each form over, the one
+		// on show first. ponytail: built once per form; evaluate in a shader if detail must follow the camera.
+		const worker = new Worker(new URL("../../lib/modular.worker.ts", import.meta.url), { type: "module" });
+		const queue = morphs ? [target.current, ...ORDER.filter((f) => f !== target.current)] : [form];
+		const request = () => {
+			const next = queue.shift();
+			if (next) worker.postMessage({ rings: RINGS, spokes: SPOKES, rim: RIM, radius: RADIUS, relief: RELIEF, peak: PEAK, form: next });
+			else worker.terminate();
+			return next;
+		};
+		let pending = request();
+		const built = new Set<Form>();
+		worker.onmessage = ({ data: m }: MessageEvent<Built>) => {
+			const f = pending!;
+			const pos = new BufferAttribute(m.pos, 3);
+			geometry.setAttribute(`p_${f}`, pos);
+			geometry.setAttribute(`n_${f}`, new BufferAttribute(m.nrm, 3));
+			geometry.setAttribute(`c_${f}`, new BufferAttribute(m.col, 3));
+			built.add(f);
+			if (!mesh) {
+				geometry.setIndex(new BufferAttribute(m.index, 1));
+				geometry.setAttribute("position", pos); // three wants one by this name; the shader blends the p_*
+				showing = f;
+				weigh(f, f, 0);
+				mesh = new Mesh(geometry, material);
+				mesh.frustumCulled = false; // positions move between forms
+				view.world.add(mesh);
+				view.invalidate();
+				if (!scene.playing) scene.seek(scene.elapsed); // a stopped scene (reduced motion) paints only when told
+			}
+			pending = request();
+		};
 
 		const rim = new BufferGeometry();
 		rim.setAttribute(
@@ -100,24 +164,57 @@ export default function ModularTerrain() {
 		sun.position.set(-3, 5, 2);
 		view.world.add(sun);
 
-		if (still) {
-			view.camera.position.copy(PATH.getPoint(0));
-			view.orbit([0, 0.2, 0]).enablePan = false;
+		const pose = (f: Form): [Vector3, Vector3] => (f === "delta" ? [PATH.getPoint(0), GAZE.getPoint(0)] : POSE[f]);
+		if (still || (!morphs && form !== "delta")) {
+			view.camera.position.copy(pose(form)[0]);
+			view.orbit(pose(form)[1].toArray() as [number, number, number]).enablePan = false;
 		} else {
 			const gaze = new Vector3();
+			const look = pose(target.current)[1].clone();
+			if (target.current !== "delta") view.camera.position.copy(pose(target.current)[0]);
 			let drawn = -1;
 			const scrolled = () => {
 				const r = outer.getBoundingClientRect();
 				const span = r.height - host.getBoundingClientRect().height;
 				return Math.min(1, Math.max(0, (PIN - r.top) / Math.max(1, span)));
 			};
-			view.onFrame(() => {
-				const p = ease((staged ?? scrolled)());
-				if (p === drawn) return false;
-				drawn = p;
-				PATH.getPoint(p, view.camera.position);
-				view.camera.lookAt(GAZE.getPoint(p, gaze));
-				return true;
+			view.onFrame((dt) => {
+				let changed = false;
+				// The landscape: start a morph toward the form on stage once both are built.
+				const want = target.current;
+				if (morphs && showing && !tween && want !== showing && built.has(want)) tween = { from: showing, to: want, start: performance.now() };
+				if (tween) {
+					const k = Math.min(1, (performance.now() - tween.start) / MORPH_MS);
+					weigh(tween.from, tween.to, ease(k));
+					if (k === 1) {
+						showing = tween.to;
+						tween = null;
+					}
+					changed = true;
+				}
+				// The camera: Δ's flight by scroll; the others glide to their view.
+				const f = morphs ? want : form;
+				if (f === "delta" && (!tween || tween.to === "delta")) {
+					const p = ease((staged ?? scrolled)());
+					if (p !== drawn || changed) {
+						drawn = p;
+						PATH.getPoint(p, view.camera.position);
+						view.camera.lookAt(GAZE.getPoint(p, gaze));
+						look.copy(gaze);
+						changed = true;
+					}
+				} else {
+					drawn = -1;
+					const [to, at] = pose(f);
+					const k = 1 - Math.exp(-dt * 3);
+					if (view.camera.position.distanceTo(to) > 1e-3 || look.distanceTo(at) > 1e-3) {
+						view.camera.position.lerp(to, k);
+						look.lerp(at, k);
+						view.camera.lookAt(look);
+						changed = true;
+					}
+				}
+				return changed;
 			});
 		}
 
@@ -127,11 +224,10 @@ export default function ModularTerrain() {
 			worker.terminate();
 			scene.destroy(); // ThreeNode frees the geometry, materials and GL context
 		};
-	}, [still, staged]);
+	}, [still, staged, morphs, form]);
 
 	const box = <div ref={hostRef} className="w-full overflow-hidden rounded-xl" style={{ aspectRatio: `${W} / ${H}`, background: STAGE }} />;
-	if (still) return <div ref={outerRef} className="cursor-grab">{box}</div>;
-	if (staged) return <div ref={outerRef}>{box}</div>;
+	if (still || staged || morphs || form !== "delta") return <div ref={outerRef} className={still || (!morphs && form !== "delta") ? "cursor-grab" : undefined}>{box}</div>;
 	// Three screens of scroll with the view pinned: the flight's length.
 	return (
 		<div ref={outerRef} style={{ height: "260vh" }}>

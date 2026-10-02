@@ -3,13 +3,24 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Sim from "./Sim";
 import { setTransition, smooth } from "./LabStage";
-import { ACTS, IMMERSIVE, SCROLL, simById } from "./registry";
-import { ScrollProgress } from "./scrollProgress";
+import { ACTS, IMMERSIVE, SCROLL, groupOf, simById } from "./registry";
+import { ScrollProgress, StageChapter } from "./scrollProgress";
 
 type Chapter = { act: number; id?: string };
 
 /** Each act opens with its title card (no id), then its scenes. */
 const CHAPTERS: Chapter[] = ACTS.flatMap((a, act) => [{ act }, ...a.sims.map((id) => ({ act, id }))]);
+
+/** Where scenes mount on the stage: one slot per scene, except a group's chapters, which share one. */
+const SLOTS: { key: string; members: number[] }[] = [];
+CHAPTERS.forEach(({ id }, i) => {
+	if (!id) return;
+	const key = groupOf(id)?.[0] ?? id;
+	const slot = SLOTS.find((s) => s.key === key);
+	if (slot) slot.members.push(i);
+	else SLOTS.push({ key, members: [i] });
+});
+const slotOf = (i: number) => SLOTS.find((s) => s.members.includes(i));
 const actName = (i: number) => (i < ACTS.length - 1 ? `Act ${["I", "II", "III", "IV", "V", "VI"][i]}` : "Coda");
 
 /**
@@ -58,7 +69,7 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 	const [immersed, setImmersed] = useState(false);
 	const root = useRef<HTMLDivElement>(null);
 	const sections = useRef<(HTMLElement | null)[]>([]);
-	const wrappers = useRef<(HTMLDivElement | null)[]>([]);
+	const wrappers = useRef<Record<string, HTMLDivElement | null>>({});
 	const layer = useRef<HTMLDivElement>(null);
 	// Read by the input handlers, which are bound once.
 	const state = useRef({ active: 0, moving: false, gestureUntil: 0, immersed: false });
@@ -90,10 +101,16 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 		if (smooth) smooth.scrollTo(top, { duration: MOVE_MS / 1000, easing: ease, lock: true, force: true });
 		else scrollTo({ top, behavior: "smooth" });
 		const start = performance.now();
+		const wrapperOf = (i: number) => {
+			const slot = slotOf(i);
+			return slot ? (wrappers.current[slot.key] ?? null) : null;
+		};
 		requestAnimationFrame(function frame(now) {
 			const t = ease(Math.min(1, (now - start) / MOVE_MS));
-			const [out, inc] = [wrappers.current[from], wrappers.current[to]];
-			setTransition({ from: out ?? null, to: inc ?? null, t });
+			let [out, inc] = [wrapperOf(from), wrapperOf(to)];
+			// Within a group the scene stays and changes itself (StageChapter): nothing to dissolve.
+			if (out && out === inc) out = inc = null;
+			setTransition(out || inc ? { from: out, to: inc, t } : null);
 			// What the stage can't dissolve (SVG, 2D canvas, the text over a 3D scene) cross-fades here.
 			if (out) Object.assign(out.style, { opacity: String(1 - t), transform: `scale(${1 + 0.03 * t})` });
 			if (inc) Object.assign(inc.style, { opacity: String(t), transform: `scale(${1.04 - 0.04 * t})` });
@@ -216,25 +233,32 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 	return (
 		<div ref={root} className="ml-[calc(50%-50vw)] w-screen">
 			<div ref={layer} className="sticky top-(--nav-height) h-[calc(100vh-var(--nav-height))] overflow-hidden">
-				{CHAPTERS.map(({ id }, i) => {
-					const sim = id && (Math.abs(i - active) <= 1 || i === leaving) ? simById(id) : null;
+				{SLOTS.map(({ key, members }) => {
+					const sim = members.some((i) => Math.abs(i - active) <= 1 || i === leaving) ? simById(key) : null;
 					if (!sim) return null;
+					const shown = members.includes(active) || (leaving !== null && members.includes(leaving));
+					const arriving = members.includes(active) && leaving !== null && !members.includes(leaving);
+					// A group's scene shows the chapter on stage, or (waiting) the one nearest it.
+					const onStage = members.reduce((a, b) => (Math.abs(b - active) < Math.abs(a - active) ? b : a));
+					const scroll = members.find((i) => SCROLL[CHAPTERS[i]!.id!]);
 					// As large as fits, nothing cropped: the controls along a scene's edges stay on screen.
 					const width = `min(100vw, calc((100vh - var(--nav-height)) * ${sim.aspect}))`;
 					return (
 						// The neighbours: mounted, but no box, so they neither draw nor take input.
 						// Flex, not grid: a grid track grows to its content and left-aligns any overflow.
 						<div
-							key={sim.id}
-							ref={(el) => void (wrappers.current[i] = el)}
+							key={key}
+							ref={(el) => void (wrappers.current[key] = el)}
 							className="absolute inset-0 flex items-center justify-center"
 							// Arriving, it starts invisible: the move's first frame would otherwise come a frame late.
-							style={{ display: i === active || i === leaving ? undefined : "none", opacity: i === active && leaving !== null ? 0 : undefined }}
+							style={{ display: shown ? undefined : "none", opacity: arriving ? 0 : undefined }}
 						>
 							<div className="shrink-0" style={{ width }}>
-								<ScrollProgress.Provider value={SCROLL[sim.id] ? progress[i]! : null}>
-									<Sim id={sim.id} />
-								</ScrollProgress.Provider>
+								<StageChapter.Provider value={members.length > 1 ? CHAPTERS[onStage]!.id! : null}>
+									<ScrollProgress.Provider value={scroll !== undefined ? progress[scroll]! : null}>
+										<Sim id={key} />
+									</ScrollProgress.Provider>
+								</StageChapter.Provider>
 							</div>
 						</div>
 					);

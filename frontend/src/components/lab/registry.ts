@@ -73,6 +73,30 @@ export const SIMS: Sim[] = [
 		aspect: 640 / 440,
 	},
 	{
+		id: "e4",
+		title: "The first Eisenstein series",
+		hook: "The simplest modular form there is: sum over every lattice point, and pits open where it vanishes.",
+		tryThis: "Look for the dark pits: one at each corner of the fundamental domain, copied onto every tile. Toward the rim the hills level into a plateau.",
+		maths: String.raw`$E_4(z) = 1 + 240\sum_{n \ge 1}\sigma_3(n)\,q^n$, with $\sigma_3(n)$ the sum of the cubes of $n$'s divisors, is a modular form of weight 4: up to a constant, $\sum (mz + n)^{-4}$ over every point of the lattice $\mathbb{Z}z + \mathbb{Z}$. The invariant height is $y^2|E_4(z)|$. Unlike $\Delta$ it is not a cusp form: $E_4 \to 1$ at the cusp, so its height grows there and is eased to a plateau. It has a single zero in the fundamental domain, at $\rho = e^{2\pi i/3}$, and $E_4(i) = 3\Gamma(\tfrac14)^8/(2\pi)^6 \approx 1.4558$; both are checked.`,
+		aspect: 640 / 440,
+	},
+	{
+		id: "e6",
+		title: "The second Eisenstein series",
+		hook: "Weight six: the pits move from the corners of the tiles to their tops.",
+		tryThis: "Watch where the pits go: now one at the top of every tile, where E₄ had none.",
+		maths: String.raw`$E_6(z) = 1 - 504\sum_{n \ge 1}\sigma_5(n)\,q^n$ has weight 6, and its height is $y^3|E_6(z)|$. Its zero sits at $z = i$, the point the inversion $z \mapsto -1/z$ fixes, so it must vanish there: $E_6(-1/z) = z^6 E_6(z)$ at $z = i$ gives $E_6(i) = -E_6(i)$. Together $E_4$ and $E_6$ generate every modular form: each one is a polynomial in them, $\Delta = (E_4^3 - E_6^2)/1728$ among them.`,
+		aspect: 640 / 440,
+	},
+	{
+		id: "jinv",
+		title: "The j-invariant",
+		hook: "One number for every shape of lattice: equal values, the same lattice turned.",
+		tryThis: "The height is the same at every copy of a point, with no correction at all: j has weight zero. It shoots up toward the rim, where j has its pole.",
+		maths: String.raw`$j(z) = 1728\,\frac{E_4^3}{E_4^3 - E_6^2} = \frac{E_4(z)^3}{\Delta(z)}$ is unchanged by the whole modular group, so its value names a lattice up to rotation and scaling: two lattices are similar exactly when their $j$s agree. It has a pole at the cusp ($j = q^{-1} + 744 + 196884\,q + \dots$, and 196884 is where moonshine begins), so the height is $\log(1 + |j|)$, levelled near the rim. $j(i) = 1728$ (the square lattice) and $j(\rho) = 0$ (the hexagonal one); both are checked.`,
+		aspect: 640 / 440,
+	},
+	{
 		id: "knots",
 		title: "Every path on the modular surface, around a knot",
 		hook: "Sixty-five thousand particles slide along the landscape above, and turn out to be living around a trefoil.",
@@ -230,7 +254,7 @@ export const simById = (id: string): Sim | undefined => SIMS.find((s) => s.id ==
 export const ACTS: { title: string; sims: string[] }[] = [
 	{ title: "Chaos & pattern", sims: ["mandelbrot", "lorenz", "flow", "fluid", "life", "fibonacci", "fourier"] },
 	{ title: "Surfaces", sims: ["puzzle", "laplace", "torus"] },
-	{ title: "The modular world", sims: ["modular", "delta", "knots"] },
+	{ title: "The modular world", sims: ["modular", "delta", "e4", "e6", "jinv", "knots"] },
 	{ title: "Inside geometries", sims: ["h3", "sl2", "s3", "nil", "sol"] },
 	{ title: "Black holes", sims: ["blackhole", "kerr"] },
 	{ title: "The engine", sims: ["ad", "hero"] }, // the coda
@@ -241,3 +265,10 @@ export const IMMERSIVE = new Set(["mandelbrot", "fluid", "h3", "sl2", "s3", "nil
 
 /** Scenes driven by scroll, and how many screens their chapter lasts (ScrollProgress). */
 export const SCROLL: Record<string, number> = { delta: 2.6 };
+
+/**
+ * On the stage, chapters that are one scene: mounted once (the first id's Sim) while any of them is
+ * near, told which is on stage (StageChapter), and changed by the scene itself, not dissolved.
+ */
+export const GROUPS: string[][] = [["delta", "e4", "e6", "jinv"]];
+export const groupOf = (id: string) => GROUPS.find((g) => g.includes(id));

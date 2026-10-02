@@ -61,6 +61,70 @@ export function logHeight(x: number, y: number): number {
 	return 6 * Math.log(r.v) + logDeltaProduct(r.u, r.v)[0];
 }
 
+/* ------------------------------------------- Eisenstein series, and j */
+
+/** σ₍ₖ₋₁₎(n) for the first terms, k = 4 and 6. */
+const sigma = (n: number, p: number) => {
+	let s = 0;
+	for (let d = 1; d <= n; d++) if (n % d === 0) s += d ** p;
+	return s;
+};
+
+/**
+ * Eₖ(w) = 1 + c Σ σₖ₋₁(n) qⁿ (c = 240 for k = 4, −504 for k = 6) as a complex number, by its
+ * q-series. In the fundamental domain |q| ≤ 0.0043, so a dozen terms are exact to double precision.
+ */
+export function eisenstein(k: 4 | 6, u: number, v: number, terms = 12): [number, number] {
+	const c = k === 4 ? 240 : -504;
+	let [re, im] = [1, 0];
+	for (let n = 1; n <= terms; n++) {
+		const m = c * sigma(n, k - 1) * Math.exp(-2 * Math.PI * n * v);
+		re += m * Math.cos(2 * Math.PI * n * u);
+		im += m * Math.sin(2 * Math.PI * n * u);
+	}
+	return [re, im];
+}
+
+/** The forms the terrain can show, and the weight each transforms with. */
+export const FORMS = { delta: 12, e4: 4, e6: 6, j: 0 } as const;
+export type Form = keyof typeof FORMS;
+
+/**
+ * log|f(z)| and arg f(z) anywhere in the upper half-plane: evaluated in the fundamental domain,
+ * the automorphy factor carried back. f(γz) = (cz + d)ᵏ f(z), so f(z) = f(w) / Jᵏ, as for Δ.
+ * j = E₄³/Δ has weight 0: the same at every copy of a point.
+ */
+export function logForm(form: Form, x: number, y: number): [number, number] {
+	const r = reduce(x, y);
+	let [a, p]: [number, number] = [0, 0];
+	if (form === "delta") [a, p] = logDeltaProduct(r.u, r.v);
+	else if (form === "j") {
+		const [e, d] = [eisenstein(4, r.u, r.v), logDeltaProduct(r.u, r.v)];
+		[a, p] = [1.5 * Math.log(e[0] * e[0] + e[1] * e[1]) - d[0], 3 * Math.atan2(e[1], e[0]) - d[1]];
+	} else {
+		const [re, im] = eisenstein(FORMS[form], r.u, r.v);
+		[a, p] = [0.5 * Math.log(re * re + im * im), Math.atan2(im, re)];
+	}
+	const k = FORMS[form];
+	return [a - k * r.jLog, p - k * r.jArg];
+}
+
+/**
+ * The terrain's height, 0–1, from the modular-invariant y^{k/2}|f(z)|. Δ is a cusp form: normalised
+ * by its peak. E₄ and E₆ are not, and j has a pole at the cusp: their invariants grow without bound
+ * toward it (on the disk, the rim), so they are eased to a plateau, 1 − e^{−x/s}, s near their
+ * size inside the domain. Zeros (E₄ at ρ, E₆ at i, j at ρ) stay pits.
+ */
+export function formHeight(form: Form, x: number, y: number, deltaPeak: number): number {
+	const r = reduce(x, y);
+	const logAbs = logForm(form, r.u, r.v)[0]; // already in the domain: no factor to carry
+	const k = FORMS[form];
+	const x0 = (k / 2) * Math.log(r.v) + logAbs; // log of the invariant
+	if (form === "delta") return Math.exp(x0 - deltaPeak);
+	if (form === "j") return Math.min(1, Math.log1p(Math.exp(logAbs)) / Math.log1p(1e5));
+	return 1 - Math.exp(-Math.exp(x0) / (form === "e4" ? 3 : 4));
+}
+
 /** Disk → half-plane: the Cayley map u ↦ i(1 + u)/(1 − u). */
 export function fromDisk(a: number, b: number): [number, number] {
 	const d = (1 - a) * (1 - a) + b * b;
@@ -211,6 +275,8 @@ export interface TerrainOptions {
 	relief: number;
 	/** max log(y⁶|Δ|), to normalise heights to 0–1. */
 	peak: number;
+	/** Which form's landscape (default Δ). */
+	form?: Form;
 }
 
 /** sRGB → linear, as three's Color.setRGB(…, SRGBColorSpace) does. */
@@ -222,7 +288,7 @@ const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) 
  * triangles. Pure and three-free, so it runs in a Worker (modular.worker.ts): ~130k
  * points took 200–650 ms of the main thread. Normals as three's computeVertexNormals.
  */
-export function terrainMesh({ rings, spokes, rim, radius, relief, peak }: TerrainOptions) {
+export function terrainMesh({ rings, spokes, rim, radius, relief, peak, form = "delta" }: TerrainOptions) {
 	const n = (rings + 1) * spokes;
 	const pos = new Float32Array(n * 3);
 	const col = new Float32Array(n * 3);
@@ -233,8 +299,9 @@ export function terrainMesh({ rings, spokes, rim, radius, relief, peak }: Terrai
 			const t = (j / spokes) * Math.PI * 2;
 			const [a, b] = [r * Math.cos(t), r * Math.sin(t)];
 			const [x, y] = fromDisk(a, b);
-			const [logAbs, phase] = logDelta(x, y);
-			const h = Math.exp(6 * Math.log(y) + logAbs - peak); // y⁶|Δ|, 0–1
+			const [logAbs, phase] = logForm(form, x, y);
+			// y⁶|Δ| as it always was (so the Δ terrain is unchanged); the others through formHeight.
+			const h = form === "delta" ? Math.exp(6 * Math.log(y) + logAbs - peak) : formHeight(form, x, y, peak);
 			const s = 1 - r * r;
 			const k = (i * spokes + j) * 3;
 			pos[k] = a * radius;
