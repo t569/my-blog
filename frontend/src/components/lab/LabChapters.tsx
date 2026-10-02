@@ -144,10 +144,12 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 			const t = ease(Math.min(1, (now - start) / MOVE_MS));
 			let [out, inc] = [wrapperOf(from), wrapperOf(to)];
 			// Within a group the scene stays and changes itself (StageChapter): nothing to dissolve.
-			if (out && out === inc) out = inc = null;
+			// It still morphs over the move, so it runs light too.
+			const morph = out && out === inc ? inc : null;
+			if (morph) out = inc = null;
 			setTransition(out || inc ? { from: out, to: inc, t } : null);
 			// One scene drawing at a time: the leaving one holds its frame, the arriving one runs light.
-			easeMove(out, inc, t < 1 ? MOVE_MS - (now - start) + 150 : null);
+			easeMove(out, inc ?? morph, t < 1 ? MOVE_MS - (now - start) + 150 : null);
 			// What the stage can't dissolve (SVG, 2D canvas, the text over a 3D scene) cross-fades here.
 			if (out) Object.assign(out.style, { opacity: String(1 - t), transform: `scale(${1 + 0.03 * t})` });
 			if (inc) Object.assign(inc.style, { opacity: String(t), transform: `scale(${1.04 - 0.04 * t})` });

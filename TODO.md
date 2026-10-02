@@ -1181,6 +1181,45 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
 - [ ] **Phase 4: polish.** framer-motion kinetic type for titles and panels;
       spring cursor that reacts to scenes and text (none on touch); immersive
       mode's enter/exit.
+- [ ] **Performance: stop the churn** (2026-10-02, plan from an audit of the
+      engine and the sims against Blender's viewport and WebGL practice).
+      The architecture already matches: draw on demand, one shared context,
+      low resolution while moving. The lag came from rebuilding, reallocating
+      and re-measuring things that hadn't changed.
+  - [x] Scroll rebuilt every 3D scene: `useThemeKey` watched `class`/`style`
+        on `<html>`, which Lenis toggles at every scroll start and stop. Now
+        it watches `data-theme`/`data-skin` only.
+  - [x] Composite: no `Vector2`s allocated per frame, and each box's radius is
+        cached (`getComputedStyle` per view per draw was a style flush).
+  - [x] A morph inside the Δ/E4/E6/j group runs at the move's floor
+        resolution (`moving`), like a move between chapters.
+  - [x] Engine, dynamic resolution without reallocation. A shared target
+        stays at full size, and a reduced frame fills its corner
+        (`ThreeNode.outputScale`, which the stage samples). Canvas and bloom
+        views snap to ≤3 levels instead of resizing at every ×1.6 step.
+        Bloom views no longer size the unused 4× MSAA target.
+  - [x] `SHARPEN_SHARED_MS = 50`: with one GPU queue, a 250 ms sharpening
+        frame froze every view. The cost is that deep fractals settle softer;
+        this constant is the knob.
+  - [x] `warm()` also draws one 1×1 frame, so geometry (about 22 MB for the
+        terrain) uploads in idle time, not mid-move. Lights' shadow maps are
+        disposed with their scene.
+  - [ ] Commit, then `git subtree push` scene-engine and run its tests there
+        (vitest isn't installed in the subtree copy).
+  - [ ] Measure with the tab in front: a DevTools trace of scroll, Δ→E4→E6→j
+        and Mandelbrot, before and after. Then a phone, or 4× CPU throttle.
+  - [ ] Only if the trace names them:
+        - The terrain fetches all 12 morph attributes even when idle. Rebind
+          to one form plus a no-morph define once a morph settles.
+        - Layout reads interleaved with writes during moves (`fit()`, the
+          stage's rect sweep, `steer()`).
+        - Space3D/SVG re-projection; Phyllotaxis's 620 circles.
+        - Contexts per sim in posts.
+  - [ ] Bug found on the way: `disposeObject` on a model copy disposes
+        geometry and materials shared with the cached glTF (`node.ts` model
+        cache). The next instance of that URL re-uploads, or renders broken.
+  - Skipped: worker index transfer (already zero-copy); graph force buffers
+    (dozens of nodes); OffscreenCanvas (no gain for a shared compositor).
 
 ---
 

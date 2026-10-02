@@ -35,6 +35,7 @@ uniform float radius;
 uniform float dissolve;
 uniform float zoom;
 uniform float time;
+uniform vec2 used;
 varying vec2 vUv;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -45,7 +46,13 @@ float noise(vec2 p) {
 float fbm(vec2 p) { return 0.5 * noise(p) + 0.25 * noise(p * 2.03) + 0.25 * noise(p * 4.01); }
 // Clamped as the view's own 8-bit canvas would have stored it: additive layers leave a half-float
 // target above 1 (alpha too, which would make the backdrop below subtract).
-vec4 frame(vec2 uv) { return drawn > 0.5 ? clamp(texture2D(map, uv), 0.0, 1.0) : vec4(0.0); }
+// A reduced-resolution frame fills only the bottom-left \`used\` part of the target (ThreeNode.outputScale);
+// kept half a texel inside it, so filtering never reaches the stale rest.
+vec4 frame(vec2 uv) {
+	vec2 half = 0.5 / vec2(textureSize(map, 0));
+	uv = clamp(uv * used, half, used - half);
+	return drawn > 0.5 ? clamp(texture2D(map, uv), 0.0, 1.0) : vec4(0.0);
+}
 void main() {
 	vec2 uv = 0.5 + (vUv - 0.5) / zoom;
 	float mask = 1.0;
@@ -157,6 +164,7 @@ async function setUp(host: HTMLElement) {
 			dissolve: { value: 0 },
 			zoom: { value: 1 },
 			time: { value: 0 },
+			used: { value: new THREE.Vector2(1, 1) },
 		},
 		vertexShader: VERTEX,
 		fragmentShader: FRAGMENT,
@@ -190,6 +198,13 @@ async function setUp(host: HTMLElement) {
 	};
 
 	let drawn = "";
+	const size = new THREE.Vector2();
+	const buffer = new THREE.Vector2();
+	// A box's corner radius, read once: getComputedStyle per view per draw was a style flush each.
+	// A skin or theme can change it, so those forget them.
+	let radii = new WeakMap<Element, number>();
+	const restyled = new MutationObserver(() => (radii = new WeakMap()));
+	restyled.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-skin"] });
 	// Phones run 3× screens on small GPUs: the stage composites at most at 1.5×, which their eyes
 	// can't tell from 3× at arm's length; each scene's own governor takes its resolution from there.
 	const phone = matchMedia("(pointer: coarse)").matches;
@@ -244,14 +259,14 @@ async function setUp(host: HTMLElement) {
 			drawn = key;
 
 			if (renderer.getPixelRatio() !== dpr) renderer.setPixelRatio(dpr);
-			const size = renderer.getSize(new THREE.Vector2());
+			renderer.getSize(size);
 			if (size.x !== w || size.y !== h) renderer.setSize(w, h, false);
 			renderer.setRenderTarget(null);
 			renderer.setScissorTest(false);
 			renderer.setClearColor(0x000000, 0);
 			renderer.clear();
 			renderer.setScissorTest(true);
-			const bufferH = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
+			const bufferH = renderer.getDrawingBufferSize(buffer).y;
 			for (const [view, r, role] of views) {
 				const t = move?.t ?? 0;
 				material.uniforms.dissolve.value = role === "out" ? Math.max(t, 1e-3) : 0;
@@ -267,11 +282,14 @@ async function setUp(host: HTMLElement) {
 				const ph = Math.round(r.height * dpr);
 				const u = material.uniforms;
 				u.map.value = view.output;
+				u.used.value.copy(view.outputScale);
 				u.drawn.value = view.output ? 1 : 0;
 				u.bg.value = rgba(view.background || "transparent");
 				u.size.value.set(pw, ph);
 				const box = view.canvas.parentElement;
-				u.radius.value = (box ? parseFloat(getComputedStyle(box).borderTopLeftRadius) || 0 : 0) * dpr;
+				let radius = box ? radii.get(box) : 0;
+				if (radius === undefined) radii.set(box!, (radius = parseFloat(getComputedStyle(box!).borderTopLeftRadius) || 0));
+				u.radius.value = radius * dpr;
 				// three takes CSS pixels here and multiplies by the pixel ratio.
 				const y = bufferH - top - ph;
 				renderer.setViewport(x / dpr, y / dpr, pw / dpr, ph / dpr);
@@ -285,6 +303,7 @@ async function setUp(host: HTMLElement) {
 			if (ThreeNode.onDraw === composite) ThreeNode.onDraw = null;
 			ThreeNode.pixelRatioCap = null; // posts and the editor render as before
 			warming = false;
+			restyled.disconnect();
 			// After this commit's other cleanups: the scenes being unmounted with the page still hold it.
 			setTimeout(() => {
 				material.dispose();
