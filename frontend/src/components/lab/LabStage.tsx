@@ -9,6 +9,9 @@ import { awaitStage } from "./Sim";
 /** Scroll offset for anchor jumps: the sections' scroll-mt-24. */
 const ANCHOR_OFFSET = -96;
 
+/** The page's smooth scroll while the stage is mounted, for the chapters to steer and pause. */
+export let smooth: Lenis | null = null;
+
 const VERTEX = /* glsl */ `
 varying vec2 vUv;
 void main() {
@@ -53,6 +56,7 @@ export default function LabStage() {
 
 	useEffect(() => {
 		const lenis = prefersReducedMotion() ? null : new Lenis({ autoRaf: false, anchors: { offset: ANCHOR_OFFSET } });
+		smooth = lenis;
 		let live = true;
 		let draw: (() => void) | null = null;
 		let raf = requestAnimationFrame(function frame(t) {
@@ -71,6 +75,7 @@ export default function LabStage() {
 		return () => {
 			live = false;
 			cancelAnimationFrame(raf);
+			if (smooth === lenis) smooth = null;
 			lenis?.destroy();
 			void ready.then((stage) => stage.dispose()).catch(() => {});
 		};
@@ -128,7 +133,19 @@ async function setUp(host: HTMLElement) {
 	};
 
 	let drawn = "";
-	return {
+	// A view has drawn: composite once its animation frame's work is done (a microtask), in the same
+	// frame, not at the start of the next. The views' frames run after this component's own.
+	let queued = false;
+	const composite = () => {
+		if (queued) return;
+		queued = true;
+		queueMicrotask(() => {
+			queued = false;
+			stage.draw();
+		});
+	};
+	ThreeNode.onDraw = composite;
+	const stage = {
 		/** Every frame: composite the views on screen, if anything about them changed. */
 		draw() {
 			const w = canvas.clientWidth;
@@ -178,6 +195,7 @@ async function setUp(host: HTMLElement) {
 		},
 		dispose() {
 			if (ThreeNode.sharedRenderer === renderer) ThreeNode.sharedRenderer = null;
+			if (ThreeNode.onDraw === composite) ThreeNode.onDraw = null;
 			// After this commit's other cleanups: the scenes being unmounted with the page still hold it.
 			setTimeout(() => {
 				material.dispose();
@@ -188,4 +206,5 @@ async function setUp(host: HTMLElement) {
 			});
 		},
 	};
+	return stage;
 }

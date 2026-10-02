@@ -7,6 +7,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import Sim from "@/components/lab/Sim";
 import LabStage from "@/components/lab/LabStage";
+import LabView from "@/components/lab/LabView";
 import { SIMS } from "@/components/lab/registry";
 
 export const metadata: Metadata = {
@@ -28,6 +29,54 @@ export const metadata: Metadata = {
  */
 export default function LabPage() {
 	if (!SITE.lab) notFound();
+
+	// Each scene's words, made once: the list and the stage's panels show the same nodes.
+	const words = SIMS.map((s, i) => ({
+		head: (
+			<div className="flex max-w-2xl flex-col gap-2">
+				<p className="font-mono text-xs text-text-tertiary">{String(i + 1).padStart(2, "0")}</p>
+				<h2 className="font-display text-h3 font-semibold text-text-primary">{s.title}</h2>
+				<p className="text-body text-text-secondary">{s.hook}</p>
+			</div>
+		),
+		foot: (
+			<div className="flex max-w-2xl flex-col gap-3">
+				<p className="text-sm leading-relaxed text-text-primary">
+					<span className="mr-2 rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[0.7rem] uppercase tracking-wider text-accent">Try</span>
+					{s.tryThis}
+				</p>
+				<details className="group text-sm leading-relaxed text-text-secondary">
+					<summary className="cursor-pointer list-none font-mono text-xs text-text-tertiary hover:text-accent">
+						<span className="inline-block transition-transform group-open:rotate-90">▸</span> The mathematics
+					</summary>
+					{/* On the server: KaTeX's HTML ships, not KaTeX. */}
+					<div className="mt-2">
+						<ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+							{s.maths}
+						</ReactMarkdown>
+					</div>
+				</details>
+			</div>
+		),
+	}));
+
+	const list = SIMS.map((s, i) => (
+		<section key={s.id} id={s.id} className="flex scroll-mt-24 flex-col gap-5">
+			{words[i]!.head}
+			<Sim id={s.id} />
+			{words[i]!.foot}
+		</section>
+	));
+
+	const panels = Object.fromEntries(
+		SIMS.map((s, i) => [
+			s.id,
+			<div key={s.id} className="flex flex-col gap-4">
+				{words[i]!.head}
+				{words[i]!.foot}
+			</div>,
+		]),
+	);
 
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-20 px-4 py-12 md:px-6">
@@ -56,33 +105,7 @@ export default function LabPage() {
 				</nav>
 			</header>
 
-			{SIMS.map((s, i) => (
-				<section key={s.id} id={s.id} className="flex scroll-mt-24 flex-col gap-5">
-					<div className="flex max-w-2xl flex-col gap-2">
-						<p className="font-mono text-xs text-text-tertiary">{String(i + 1).padStart(2, "0")}</p>
-						<h2 className="font-display text-h3 font-semibold text-text-primary">{s.title}</h2>
-						<p className="text-body text-text-secondary">{s.hook}</p>
-					</div>
-					<Sim id={s.id} />
-					<div className="flex max-w-2xl flex-col gap-3">
-						<p className="text-sm leading-relaxed text-text-primary">
-							<span className="mr-2 rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[0.7rem] uppercase tracking-wider text-accent">Try</span>
-							{s.tryThis}
-						</p>
-						<details className="group text-sm leading-relaxed text-text-secondary">
-							<summary className="cursor-pointer list-none font-mono text-xs text-text-tertiary hover:text-accent">
-								<span className="inline-block transition-transform group-open:rotate-90">▸</span> The mathematics
-							</summary>
-							{/* On the server: KaTeX's HTML ships, not KaTeX. */}
-							<div className="mt-2">
-								<ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-									{s.maths}
-								</ReactMarkdown>
-							</div>
-						</details>
-					</div>
-				</section>
-			))}
+			<LabView list={list} panels={panels} />
 		</main>
 	);
 }

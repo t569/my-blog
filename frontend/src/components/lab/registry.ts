@@ -225,3 +225,19 @@ export const SIMS: Sim[] = [
 ];
 
 export const simById = (id: string): Sim | undefined => SIMS.find((s) => s.id === id.trim());
+
+/** The lab as a stage (LabChapters): the scenes in acts, each opened by a title card. */
+export const ACTS: { title: string; sims: string[] }[] = [
+	{ title: "Chaos & pattern", sims: ["mandelbrot", "lorenz", "flow", "fluid", "life", "fibonacci", "fourier"] },
+	{ title: "Surfaces", sims: ["puzzle", "laplace", "torus"] },
+	{ title: "The modular world", sims: ["modular", "delta", "knots"] },
+	{ title: "Inside geometries", sims: ["h3", "sl2", "s3", "nil", "sol"] },
+	{ title: "Black holes", sims: ["blackhole", "kerr"] },
+	{ title: "The engine", sims: ["ad", "hero"] }, // the coda
+];
+
+/** On the stage, these take every input once clicked (the wheel included); Esc gives it back. */
+export const IMMERSIVE = new Set(["mandelbrot", "fluid", "h3", "sl2", "s3", "nil", "sol", "blackhole", "kerr"]);
+
+/** Scenes driven by scroll, and how many screens their chapter lasts (ScrollProgress). */
+export const SCROLL: Record<string, number> = { delta: 2.6 };

@@ -1073,10 +1073,66 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
         Known ceiling until phase 2: native scrolling (touch, scrollbar drag)
         is composited a frame late, so boxes can trail the page; pinned
         chapters don't move with scroll, so this goes away there.
-- [ ] **Phase 2: pinned chapters.** Chapters, acts, title cards, progress rail,
+- [x] **Phase 2: pinned chapters.** Chapters, acts, title cards, progress rail,
       glass panel; scene fitted to cover the viewport; only active ± 1 mounted
       (so leaks in a shared context now matter: audit `dispose`); the list as
       fallback + toggle; `immersive` flag and `data-lenis-prevent`.
+  - [x] `LabView`: the server renders the list; the stage replaces it after
+        hydration where it suits (motion allowed, ≥ 768 px, a fine pointer,
+        WebGL2) unless the reader picked the list (toggle, `localStorage`).
+        Touch-first screens get the list: a full-screen scene that takes a
+        drag would swallow the scroll.
+  - [x] `LabChapters`: a sticky layer under the navbar holds the scene on
+        stage; the chapters scroll over it (so the footer follows as usual).
+        Active = the chapter crossing the middle of the screen; it and its
+        neighbours are mounted, the neighbours with no box (`display: none`),
+        so they neither draw nor take input. Title card per act, act rail,
+        glass panel (bottom left, scrolls with its chapter).
+  - [x] Fit: first covered the screen, cropped; now inside it, centred (2b).
+  - [x] Input: over a scene the wheel scrolls the page (captured before an
+        orbit would zoom). `IMMERSIVE` scenes show a click-to-explore layer;
+        clicked, they take everything (Lenis stopped) until Esc or the
+        chapter changes.
+  - [x] The words are made once on the server and shared by list and panels:
+        the KaTeX HTML is not in the payload twice.
+  - [x] Dispose audit (2026-10-02): live GPU objects counted by wrapping
+        WebGL's create/delete, over three walks of all 28 chapters and back.
+        Textures, buffers, framebuffers, renderbuffers, programs and VAOs end
+        each walk exactly where they started; never more than 3 scenes mounted.
+        Known, accepted: 2 shader objects per walk. Mandelbrot precompiles its
+        program (`compileAsync`, saves a ~250 ms freeze on arrival); mounted as
+        a hidden neighbour and unmounted before its first draw, three deletes
+        the program but not its shaders (it frees them on first use only). No
+        textures or buffers; worth an upstream three issue, not a workaround.
+- [x] **Phase 2b: the scenes on the stage** (2026-10-02, from a first look)
+  - [x] Fit inside the screen, centred (flex, not grid: a grid track grows to
+        its content and left-aligns overflow). Cover cropped controls and cost
+        ~5× the list's pixels; the stage keeps the page colour round the sides.
+  - [x] Scroll-driven scenes on a pinned stage: `ScrollProgress` (context)
+        hands the chapter's progress in; `SCROLL` in the registry makes the
+        chapter that many screens. The modular terrain flies again. Off the
+        stage the context is null and it measures its own box, as before.
+  - [x] Lorenz carries on after a remount (time and camera kept for the visit),
+        and no longer erases itself every 30 s: complete, the head goes round.
+  - [x] Lag, measured on a laptop's Intel Iris Plus with one tab (several /lab
+        tabs fight over the GPU and throttle each other to 30 Hz: measure alone):
+        black hole 30 fps at half resolution → 60 fps at full; Kerr 3–10 fps →
+        ~50 fps at ~0.3. How:
+        - Black hole shader 2.1× cheaper, pixel-identical (mean 0.03/255): steps
+          land on the disk's plane exactly (its crossings are known in advance,
+          the ray keeps to its plane), so the coarse steps that sky rays spend
+          most of their time in cost only RK4's own (tiny) error; inside r = 3
+          heading in, light only falls, so the shadow stops there.
+        - Kerr 1.5× cheaper, identical (0.08/255): fine steps only near the gas.
+          Still ~200 ms a full frame there, so its floor is 0.25 (`rayView`'s
+          new `minResolution`): one long GPU job stalls the whole page's frames,
+          not just the scene's, so each frame must be short.
+        - Governor: judged against the display's own frame period; far over
+          budget, drops straight to a scale that fits. Its GPU timer
+          (`frameCost`) under-reports on ANGLE/D3D11 (9 ms reported, ~30 ms
+          real): frame intervals stay the signal.
+        - The stage composites in the frame a view draws (`ThreeNode.onDraw`),
+          not the next: a drag answered a frame late.
 - [ ] **Phase 3: transitions.** Outgoing and incoming targets mixed by one
       shader per act, driven by scroll progress between chapters; CSS wipe
       whenever an SVG/2D scene is on either side.

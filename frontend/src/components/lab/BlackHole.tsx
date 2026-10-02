@@ -60,18 +60,29 @@ void main() {
 	vec2 s = vec2(1.0 / r0, -(1.0 / r0) * dr / max(tl, 1e-6));
 	float b = inversesqrt(max(s.y * s.y + s.x * s.x - 2.0 * s.x * s.x * s.x, 1e-9)); // impact parameter
 	float phi = 0.0;
-	vec3 prev = C;
 	vec3 col = vec3(0.0);
+	// The ray stays in its plane, so it meets the disk's plane (y = 0) where cos φ e1.y + sin φ e2.y = 0:
+	// every π from the first such angle ahead. Steps land on those exactly, so the sin, cos and position
+	// are worked out there and at the escape only, not at every step.
+	float plane = atan(e2.y, e1.y) + 1.5707963;
+	plane -= 3.1415927 * floor(plane / 3.1415927);
+	if (plane < 1e-4) plane += 3.1415927;
 	for (int i = 0; i < 700; i++) {
-		float h = mix(0.05, 0.006, smoothstep(0.04, 0.34, s.x)); // fine steps near the hole
+		// Fine steps only near the photon sphere, where the ring is decided. Elsewhere the step costs only
+		// RK4's own error (tiny on this smooth equation): the disk crossings and the escape are exact.
+		float h = mix(0.15, 0.006, smoothstep(0.04, 0.34, s.x));
+		bool atDisk = phi + h >= plane;
+		if (atDisk) h = plane - phi;
 		vec2 k1 = f(s), k2 = f(s + 0.5 * h * k1), k3 = f(s + 0.5 * h * k2), k4 = f(s + h * k3);
 		s += h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 		phi += h;
-		if (s.x > 0.5) break; // through the horizon: the shadow
-		vec3 pos = (cos(phi) * e1 + sin(phi) * e2) / s.x;
-		if (prev.y * pos.y < 0.0) {
-			vec3 hit = mix(prev, pos, prev.y / (prev.y - pos.y));
-			float r = length(hit);
+		// Inside the photon sphere (r < 3) and heading in, light only falls: every turning point of
+		// u'' = -u + 3u^2 lies outside it. The shadow is decided here, not after the fine steps to r = 2.
+		if (s.x > 1.0 / 3.0 && s.y > 0.0) break;
+		if (atDisk) {
+			plane += 3.1415927;
+			vec3 hit = (cos(phi) * e1 + sin(phi) * e2) / s.x;
+			float r = 1.0 / s.x;
 			if (r > ${DISK[0].toFixed(1)} && r < ${DISK[1].toFixed(1)}) {
 				// Gas on circular orbits, turning counterclockwise seen from +y, Omega = r^-3/2.
 				// g = sqrt(1 - 3/r) / (1 - Omega L). We traced backwards, so the photon's own L is -b n.y.
@@ -88,8 +99,12 @@ void main() {
 				break;
 			}
 		}
-		if (s.x < 1.0 / 80.0 && s.y < 0.0) { col = sky(normalize(pos - prev)); break; } // escaped
-		prev = pos;
+		if (s.x < 1.0 / 80.0 && s.y < 0.0) {
+			// Escaped. Its direction: d/dφ of (cos φ e1 + sin φ e2) / u, up to a positive factor.
+			vec3 radial = cos(phi) * e1 + sin(phi) * e2;
+			col = sky(normalize((-sin(phi) * e1 + cos(phi) * e2) * s.x - radial * s.y));
+			break;
+		}
 	}
 	gl_FragColor = vec4(1.0 - exp(-col), 1.0); // the approaching side is ~10× the receding: compress, don't clip
 }`;

@@ -73,8 +73,12 @@ void main() {
 	float tau = 0.0;
 	vec3 prev = cart(r, th, ph);
 	for (int i = 0; i < 520; i++) {
-		// Backwards along the photon: big steps far out, fine ones near the hole and through the gas.
-		float h = -min(min(0.03 * r + 0.05, 0.25), 0.03 * (r - rh) + 0.004);
+		// Backwards along the photon: fine steps through the gas and near the hole. Away from the gas the
+		// step grows with r (light there bends gently), or a sky ray spends ~200 steps in empty space.
+		// The margin keeps big steps clear of it: at its edge the density is e^-8.7 of the peak.
+		float Rs = r * sin(th), zs = r * cos(th);
+		bool nearGas = Rs > risco * 0.9 - 1.0 && Rs < 21.0 && abs(zs) < 0.5 * Rs + 1.0;
+		float h = -min(nearGas ? min(0.03 * r + 0.05, 0.25) : 0.05 * r + 0.05 + 0.1 * max(r - 22.4, 0.0), 0.03 * (r - rh) + 0.004);
 		float k1r, k1t, k1p, k1pr, k1pt, k2r, k2t, k2p, k2pr, k2pt, k3r, k3t, k3p, k3pr, k3pt, k4r, k4t, k4p, k4pr, k4pt;
 		deriv(r, th, pr, pt, L, k1r, k1t, k1p, k1pr, k1pt);
 		deriv(r + 0.5 * h * k1r, th + 0.5 * h * k1t, pr + 0.5 * h * k1pr, pt + 0.5 * h * k1pt, L, k2r, k2t, k2p, k2pr, k2pt);
@@ -142,6 +146,9 @@ export default function KerrBlackHole() {
 			frag: FRAG,
 			uniforms: { C: { value: C }, F: { value: F }, R: { value: R }, U: { value: U }, ...u },
 			bloom: { strength: 0.7, radius: 0.45, threshold: 0.75 },
+			// The heaviest scene here: ~340 ms a full-size frame on a laptop's integrated GPU. Mostly soft
+			// glowing gas, so it can drop further than the others before it shows.
+			minResolution: 0.25,
 			fly: (dt) => {
 				az += dt * 0.035;
 				u.time.value += dt;

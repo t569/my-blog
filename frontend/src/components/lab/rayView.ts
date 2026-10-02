@@ -21,6 +21,9 @@ export interface RayScene {
 	/** Turn by a drag: yaw and pitch in radians. */
 	look?: (yaw: number, pitch: number) => void;
 	bloom?: ThreeOptions["bloom"];
+	/** The lowest resolution the governor may take it to (default 0.5). A frame the GPU can't finish
+	 *  in budget stalls the whole page, not just this view: the heaviest scenes need a lower floor. */
+	minResolution?: number;
 	/** Handed a redraw, for controls outside the canvas (a slider) that change uniforms. */
 	onReady?: (redraw: () => void) => void;
 }
@@ -28,7 +31,7 @@ export interface RayScene {
 export function mountRayView(host: HTMLElement, width: number, height: number, s: RayScene): () => void {
 	const still = prefersReducedMotion();
 	const scene = new Scene({ width, height }, host);
-	const view = new ThreeNode({ x: width / 2, y: height / 2, width, height, shadows: "none", minResolution: 0.5, bloom: s.bloom });
+	const view = new ThreeNode({ x: width / 2, y: height / 2, width, height, shadows: "none", minResolution: s.minResolution ?? 0.5, bloom: s.bloom });
 	scene.add(view);
 
 	const mat = new ShaderMaterial({

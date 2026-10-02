@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { Scene } from "@t569/scene-engine";
 import { ThreeNode } from "@t569/scene-engine/three";
 import {
@@ -18,6 +18,7 @@ import {
 } from "three";
 import type { terrainMesh } from "@/lib/modular";
 import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
+import { ScrollProgress } from "./scrollProgress";
 
 /**
  * The modular discriminant Δ as a landscape on the Poincaré disk, flown
@@ -60,6 +61,8 @@ export default function ModularTerrain() {
 	const outerRef = useRef<HTMLDivElement>(null);
 	const hostRef = useRef<HTMLDivElement>(null);
 	const still = prefersReducedMotion(); // client-only: Sim mounts this after hydration
+	// On the lab's stage the box is already pinned, and the chapter's scroll is handed in.
+	const staged = useContext(ScrollProgress);
 
 	useEffect(() => {
 		const [outer, host] = [outerRef.current, hostRef.current];
@@ -103,10 +106,13 @@ export default function ModularTerrain() {
 		} else {
 			const gaze = new Vector3();
 			let drawn = -1;
-			view.onFrame(() => {
+			const scrolled = () => {
 				const r = outer.getBoundingClientRect();
 				const span = r.height - host.getBoundingClientRect().height;
-				const p = ease(Math.min(1, Math.max(0, (PIN - r.top) / Math.max(1, span))));
+				return Math.min(1, Math.max(0, (PIN - r.top) / Math.max(1, span)));
+			};
+			view.onFrame(() => {
+				const p = ease((staged ?? scrolled)());
 				if (p === drawn) return false;
 				drawn = p;
 				PATH.getPoint(p, view.camera.position);
@@ -121,10 +127,11 @@ export default function ModularTerrain() {
 			worker.terminate();
 			scene.destroy(); // ThreeNode frees the geometry, materials and GL context
 		};
-	}, [still]);
+	}, [still, staged]);
 
 	const box = <div ref={hostRef} className="w-full overflow-hidden rounded-xl" style={{ aspectRatio: `${W} / ${H}`, background: STAGE }} />;
 	if (still) return <div ref={outerRef} className="cursor-grab">{box}</div>;
+	if (staged) return <div ref={outerRef}>{box}</div>;
 	// Three screens of scroll with the view pinned: the flight's length.
 	return (
 		<div ref={outerRef} style={{ height: "260vh" }}>
