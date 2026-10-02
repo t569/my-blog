@@ -1,21 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Sim from "./Sim";
+import LabLoader from "./LabLoader";
 import { setTransition, smooth } from "./LabStage";
 import { ACTS, IMMERSIVE, SCROLL, groupOf, simById } from "./registry";
 import { ScrollProgress, StageChapter } from "./scrollProgress";
 
-type Chapter = { act: number; id?: string };
+/** A chapter: a prologue line (act −1), an act's title card (no id), or a scene. */
+type Chapter = { act: number; id?: string; line?: string };
+
+/** The opening: three lines over one scene, before Act I. */
+const PROLOGUE = ["Do you know math can be interactive?", "What if we could simulate everything?", "I built an engine to do just that."];
+const INTRO = "intro";
 
 /** Each act opens with its title card (no id), then its scenes. */
-const CHAPTERS: Chapter[] = ACTS.flatMap((a, act) => [{ act }, ...a.sims.map((id) => ({ act, id }))]);
+const CHAPTERS: Chapter[] = [
+	...PROLOGUE.map((line) => ({ act: -1, line })),
+	...ACTS.flatMap((a, act) => [{ act }, ...a.sims.map((id) => ({ act, id }))]),
+];
+
+const IntroField = lazy(() => import("./IntroField"));
 
 /** Where scenes mount on the stage: one slot per scene, except a group's chapters, which share one. */
 const SLOTS: { key: string; members: number[] }[] = [];
-CHAPTERS.forEach(({ id }, i) => {
-	if (!id) return;
-	const key = groupOf(id)?.[0] ?? id;
+CHAPTERS.forEach(({ id, line }, i) => {
+	if (!id && !line) return;
+	const key = line ? INTRO : (groupOf(id!)?.[0] ?? id!);
 	const slot = SLOTS.find((s) => s.key === key);
 	if (slot) slot.members.push(i);
 	else SLOTS.push({ key, members: [i] });
@@ -63,7 +74,18 @@ const SWIPE_PX = 50;
  * (a flight driven by scroll) scrolls freely until its end, then flicks resume. An
  * IMMERSIVE scene takes every input once clicked, until Esc.
  */
-export default function LabChapters({ panels }: { panels: Record<string, ReactNode> }) {
+export default function LabChapters({ panels, onList }: { panels: Record<string, ReactNode>; onList: () => void }) {
+	// The loader's curtain is down: the page holds still, and the first line waits for it.
+	const [loaded, setLoaded] = useState(false);
+	const opened = useCallback(() => {
+		smooth?.start();
+		setLoaded(true);
+	}, []);
+	useEffect(() => {
+		smooth?.stop();
+		// Opened at the top (the list's header gives way to the prologue), unless a #scene was asked for.
+		if (!location.hash) document.querySelector("[data-chapter='0']")?.scrollIntoView();
+	}, []);
 	const [active, setActive] = useState(0);
 	const [leaving, setLeaving] = useState<number | null>(null);
 	const [immersed, setImmersed] = useState(false);
@@ -86,7 +108,11 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 		}),
 	);
 	const current = CHAPTERS[active]!;
-	const immersive = !!current.id && IMMERSIVE.has(current.id);
+	// On touch every scene is tap-to-play: a scene that took the drag would swallow the swipe.
+	const [touch] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches);
+	// The intro's scene comes in the screen's shape (IntroField): its slot covers the stage at that shape.
+	const [portrait] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(orientation: portrait)").matches);
+	const immersive = !!current.id && (IMMERSIVE.has(current.id) || touch);
 
 	/** Move to chapter `to`: scroll there, and dissolve the scene on stage into its scene. */
 	const goto = useCallback((to: number) => {
@@ -232,33 +258,44 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 
 	return (
 		<div ref={root} className="ml-[calc(50%-50vw)] w-screen">
+			{!loaded && <LabLoader onDone={opened} />}
 			<div ref={layer} className="sticky top-(--nav-height) h-[calc(100vh-var(--nav-height))] overflow-hidden">
 				{SLOTS.map(({ key, members }) => {
-					const sim = members.some((i) => Math.abs(i - active) <= 1 || i === leaving) ? simById(key) : null;
-					if (!sim) return null;
+					const near = members.some((i) => Math.abs(i - active) <= 1 || i === leaving);
+					const intro = key === INTRO;
+					const sim = near && !intro ? simById(key) : null;
+					if (!near || (!sim && !intro)) return null;
 					const shown = members.includes(active) || (leaving !== null && members.includes(leaving));
 					const arriving = members.includes(active) && leaving !== null && !members.includes(leaving);
 					// A group's scene shows the chapter on stage, or (waiting) the one nearest it.
 					const onStage = members.reduce((a, b) => (Math.abs(b - active) < Math.abs(a - active) ? b : a));
 					const scroll = members.find((i) => SCROLL[CHAPTERS[i]!.id!]);
-					// As large as fits, nothing cropped: the controls along a scene's edges stay on screen.
-					const width = `min(100vw, calc((100vh - var(--nav-height)) * ${sim.aspect}))`;
+					// As large as fits, nothing cropped: the controls along a scene's edges stay on screen. The
+					// intro has no controls and no edges worth keeping: it fills the stage.
+					const width = intro ? `max(100vw, calc((100vh - var(--nav-height)) * ${portrait ? "9 / 16" : "16 / 9"}))` : `min(100vw, calc((100vh - var(--nav-height)) * ${sim!.aspect}))`;
 					return (
 						// The neighbours: mounted, but no box, so they neither draw nor take input.
 						// Flex, not grid: a grid track grows to its content and left-aligns any overflow.
 						<div
 							key={key}
 							ref={(el) => void (wrappers.current[key] = el)}
-							className="absolute inset-0 flex items-center justify-center"
+							// On a phone, centred in what the bottom sheet leaves, so its controls stay clear of it.
+							className={`absolute inset-0 flex items-center justify-center ${intro ? "" : "max-md:pb-[45vh]"}`}
 							// Arriving, it starts invisible: the move's first frame would otherwise come a frame late.
 							style={{ display: shown ? undefined : "none", opacity: arriving ? 0 : undefined }}
 						>
 							<div className="shrink-0" style={{ width }}>
-								<StageChapter.Provider value={members.length > 1 ? CHAPTERS[onStage]!.id! : null}>
-									<ScrollProgress.Provider value={scroll !== undefined ? progress[scroll]! : null}>
-										<Sim id={key} />
-									</ScrollProgress.Provider>
-								</StageChapter.Provider>
+								{intro ? (
+									<Suspense>
+										<IntroField />
+									</Suspense>
+								) : (
+									<StageChapter.Provider value={members.length > 1 ? CHAPTERS[onStage]!.id! : null}>
+										<ScrollProgress.Provider value={scroll !== undefined ? progress[scroll]! : null}>
+											<Sim id={key} />
+										</ScrollProgress.Provider>
+									</StageChapter.Provider>
+								)}
 							</div>
 						</div>
 					);
@@ -267,11 +304,20 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 					<button
 						type="button"
 						onClick={() => setImmersed(true)}
-						aria-label="Explore this scene: it takes every input until Esc"
+						aria-label={touch ? "Play with this scene" : "Explore this scene: it takes every input until Esc"}
 						className="absolute inset-0 cursor-pointer"
 					/>
 				)}
-				<nav aria-label="Acts" className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-3 rounded-xl bg-bg-page/70 px-3 py-3 backdrop-blur-md font-mono text-[0.65rem] uppercase tracking-widest">
+				{/* Small screens: a thin line for where you are, and the way back to the list. */}
+				<div className="absolute right-2 top-1/2 flex -translate-y-1/2 flex-col items-center gap-2 md:hidden">
+					<div className="h-28 w-0.5 rounded-full bg-white/15">
+						<div className="w-0.5 rounded-full bg-accent transition-[height] duration-700" style={{ height: `${(100 * (active + 1)) / CHAPTERS.length}%` }} />
+					</div>
+					<button type="button" onClick={onList} className="font-mono text-[0.6rem] uppercase text-text-tertiary">
+						List
+					</button>
+				</div>
+				<nav aria-label="Acts" className="absolute right-4 top-1/2 hidden -translate-y-1/2 flex-col gap-3 rounded-xl bg-bg-page/70 px-3 py-3 backdrop-blur-md font-mono text-[0.65rem] uppercase tracking-widest md:flex">
 					{ACTS.map((a, i) => (
 						<a
 							key={a.title}
@@ -279,33 +325,42 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 							onClick={(e) => {
 								e.preventDefault();
 								e.stopPropagation(); // Lenis's own anchor handling would start a second scroll
-								goto(CHAPTERS.findIndex((c) => c.act === i && !c.id));
+								goto(CHAPTERS.findIndex((c) => c.act === i && !c.id && !c.line));
 							}}
 							className={i === current.act ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}
 						>
 							{actName(i)}
 						</a>
 					))}
+					<button type="button" onClick={onList} className="mt-2 border-t border-border-subtle pt-3 text-left uppercase text-text-tertiary hover:text-accent">
+						List
+					</button>
 				</nav>
 			</div>
 
 			<div className="pointer-events-none relative -mt-[calc(100vh-var(--nav-height))]">
-				{CHAPTERS.map(({ act, id }, i) => (
+				{CHAPTERS.map(({ act, id, line }, i) => (
 					<section
-						key={id ?? `act-${act}`}
-						id={id ?? `act-${act + 1}`}
+						key={id ?? (line ? `intro-${i}` : `act-${act}`)}
+						id={id ?? (line ? `intro-${i + 1}` : `act-${act + 1}`)}
 						data-chapter={i}
 						ref={(el) => void (sections.current[i] = el)}
-						className={`flex min-h-screen flex-col px-6 md:px-12 ${id ? "pb-12" : "items-center justify-center"}`}
+						className={`flex min-h-screen flex-col px-3 md:px-12 ${id ? "pb-4 md:pb-12" : "items-center justify-center"}`}
 						style={id && SCROLL[id] ? { height: `${SCROLL[id] * 100}vh` } : undefined}
 					>
-						{id ? (
+						{line ? (
+							// Over the night scene in either theme: light words.
+							<Rise on={loaded && i === active && leaving === null} as="h2" delay={150} className="max-w-5xl text-center font-display text-5xl font-bold leading-tight text-white [text-shadow:0_2px_28px_rgb(0_0_0/0.9)] md:text-7xl">
+								{line}
+							</Rise>
+						) : id ? (
 							// At the foot of its chapter, and held at the foot of the screen through a long one.
 							// Open mathematics can outgrow the screen: the panel scrolls itself, not the page.
 							<div
 								data-lenis-prevent
 								// Rises into place once its chapter has arrived; settles back as it leaves.
-								className={`sticky bottom-12 mt-auto max-h-[calc(100vh-6rem)] max-w-md overflow-y-auto rounded-2xl border border-border-subtle bg-bg-page/70 p-5 shadow-lg backdrop-blur-md transition-[opacity,translate] duration-700 ease-out ${
+								// On a phone a bottom sheet: full width, at most 45% of the screen, the scene above it.
+								className={`sticky bottom-4 mt-auto max-h-[45vh] w-full overflow-y-auto rounded-2xl border md:bottom-12 md:max-h-[calc(100vh-6rem)] md:max-w-md border-border-subtle bg-bg-page/70 p-5 shadow-lg backdrop-blur-md transition-[opacity,translate] duration-700 ease-out ${
 									immersed && i === active
 										? "pointer-events-none opacity-0"
 										: i === active && leaving === null
@@ -313,7 +368,8 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 											: "pointer-events-auto translate-y-6 opacity-0"
 								}`}
 							>
-								{panels[id]}
+								{/* Words only near the stage: twenty-five chapters' worth was most of the DOM. */}
+								{Math.abs(i - active) <= 1 || i === leaving ? panels[id] : null}
 							</div>
 						) : (
 							<div className="text-center">
@@ -328,11 +384,20 @@ export default function LabChapters({ panels }: { panels: Record<string, ReactNo
 					</section>
 				))}
 			</div>
-			{immersed && (
-				<p className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-bg-page/70 px-3 py-1 font-mono text-xs text-text-secondary backdrop-blur">
-					Esc to return
-				</p>
-			)}
+			{immersed &&
+				(touch ? (
+					<button
+						type="button"
+						onClick={() => setImmersed(false)}
+						className="fixed bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-bg-page/80 px-4 py-2 font-mono text-xs text-text-primary backdrop-blur"
+					>
+						Done
+					</button>
+				) : (
+					<p className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-bg-page/70 px-3 py-1 font-mono text-xs text-text-secondary backdrop-blur">
+						Esc to return
+					</p>
+				))}
 		</div>
 	);
 }

@@ -42,6 +42,8 @@ let queue = Promise.resolve();
 /** LabStage while it sets up: scenes load after it, so their 3D is made on its shared renderer. */
 let stage: Promise<unknown> = Promise.resolve();
 export const awaitStage = (setUp: Promise<unknown>) => void (stage = setUp);
+/** For a loader: the stage's set-up. */
+export const stageReady = () => stage;
 const loader = (id: string) => {
 	const load = LOAD[id.trim()];
 	return load && (() => stage.then(load));

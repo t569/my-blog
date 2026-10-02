@@ -174,6 +174,11 @@ async function setUp(host: HTMLElement) {
 	};
 
 	let drawn = "";
+	// Phones run 3× screens on small GPUs: the stage composites at most at 1.5×, which their eyes
+	// can't tell from 3× at arm's length; each scene's own governor takes its resolution from there.
+	const phone = matchMedia("(pointer: coarse)").matches;
+	// And each scene renders at most at 1.25× there; the governor lowers it further as needed.
+	if (phone) ThreeNode.pixelRatioCap = 1.25;
 	// A view has drawn: composite once its animation frame's work is done (a microtask), in the same
 	// frame, not at the start of the next. The views' frames run after this component's own.
 	let queued = false;
@@ -191,7 +196,7 @@ async function setUp(host: HTMLElement) {
 		draw() {
 			const w = canvas.clientWidth;
 			const h = canvas.clientHeight;
-			const dpr = Math.min(window.devicePixelRatio || 1, 2);
+			const dpr = Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2);
 			const views: [InstanceType<typeof ThreeNode>, DOMRect, "in" | "out" | null][] = [];
 			const move = transition;
 			let key = `${w}x${h}@${dpr}${move ? `~${move.t}` : ""}`;
@@ -247,6 +252,7 @@ async function setUp(host: HTMLElement) {
 		dispose() {
 			if (ThreeNode.sharedRenderer === renderer) ThreeNode.sharedRenderer = null;
 			if (ThreeNode.onDraw === composite) ThreeNode.onDraw = null;
+			ThreeNode.pixelRatioCap = null; // posts and the editor render as before
 			// After this commit's other cleanups: the scenes being unmounted with the page still hold it.
 			setTimeout(() => {
 				material.dispose();

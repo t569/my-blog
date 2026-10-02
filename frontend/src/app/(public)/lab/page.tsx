@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SITE } from "@/lib/constants";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import katex from "katex";
 import "katex/dist/katex.min.css";
 import Sim from "@/components/lab/Sim";
 import LabStage from "@/components/lab/LabStage";
@@ -27,6 +25,22 @@ export const metadata: Metadata = {
  * Off unless NEXT_PUBLIC_SITE_LAB=true: upstream gets neither this page nor a
  * link to it. Each scene loads as it nears the screen and animates only on it.
  */
+/** LabView's choice, made in the HTML: motion allowed, WebGL2 there, and the reader hasn't picked the list. */
+const STAGE_PROBE = `try{if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&"WebGL2RenderingContext"in window&&localStorage.getItem("lab-view")!=="list")document.documentElement.setAttribute("data-lab-stage","")}catch(e){}`;
+
+const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * A scene's mathematics (prose with $…$ formulas) as one HTML string, typeset by KaTeX on the
+ * server. A string, not a React tree: React hydrates it as a single node instead of walking the
+ * thousands of spans KaTeX makes, which on a phone was most of the time before the lab opened.
+ */
+const mathsHtml = (src: string) =>
+	`<p>${src
+		.split(/(\$[^$]+\$)/)
+		.map((part) => (part.length > 2 && part.startsWith("$") && part.endsWith("$") ? katex.renderToString(part.slice(1, -1), { throwOnError: false }) : escape(part)))
+		.join("")}</p>`;
+
 export default function LabPage() {
 	if (!SITE.lab) notFound();
 
@@ -50,11 +64,7 @@ export default function LabPage() {
 						<span className="inline-block transition-transform group-open:rotate-90">▸</span> The mathematics
 					</summary>
 					{/* On the server: KaTeX's HTML ships, not KaTeX. */}
-					<div className="mt-2">
-						<ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-							{s.maths}
-						</ReactMarkdown>
-					</div>
+					<div className="mt-2" dangerouslySetInnerHTML={{ __html: mathsHtml(s.maths) }} />
 				</details>
 			</div>
 		),
@@ -80,8 +90,17 @@ export default function LabPage() {
 
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-20 px-4 py-12 md:px-6">
+			{/* Runs as the HTML is read, before the first paint: the same choice LabView makes after
+			    hydration. On a phone hydration takes seconds; meanwhile the curtain is already down
+			    (globals.css, "The lab"), instead of the list showing and then being swapped out. */}
+			<script dangerouslySetInnerHTML={{ __html: STAGE_PROBE }} />
+			<div id="lab-preloader" aria-hidden className="fixed inset-0 z-[69] hidden flex-col items-center justify-center bg-[#05050a] text-white">
+				<p className="font-mono text-xs uppercase tracking-[0.4em] text-white/50">The lab</p>
+				<p className="mt-4 font-display text-7xl font-bold tabular-nums md:text-8xl">000</p>
+				<div className="mt-6 h-px w-48 bg-white/15" />
+			</div>
 			<LabStage />
-			<header className="flex flex-col gap-4">
+			<header id="lab-header" className="flex flex-col gap-4">
 				<p className="font-mono text-xs uppercase tracking-widest text-text-tertiary">Lab</p>
 				<h1 className="font-display text-h1 font-bold text-text-primary">Scenes you can touch</h1>
 				<p className="max-w-2xl text-body text-text-secondary">
@@ -105,7 +124,9 @@ export default function LabPage() {
 				</nav>
 			</header>
 
-			<LabView list={list} panels={panels} />
+			<div id="lab-list" className="contents">
+				<LabView list={list} panels={panels} />
+			</div>
 		</main>
 	);
 }

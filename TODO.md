@@ -1133,6 +1133,29 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
           real): frame intervals stay the signal.
         - The stage composites in the frame a view draws (`ThreeNode.onDraw`),
           not the next: a drag answered a frame late.
+- [x] **Phase 2c: intro, flicks, dissolve, modular forms, phones** (2026-10-02).
+  - [x] One flick (wheel gesture, swipe, key) = one chapter; SCROLL chapters
+        scroll freely to their end. The outgoing scene dissolves into the
+        next on the stage (noise mask, displacement, RGB split, faint edge);
+        SVG/canvas scenes cross-fade; titles rise word by word.
+  - [x] Ads: SpecScene keeps each spec's clock (no replayed intros); the
+        banner is Euler's identity, still pure data.
+  - [x] E₄, E₆, j (`lib/modular.ts`, checked) as one landscape that morphs
+        (registry GROUPS + StageChapter): every form's attributes on one
+        geometry, blended by weights; camera glides per form.
+  - [x] Prologue: three lines over a night galaxy (IntroField, data only),
+        behind a loader counting real work (capped at 5 s by the clock). The
+        page's inline probe drops a static curtain before the first paint,
+        so a phone never shows the list while it hydrates.
+  - [x] Phones get the stage: tap-to-play on touch (a swipe always moves
+        chapters), bottom-sheet panel, progress line, scene above the sheet;
+        stage composite ≤ 1.5×, every view ≤ 1.25× (`ThreeNode.pixelRatioCap`),
+        terrain at a quarter of the points, intro in portrait on portrait.
+        Hydration made cheap: maths as one HTML string per scene (KaTeX on the
+        server, 137 formulas checked), panels rendered only near the stage.
+  - [ ] **Measure on a real phone, and with the tab in front.** A background
+        tab (even "visible") is throttled to ~1 frame/s and its timers slowed:
+        every timing taken that way was an artifact, /about included.
 - [ ] **Phase 3: transitions.** Outgoing and incoming targets mixed by one
       shader per act, driven by scroll progress between chapters; CSS wipe
       whenever an SVG/2D scene is on either side.

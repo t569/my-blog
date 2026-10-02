@@ -202,6 +202,29 @@ html.lenis {
 	scroll-behavior: auto;
 }
 
+/* The lab, chosen for the stage before the first paint (its page's inline probe): the curtain is down
+   and the list stays hidden until the stage's own loader takes over (it lifts the attribute). Should the
+   scripts never run, after 12 s the curtain gives up and the list shows, as if there were no stage. */
+html[data-lab-stage] #lab-preloader {
+	display: flex;
+	animation: lab-give-up 0s 12s forwards;
+}
+html[data-lab-stage] #lab-list,
+html[data-lab-stage] #lab-header {
+	visibility: hidden;
+	animation: lab-reveal 0s 12s forwards;
+}
+@keyframes lab-give-up {
+	to {
+		visibility: hidden;
+	}
+}
+@keyframes lab-reveal {
+	to {
+		visibility: visible;
+	}
+}
+
 body {
 	font-family: var(--font-body);
 	color: var(--color-text-primary);

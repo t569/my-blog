@@ -125,7 +125,9 @@ export default function ModularTerrain({ form = "delta" }: { form?: Form }) {
 		const queue = morphs ? [target.current, ...ORDER.filter((f) => f !== target.current)] : [form];
 		const request = () => {
 			const next = queue.shift();
-			if (next) worker.postMessage({ rings: RINGS, spokes: SPOKES, rim: RIM, radius: RADIUS, relief: RELIEF, peak: PEAK, form: next });
+			// A phone gets a quarter of the points (half each way): four forms of 130k are a lot for its memory.
+			const grid = matchMedia("(pointer: coarse)").matches ? 0.5 : 1;
+			if (next) worker.postMessage({ rings: RINGS * grid, spokes: SPOKES * grid, rim: RIM, radius: RADIUS, relief: RELIEF, peak: PEAK, form: next });
 			else worker.terminate();
 			return next;
 		};
