@@ -1204,8 +1204,8 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
   - [x] `warm()` also draws one 1×1 frame, so geometry (about 22 MB for the
         terrain) uploads in idle time, not mid-move. Lights' shadow maps are
         disposed with their scene.
-  - [ ] Commit, then `git subtree push` scene-engine and run its tests there
-        (vitest isn't installed in the subtree copy).
+  - [x] Committed; scene-engine subtree pushed (`66ff4d4`), 78/78 tests pass
+        in `D:/Repos/scene-engine`.
   - [ ] Measure with the tab in front: a DevTools trace of scroll, Δ→E4→E6→j
         and Mandelbrot, before and after. Then a phone, or 4× CPU throttle.
   - [ ] Only if the trace names them:
