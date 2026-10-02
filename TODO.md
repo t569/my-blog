@@ -1192,6 +1192,18 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
           3D scenes still dissolve.
         - An arriving 3D scene was zoomed twice (shader and CSS scale).
         - The coda hero's "Open the lab →" button did nothing, in the lab: removed.
+  - [ ] **The next scene still previews during a move** (reported on real
+        hardware after `53e754c`). The corner frame from a hidden neighbour and
+        the 2D cross-fade were fixed, and headless Chrome no longer shows either,
+        so whatever is left was not reproduced there. Start with a DevTools
+        trace or screen recording of puzzle → Laplace on the real GPU: which
+        scene shows, where, and in which frames of the move.
+  - [ ] **3D → 3D can go blank mid-move.** The leaving scene's dissolve is
+        mostly done by ~60% of the move and assumes the arriving one is drawn
+        under it. Hidden neighbours no longer draw, so the arriving scene's
+        first frame comes only once it is shown (seconds on headless Chrome's
+        software GL, Laplace → Torus). Fix: hold the dissolve at 0 until the
+        arriving view has `version > 0`, then run it over what's left.
   - [ ] Opening `/lab#<scene>` sometimes lands a chapter or two off (seen in
         headless Chrome: #fluid → Life, #laplace → Torus).
 - [ ] **Phase 4: polish.** framer-motion kinetic type for titles and panels;
