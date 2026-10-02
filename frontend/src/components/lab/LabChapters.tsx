@@ -287,7 +287,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 	return (
 		<div ref={root} className="ml-[calc(50%-50vw)] w-screen">
 			{!loaded && <LabLoader onDone={opened} />}
-			<div ref={layer} className="sticky top-(--nav-height) h-[calc(100vh-var(--nav-height))] overflow-hidden">
+			<div ref={layer} className="sticky top-(--nav-height) h-[calc(100svh-var(--nav-height))] overflow-hidden">
 				{SLOTS.map(({ key, members }) => {
 					const near = members.some((i) => i === active || i === leaving || Math.abs(i - settled) <= 1);
 					const intro = key === INTRO;
@@ -300,7 +300,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 					const scroll = members.find((i) => SCROLL[CHAPTERS[i]!.id!]);
 					// As large as fits, nothing cropped: the controls along a scene's edges stay on screen. The
 					// intro has no controls and no edges worth keeping: it fills the stage.
-					const width = intro ? `max(100vw, calc((100vh - var(--nav-height)) * ${portrait ? "9 / 16" : "16 / 9"}))` : `min(100vw, calc((100vh - var(--nav-height)) * ${sim!.aspect}))`;
+					const width = intro ? `max(100vw, calc((100svh - var(--nav-height)) * ${portrait ? "9 / 16" : "16 / 9"}))` : `min(100vw, calc((100svh - var(--nav-height)) * ${sim!.aspect}))`;
 					return (
 						// The neighbours: mounted, but no box, so they neither draw nor take input.
 						// Flex, not grid: a grid track grows to its content and left-aligns any overflow.
@@ -366,7 +366,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 				</nav>
 			</div>
 
-			<div className="pointer-events-none relative -mt-[calc(100vh-var(--nav-height))]">
+			<div className="pointer-events-none relative -mt-[calc(100svh-var(--nav-height))]">
 				{CHAPTERS.map(({ act, id, line }, i) => (
 					<section
 						key={id ?? (line ? `intro-${i}` : `act-${act}`)}
