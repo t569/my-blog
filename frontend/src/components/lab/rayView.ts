@@ -2,6 +2,7 @@ import { Scene } from "@t569/scene-engine";
 import { ThreeNode, type ThreeOptions } from "@t569/scene-engine/three";
 import { Mesh, PlaneGeometry, ShaderMaterial } from "three";
 import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
+import { simplify } from "./quality";
 
 /**
  * The frame every "inside view" shares: a full-screen fragment shader in a
@@ -37,7 +38,8 @@ export function mountRayView(host: HTMLElement, width: number, height: number, s
 	const mat = new ShaderMaterial({
 		uniforms: { ...s.uniforms, aspect: { value: width / height } },
 		vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-		fragmentShader: s.frag,
+		// Shaders scale their step counts by this (quality.ts): a constant, so loop bounds may use it.
+		fragmentShader: `#define SIMPLIFY ${simplify.toFixed(3)}\n${s.frag}`,
 		depthTest: false,
 	});
 	const quad = new Mesh(new PlaneGeometry(2, 2), mat);

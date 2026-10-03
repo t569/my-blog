@@ -34,7 +34,7 @@ void main() {
 	vec3 p = P, v = vec3(exp(-P.z) * d.x, exp(P.z) * d.y, d.z);
 	vec3 col = vec3(0.0);
 	const float h = 0.06;
-	for (int i = 0; i < 150; i++) {
+	for (int i = 0; i < int(150.0 * SIMPLIFY); i++) {
 		vec3 p1, v1, p2, v2, p3, v3, p4, v4;
 		f(v, p, p1, v1);
 		f(v + 0.5 * h * v1, p + 0.5 * h * p1, p2, v2);

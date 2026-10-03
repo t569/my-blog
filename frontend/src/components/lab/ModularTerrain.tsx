@@ -19,6 +19,7 @@ import {
 import type { Form, terrainMesh } from "@/lib/modular";
 import { prefersReducedMotion, runWhileVisible } from "@/lib/sceneTheme";
 import { ScrollProgress, StageChapter } from "./scrollProgress";
+import { simplify } from "./quality";
 
 /**
  * A modular form as a landscape on the Poincaré disk: the discriminant Δ, the
@@ -125,8 +126,8 @@ export default function ModularTerrain({ form = "delta" }: { form?: Form }) {
 		const queue = morphs ? [target.current, ...ORDER.filter((f) => f !== target.current)] : [form];
 		const request = () => {
 			const next = queue.shift();
-			// A phone gets a quarter of the points (half each way): four forms of 130k are a lot for its memory.
-			const grid = matchMedia("(pointer: coarse)").matches ? 0.5 : 1;
+			// A phone (quality.ts) gets a quarter of the points (half each way): four forms of 130k are a lot for its memory.
+			const grid = simplify < 1 ? 0.5 : 1;
 			if (next) worker.postMessage({ rings: RINGS * grid, spokes: SPOKES * grid, rim: RIM, radius: RADIUS, relief: RELIEF, peak: PEAK, form: next });
 			else worker.terminate();
 			return next;

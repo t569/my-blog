@@ -5,6 +5,7 @@ import Lenis from "lenis";
 import "lenis/dist/lenis.css";
 import { prefersReducedMotion } from "@/lib/sceneTheme";
 import { awaitStage } from "./Sim";
+import { setSimplify, simplify } from "./quality";
 
 /** Scroll offset for anchor jumps: the sections' scroll-mt-24. */
 const ANCHOR_OFFSET = -96;
@@ -73,6 +74,8 @@ void main() {
 	float inside = clamp(0.5 - d, 0.0, 1.0);
 	float edge = dissolve > 0.0 ? mask * (1.0 - mask) * 1.4 : 0.0;
 	gl_FragColor = ((c + under) * mask + vec4(vec3(edge), edge)) * inside * fade;
+	// Half a level of noise before the 8-bit canvas: glow fading into a night sky bands without it.
+	gl_FragColor.rgb += (hash(gl_FragCoord.xy) - 0.5) / 255.0 * gl_FragColor.a;
 }`;
 
 /**
@@ -212,11 +215,20 @@ async function setUp(host: HTMLElement) {
 	let radii = new WeakMap<Element, number>();
 	const restyled = new MutationObserver(() => (radii = new WeakMap()));
 	restyled.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-skin"] });
-	// Phones run 3× screens on small GPUs: the stage composites at most at 1.5×, which their eyes
-	// can't tell from 3× at arm's length; each scene's own governor takes its resolution from there.
+	// Phones run 3× screens on small GPUs: scenes render at most at 1.25× there (the governor lowers
+	// it further as needed), and the stage composites at the same ratio. Composited any finer, every
+	// frame was stretched by 1.2× on its way to the screen, so it was never sharp.
 	const phone = matchMedia("(pointer: coarse)").matches;
-	// And each scene renders at most at 1.25× there; the governor lowers it further as needed.
-	if (phone) ThreeNode.pixelRatioCap = 1.25;
+	// Test switches for measuring on a device (?perf shows the HUD; ?dpr=1, ?nobloom, ?noblur).
+	const query = new URLSearchParams(location.search);
+	const phoneRatio = Number(query.get("dpr")) || 1.25;
+	if (phone || query.has("dpr")) ThreeNode.pixelRatioCap = phoneRatio;
+	ThreeNode.noBloom = query.has("nobloom");
+	// Shaders take longer steps on phones (quality.ts): a phone GPU is ~10× short of a laptop's, and
+	// resolution alone would have to fall to a third each way to make that up.
+	setSimplify(Number(query.get("simplify")) || (phone ? 0.5 : 1));
+	const hud = query.has("perf") ? perfHud(renderer, ThreeNode) : null;
+	if (query.has("noblur")) document.documentElement.classList.add("lab-noblur");
 	// A view has drawn: composite once its animation frame's work is done (a microtask), in the same
 	// frame, not at the start of the next. The views' frames run after this component's own.
 	let queued = false;
@@ -249,7 +261,8 @@ async function setUp(host: HTMLElement) {
 		draw() {
 			const w = canvas.clientWidth;
 			const h = canvas.clientHeight;
-			const dpr = Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2);
+			hud?.tick();
+			const dpr = Math.min(window.devicePixelRatio || 1, ThreeNode.pixelRatioCap ?? 2);
 			const views: [InstanceType<typeof ThreeNode>, DOMRect, "in" | "out" | null][] = [];
 			const move = transition;
 			let key = `${w}x${h}@${dpr}${move ? `~${move.t}` : ""}`;
@@ -320,6 +333,10 @@ async function setUp(host: HTMLElement) {
 			if (ThreeNode.sharedRenderer === renderer) ThreeNode.sharedRenderer = null;
 			if (ThreeNode.onDraw === composite) ThreeNode.onDraw = null;
 			ThreeNode.pixelRatioCap = null; // posts and the editor render as before
+			ThreeNode.noBloom = false;
+			setSimplify(1);
+			hud?.dispose();
+			document.documentElement.classList.remove("lab-noblur");
 			warming = false;
 			restyled.disconnect();
 			// After this commit's other cleanups: the scenes being unmounted with the page still hold it.
@@ -333,4 +350,55 @@ async function setUp(host: HTMLElement) {
 		},
 	};
 	return stage;
+}
+
+/**
+ * `?perf`: numbers for measuring on a phone, twice a second. Per view on screen: frames drawn per
+ * second, the last frame's cost (GPU time where the browser has timer queries, else its gap),
+ * the governor's scale and the share of the target last filled. Draw calls and triangles are for
+ * the whole canvas, every view and the composite. ponytail: text in a div, a graph if text won't do.
+ */
+function perfHud(renderer: import("three").WebGLRenderer, ThreeNode: typeof import("@t569/scene-engine/three").ThreeNode) {
+	const gl = renderer.getContext();
+	const info = gl.getExtension("WEBGL_debug_renderer_info");
+	const gpu = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+	const el = document.createElement("pre");
+	el.style.cssText =
+		"position:fixed;left:4px;top:4px;z-index:100;margin:0;padding:6px 8px;max-width:calc(100vw - 8px);overflow:hidden;font:11px/1.35 monospace;color:#9f9;background:rgb(0 0 0/0.75);pointer-events:none;white-space:pre-wrap";
+	document.body.appendChild(el);
+	const style = document.createElement("style");
+	style.textContent = ".lab-noblur * { backdrop-filter: none !important; }";
+	document.head.appendChild(style);
+	renderer.info.autoReset = false; // counted over the half second, not per render call
+	const seen = new WeakMap<object, number>();
+	let frames = 0;
+	let since = performance.now();
+	return {
+		tick() {
+			frames++;
+			const now = performance.now();
+			const dt = (now - since) / 1000;
+			if (dt < 0.5) return;
+			const lines = [gpu, `stage ${(frames / dt).toFixed(0)} fps · simplify ${simplify} · dpr ${renderer.getPixelRatio()} · cap ${ThreeNode.pixelRatioCap ?? "-"}${ThreeNode.noBloom ? " · no bloom" : ""}`];
+			const { calls, triangles } = renderer.info.render;
+			lines.push(`${(calls / dt).toFixed(0)} calls/s · ${(triangles / dt / 1e6).toFixed(2)} M tris/s`);
+			for (const view of ThreeNode.shared) {
+				const r = view.canvas.getBoundingClientRect();
+				const last = seen.get(view) ?? view.version;
+				seen.set(view, view.version);
+				if (!r.width || r.bottom <= 0 || r.top >= innerHeight) continue;
+				lines.push(
+					`${view.canvas.parentElement?.closest("[data-slot]")?.getAttribute("data-slot") ?? "?"}: ${((view.version - last) / dt).toFixed(0)} fps · ${view.frameCost.toFixed(1)} ms · scale ${view.governor.scale} · used ${view.outputScale.x.toFixed(2)}`,
+				);
+			}
+			el.textContent = lines.join("\n");
+			renderer.info.reset();
+			frames = 0;
+			since = now;
+		},
+		dispose() {
+			el.remove();
+			style.remove();
+		},
+	};
 }

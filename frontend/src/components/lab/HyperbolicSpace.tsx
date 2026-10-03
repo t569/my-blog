@@ -39,7 +39,7 @@ void main() {
 	vec3 col = vec3(0.0);
 	float T = 0.0;
 	int last = -1;
-	for (int step = 0; step < 48; step++) {
+	for (int step = 0; step < int(48.0 * SIMPLIFY); step++) {
 		float best = 1e9;
 		int bi = -1;
 		for (int i = 0; i < 12; i++) {

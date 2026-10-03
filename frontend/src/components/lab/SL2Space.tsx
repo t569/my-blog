@@ -50,7 +50,7 @@ void main() {
 	float T = 0.0;
 	vec3 col = vec3(0.0);
 	bool inWall = false;
-	for (int i = 0; i < 160; i++) {
+	for (int i = 0; i < int(160.0 * SIMPLIFY); i++) {
 		// Into the fundamental domain: left by T^-n and S (the modular group; an isometry here).
 		g /= sqrt(abs(g.x * g.w - g.y * g.z)); // float32 drifts off det 1; x and y assume it
 		for (int k = 0; k < 12; k++) {

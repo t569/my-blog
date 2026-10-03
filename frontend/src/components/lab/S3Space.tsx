@@ -29,7 +29,7 @@ void main() {
 	vec4 d = cam * vec4(normalize(vec3(s, -1.0)), 0.0);
 	float t = 0.0;
 	vec3 col = vec3(0.02, 0.02, 0.04);
-	for (int i = 0; i < 90; i++) {
+	for (int i = 0; i < int(90.0 * SIMPLIFY); i++) {
 		vec4 q = cos(t) * p + sin(t) * d;
 		float best = -2.0;
 		int bi = 0;

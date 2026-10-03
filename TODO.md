@@ -1250,6 +1250,53 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
         `D:/Repos/scene-engine`.
   - Skipped: worker index transfer (already zero-copy); graph force buffers
     (dozens of nodes); OffscreenCanvas (no gain for a shared compositor).
+- [ ] **Phones** (2026-10-02, Android Chrome; plan in
+      `~/.claude/plans/the-current-simulation-engine-unified-reef.md`).
+      First reading (`?perf`, local server): intro fine but soft; Mandelbrot
+      231 ms a frame; worst ~280 ms; surfaces soft, or slow when dragged;
+      `?nobloom` made little difference. A phone GPU is ~10× short of a laptop's
+      for per-pixel work, so resolution alone can't close it.
+  - [x] `?perf` HUD (stage fps, draw calls, per view fps / cost / scale) and
+        switches `?nobloom`, `?noblur`, `?dpr=x`, `?simplify=x`.
+  - [x] Bloom scenes lost antialiasing (composer target had no MSAA): 4×.
+  - [x] Stage composited at 1.5× over views at 1.25×: always resampled. One ratio.
+  - [x] Dither in the composite: glow on night skies banded.
+  - [x] `simplify` (`lab/quality.ts`, 0.5 on phones): ODE marches (black hole,
+        Kerr) take longer steps; sphere-traced ones (Nil, S³, SL₂ℝ, H³, and Sol,
+        whose grid blurred under longer steps) see less far. Compared at 0.5 and 1
+        in headless Chrome: indistinguishable except Kerr's gas, a shade smoother.
+  - [x] The lab page's inline probe `<script>` warned in dev on client-side
+        navigation: now `StageProbe.tsx`, a script on the server and an inert
+        data block on the client.
+  - [ ] **Next: commit to `dev/t569` and push**, so Vercel builds a production
+        preview; then measure on the phone with `?perf`, and each switch alone.
+        Record the numbers here. The first reading was against the local
+        (likely dev) server.
+  - [ ] Mandelbrot on phones (decided: Lusion's approach): render the dive
+        offline on the laptop's GPU at full quality (75 s down, hold, 12 s up),
+        encode to a short MP4/WebM (a few MB), play it on phones for the dive;
+        drag or pinch switches to live exploring at shallow depth. Laptops
+        unchanged.
+  - [ ] Measure the surfaces in production (a Vercel preview): Laplace is a 9k
+        vertex mesh without bloom, so 100+ ms there points at CPU or the
+        dev server, not the GPU. If it's CPU: a DevTools trace via
+        `chrome://inspect`, looking for Layout in frames (`fit()`, the stage's
+        rect sweep, Lenis).
+  - [ ] Only if the phone numbers ask for it (plan, phases 2–3):
+        - A 30 fps cap on phones (`frameInterval` in ThreeNode): steady beats
+          chasing 60 and throttling.
+        - Bloom at a lower internal resolution, or off, on phones.
+        - MSAA 2× instead of 4× on phones, if the new composer MSAA costs.
+        - The bottom sheet's `backdrop-blur` off on phones (`?noblur` tells).
+        - `webglcontextlost` / `restored` on the stage canvas: Android drops
+          contexts under memory pressure; today every scene goes blank.
+        - Particle counts in `scene3d` scaled by `simplify` (intro).
+        - A `toneMapping` option (AgX, as Blender) — a look, not a fix.
+        - One ticker instead of a rAF per scene: only if a trace blames it.
+  - [ ] Race, reproducible: `/lab?simplify=0.5` with reduced motion forced
+        (headless), Sol alone: its one frame is placed half a box up-left
+        (the last `fit()` read a CTM without the node's translate). A
+        ResizeObserver repaint did not fix it. Still scenes only.
 
 ---
 

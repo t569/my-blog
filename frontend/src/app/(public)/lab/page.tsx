@@ -6,6 +6,7 @@ import "katex/dist/katex.min.css";
 import Sim from "@/components/lab/Sim";
 import LabStage from "@/components/lab/LabStage";
 import LabView from "@/components/lab/LabView";
+import StageProbe from "@/components/lab/StageProbe";
 import { SIMS } from "@/components/lab/registry";
 
 export const metadata: Metadata = {
@@ -25,8 +26,6 @@ export const metadata: Metadata = {
  * Off unless NEXT_PUBLIC_SITE_LAB=true: upstream gets neither this page nor a
  * link to it. Each scene loads as it nears the screen and animates only on it.
  */
-/** LabView's choice, made in the HTML: motion allowed, WebGL2 there, and the reader hasn't picked the list. */
-const STAGE_PROBE = `try{if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&"WebGL2RenderingContext"in window&&localStorage.getItem("lab-view")!=="list")document.documentElement.setAttribute("data-lab-stage","")}catch(e){}`;
 
 const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -93,7 +92,7 @@ export default function LabPage() {
 			{/* Runs as the HTML is read, before the first paint: the same choice LabView makes after
 			    hydration. On a phone hydration takes seconds; meanwhile the curtain is already down
 			    (globals.css, "The lab"), instead of the list showing and then being swapped out. */}
-			<script dangerouslySetInnerHTML={{ __html: STAGE_PROBE }} />
+			<StageProbe />
 			<div id="lab-preloader" aria-hidden className="fixed inset-0 z-[69] hidden flex-col items-center justify-center bg-[#05050a] text-white">
 				<p className="font-mono text-xs uppercase tracking-[0.4em] text-white/50">The lab</p>
 				<p className="mt-4 font-display text-7xl font-bold tabular-nums md:text-8xl">000</p>

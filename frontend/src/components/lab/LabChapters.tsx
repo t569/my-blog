@@ -306,6 +306,7 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 						// Flex, not grid: a grid track grows to its content and left-aligns any overflow.
 						<div
 							key={key}
+							data-slot={key}
 							ref={(el) => void (wrappers.current[key] = el)}
 							// On a phone, centred in what the bottom sheet leaves, so its controls stay clear of it.
 							className={`absolute inset-0 flex items-center justify-center ${intro ? "" : "max-md:pb-[45vh]"}`}

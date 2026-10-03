@@ -67,10 +67,10 @@ void main() {
 	float plane = atan(e2.y, e1.y) + 1.5707963;
 	plane -= 3.1415927 * floor(plane / 3.1415927);
 	if (plane < 1e-4) plane += 3.1415927;
-	for (int i = 0; i < 700; i++) {
+	for (int i = 0; i < int(700.0 * SIMPLIFY); i++) {
 		// Fine steps only near the photon sphere, where the ring is decided. Elsewhere the step costs only
 		// RK4's own error (tiny on this smooth equation): the disk crossings and the escape are exact.
-		float h = mix(0.15, 0.006, smoothstep(0.04, 0.34, s.x));
+		float h = mix(0.15, 0.006, smoothstep(0.04, 0.34, s.x)) / SIMPLIFY;
 		bool atDisk = phi + h >= plane;
 		if (atDisk) h = plane - phi;
 		vec2 k1 = f(s), k2 = f(s + 0.5 * h * k1), k3 = f(s + 0.5 * h * k2), k4 = f(s + h * k3);
