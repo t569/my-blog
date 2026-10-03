@@ -129,6 +129,8 @@ export default function BlackHole() {
 			frag: FRAG,
 			uniforms: { C: { value: C }, F: { value: F }, R: { value: R }, U: { value: U }, time },
 			bloom: { strength: 0.7, radius: 0.4, threshold: 0.75 },
+			// Soft gas and a glowing ring: it can drop further than the default before it shows (phones).
+			minResolution: 0.35,
 			fly: (dt) => {
 				az += dt * 0.04;
 				time.value += dt;

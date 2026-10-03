@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { capturePointer, parseScene, type SceneSpec } from "@t569/scene-engine";
 import { ThreeNode } from "@t569/scene-engine/three";
-import { DataTexture, FloatType, GLSL3, Mesh, NearestFilter, PlaneGeometry, RGBAFormat, RGFormat, ShaderMaterial, Vector2 } from "three";
+import { DataTexture, FloatType, GLSL3, LinearFilter, Mesh, NearestFilter, PlaneGeometry, RGBAFormat, RGFormat, Scene as World, ShaderMaterial, Vector2, WebGLRenderTarget } from "three";
 import { prefersReducedMotion, readPalette } from "@/lib/scene";
 import { useThemeKey } from "@/lib/sceneTheme";
 import { bitsFor, parseFixed, rebits, toFixed, type BlaTable, type Fixed } from "@/lib/mandelbrot";
+import { simplify } from "./quality";
 
 /**
  * A dive to the bottom of Seahorse Valley: 10^32 times down, to the minibrot
@@ -23,6 +24,15 @@ import { bitsFor, parseFixed, rebits, toFixed, type BlaTable, type Fixed } from 
  *
  * Drag, pinch, wheel (once you've touched it) or keys to explore; the dive
  * waits until "Dive" is pressed.
+ *
+ * Full resolution on a phone too, by interleaving: each frame computes one pixel
+ * in every k×k block and moves the rest over from the last frame by the camera's
+ * own zoom and turn (the motion is exact, so nothing is guessed). XaoS has zoomed
+ * fractals in real time this way since the 90s; engines call it checkerboard or
+ * temporal upsampling. The fresh pixels are computed packed, in a target k times
+ * smaller each way: scattered over the full frame, every GPU warp would hold one
+ * and wait on it, saving nothing. k follows the frame time: 1 on a laptop, 2–4 on
+ * a phone.
  */
 
 /** The nucleus, found by Newton's method on z_8007(c) = 0 (scratch search, 110 digits). */
@@ -103,6 +113,9 @@ uniform int uGuard;       // loop passes a pixel may take: adapted to how long f
 uniform vec3 uStops[5];
 uniform vec3 uInside;
 uniform float uRelief;
+uniform vec2 uFull;       // the full frame, in pixels: this target is uK times smaller each way,
+uniform int uK;           // one pixel of each uK × uK block of it,
+uniform vec2 uSub;        // the one at this offset in the block
 
 vec2 cmul(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
 vec2 refZ(int m) { return texelFetch(uRef, ivec2(m & 4095, m >> 12), 0).xy; }
@@ -117,7 +130,8 @@ vec3 palette(float t) {
 vec3 overlay(vec3 a, float b) { return mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, b)); }
 
 void main() {
-	vec2 p = vec2(vUv.x * ${ASPECT.toFixed(6)}, vUv.y);
+	vec2 uv = ((gl_FragCoord.xy - 0.5) * float(uK) + uSub + 0.5) / uFull * 2.0 - 1.0;
+	vec2 p = vec2(uv.x * ${ASPECT.toFixed(6)}, uv.y);
 	vec2 dc = (uOff + vec2(uRot.x * p.x - uRot.y * p.y, uRot.y * p.x + uRot.x * p.y)) * uH;
 	// z: this pixel's difference from the reference orbit. D: dz/dc in pixels, so it never overflows.
 	vec2 z = dc, D = vec2(uPx, 0.0);
@@ -207,6 +221,28 @@ void main() {
 }
 `;
 
+/** The full frame: this frame's fresh pixels where it computed them, the last frame moved into place elsewhere. */
+const RESOLVE = /* glsl */ `
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uNew;   // this frame's pixels, packed (see FRAG)
+uniform sampler2D uHist;  // the last full frame
+uniform int uK;
+uniform vec2 uSub;
+uniform vec2 uHm;         // this frame's point → the last frame's: hist = uHm · p + uHt (complex product)
+uniform vec2 uHt;
+void main() {
+	ivec2 f = ivec2(gl_FragCoord.xy);
+	if (f % uK == ivec2(uSub)) { fragColor = texelFetch(uNew, f / uK, 0); return; }
+	vec2 p = vec2(vUv.x * ${ASPECT.toFixed(6)}, vUv.y);
+	vec2 h = vec2(uHm.x * p.x - uHm.y * p.y, uHm.y * p.x + uHm.x * p.y) + uHt;
+	// Clamped: a corner turned in from outside the last frame, or the rim while zooming out,
+	// smears its edge until its own turn comes.
+	fragColor = texture(uHist, clamp(vec2(h.x / ${ASPECT.toFixed(6)}, h.y) * 0.5 + 0.5, 0.0, 1.0));
+}
+`;
+
 const CONTROLS: SceneSpec = {
 	width: W,
 	height: H,
@@ -252,7 +288,8 @@ export default function Mandelbrot() {
 		const scene = parseScene(CONTROLS, host);
 		let view: ThreeNode;
 		try {
-			view = new ThreeNode({ x: W / 2, y: H / 2, width: W, height: H, shadows: "none", maxPixelRatio: 2, minResolution: 0.35 });
+			// Always full size: the interleaving below is its dynamic resolution.
+			view = new ThreeNode({ x: W / 2, y: H / 2, width: W, height: H, shadows: "none", maxPixelRatio: 2, quality: "high" });
 		} catch {
 			// No WebGL here (disabled, or the browser blocked it after a GPU reset): say so, don't crash the page.
 			scene.destroy();
@@ -281,15 +318,89 @@ export default function Mandelbrot() {
 			uStops: { value: [0, 1, 2, 3, 4].map(() => [0, 0, 0]).flat() },
 			uInside: { value: [0, 0, 0] },
 			uRelief: { value: 1 },
+			uFull: { value: new Vector2(1, 1) },
+			uK: { value: 1 },
+			uSub: { value: new Vector2() },
 		};
 		const material = new ShaderMaterial({ glslVersion: GLSL3, vertexShader: VERT, fragmentShader: FRAG, uniforms, depthTest: false, depthWrite: false });
 		const quad = new Mesh(new PlaneGeometry(2, 2), material);
 		quad.frustumCulled = false;
-		const size = new Vector2();
-		// The height of what is being drawn into: a render target when the view shares the lab's renderer.
-		quad.onBeforeRender = (renderer) =>
-			void (uniforms.uPx.value = (2 * uniforms.uH.value) / (renderer.getRenderTarget()?.height ?? renderer.getDrawingBufferSize(size).y));
-		view.world.add(quad);
+		const fractal = new World().add(quad);
+
+		// ---- interleaved frames: the fractal is drawn into one of two targets, reading the other as
+		// the last frame; the view only shows the newest.
+		const targets = [0, 1].map(() => new WebGLRenderTarget(1, 1, { depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter }));
+		const packed = new WebGLRenderTarget(1, 1, { depthBuffer: false, minFilter: NearestFilter, magFilter: NearestFilter });
+		const resolve = new ShaderMaterial({
+			glslVersion: GLSL3,
+			vertexShader: VERT,
+			fragmentShader: RESOLVE,
+			uniforms: { uNew: { value: packed.texture }, uHist: { value: null as WebGLRenderTarget["texture"] | null }, uK: uniforms.uK, uSub: uniforms.uSub, uHm: { value: new Vector2(1, 0) }, uHt: { value: new Vector2() } },
+			depthTest: false,
+			depthWrite: false,
+		});
+		const resolved = new Mesh(new PlaneGeometry(2, 2), resolve);
+		resolved.frustumCulled = false;
+		const combine = new World().add(resolved);
+		const show = new ShaderMaterial({
+			glslVersion: GLSL3,
+			vertexShader: VERT,
+			fragmentShader: "in vec2 vUv; out vec4 fragColor; uniform sampler2D uTex; void main() { fragColor = texture(uTex, vUv * 0.5 + 0.5); }",
+			uniforms: { uTex: { value: targets[0]!.texture } },
+			depthTest: false,
+			depthWrite: false,
+		});
+		const shown = new Mesh(new PlaneGeometry(2, 2), show);
+		shown.frustumCulled = false;
+		shown.visible = false; // until the first frame
+		view.world.add(shown);
+		let k = simplify < 1 ? 3 : 2; // down to 1 once frames show they can afford it
+		let phase = 0;
+		let left = 0; // phases still to compute since the view last changed
+		let last = { ox: 0, oy: 0, h: 0, rot: 0 };
+		let period = 1000; // the display's frame period, ms: the shortest gap seen
+		let slow = 0; // a smoothed frame gap while drawing, ms
+		let quick = 0; // frames in a row at the display's rate
+
+		/** One interleaved frame into the next target, from the camera now and the last frame drawn. */
+		function pass() {
+			const ratio = Math.min(devicePixelRatio || 1, 2, ThreeNode.pixelRatioCap ?? Infinity);
+			// Its size on screen, as ThreeNode sizes its own: the layout box is the scene's 960 wide, scaled down.
+			const box = canvas.getBoundingClientRect();
+			const w = Math.max(1, Math.round(box.width * ratio));
+			const h = Math.max(1, Math.round(box.height * ratio));
+			if (targets[0]!.width !== w || targets[0]!.height !== h) targets.forEach((t) => t.setSize(w, h));
+			// Last frame's pixel for this one: hist = s·e^{i·Δrot}·p + e^{-i·rot₀}·Δcentre / h₀.
+			const s = cam.h / last.h;
+			const [dx, dy] = [(cam.ox - last.ox) / last.h, (cam.oy - last.oy) / last.h];
+			const [c0, s0] = [Math.cos(last.rot), Math.sin(last.rot)];
+			resolve.uniforms.uHm.value.set(s * Math.cos(cam.rot - last.rot), s * Math.sin(cam.rot - last.rot));
+			resolve.uniforms.uHt.value.set(c0 * dx + s0 * dy, -s0 * dx + c0 * dy);
+			// A jump (a restart, a resize) lines nothing up: the frame fills in over k² frames like any other.
+			// Never one whole frame at once: deep down that takes seconds, and the GPU watchdog kills the context.
+			const n = k;
+			phase = (phase + 7) % (n * n); // 7 is prime to 4, 9 and 16: every phase in turn, scattered
+			uniforms.uK.value = n;
+			uniforms.uSub.value.set(phase % n, Math.floor(phase / n));
+			uniforms.uFull.value.set(w, h);
+			uniforms.uPx.value = (2 * cam.h) / h;
+			packed.setSize(Math.ceil(w / n), Math.ceil(h / n)); // a no-op unless k changed
+			const [from, to] = [targets[0]!, targets[1]!];
+			resolve.uniforms.uHist.value = from.texture;
+			const renderer = view.renderer;
+			const prev = renderer.getRenderTarget();
+			renderer.setRenderTarget(packed);
+			renderer.render(fractal, view.camera);
+			renderer.setRenderTarget(to);
+			renderer.render(combine, view.camera);
+			renderer.setRenderTarget(prev);
+			targets.reverse();
+			show.uniforms.uTex.value = to.texture;
+			shown.visible = true;
+			last = { ...cam };
+		}
+
+		let changed = false; // the view moved, or its colours did: start a new round of phases
 
 		// ---- palette, from the skin or a fixed one
 		const scratch = document.createElement("canvas").getContext("2d")!;
@@ -299,7 +410,7 @@ export default function Mandelbrot() {
 			const stops = pal === 0 ? [p.page, p.accent, p.text, p.accentMuted || p.accent, p.surface].map((c) => rgb(c, scratch)) : PALETTES[pal]!;
 			uniforms.uStops.value = stops.flat().map((v) => v / 255);
 			uniforms.uInside.value = (pal === 0 ? rgb(p.text, scratch) : [0, 0, 0]).map((v) => v / 255);
-			view.invalidate("view");
+			changed = true; // recolours as the phases come round
 		};
 		setPalette.current();
 
@@ -351,7 +462,7 @@ export default function Mandelbrot() {
 		// Compile the shader in parallel while the worker computes the first orbit: compiled on first
 		// draw instead, its link blocked the page for ~250 ms mid-scroll. (compileAsync skips hidden
 		// objects, hence the brief visible.)
-		void view.renderer.compileAsync(view.world, view.camera).catch(() => {});
+		void view.renderer.compileAsync(fractal, view.camera).catch(() => {});
 		quad.visible = false; // nothing to draw against until the first orbit is back
 
 		function request(cMax: number, c?: Fixed, len?: number) {
@@ -367,6 +478,8 @@ export default function Mandelbrot() {
 				// The camera kept moving against the old reference; re-express it against the new one.
 				cam.ox -= p.ox;
 				cam.oy -= p.oy;
+				last.ox -= p.ox;
+				last.oy -= p.oy;
 				drop(uniforms.uRef.value);
 				uniforms.uRef.value = texture(e.data.ref, e.data.refLen + 1, false);
 				uniforms.uRefLen.value = e.data.refLen;
@@ -441,38 +554,52 @@ export default function Mandelbrot() {
 		// The nucleus is periodic: its orbit returns to 0 at step 8007, so that is all it needs.
 		request(cam.h * 4, ref, TARGET.period);
 
-		// The work governor: after each drawn frame, a slow one halves the per-pixel budget and a quick
-		// one lets it grow back. The dive's frames are cheap, so it keeps the full 8192 (its worst pixel
-		// needs ~7k); near a parabolic point it falls until frames are affordable again.
-		let seenCost = 0;
-		view.onFrame(() => {
-			const cost = view.frameCost;
-			if (cost === seenCost) return false;
-			seenCost = cost;
-			const g = uniforms.uGuard.value;
-			uniforms.uGuard.value = cost > 120 ? Math.max(1024, g >> 1) : cost < 40 ? Math.min(8192, Math.round(g * 1.25)) : g;
-			return false;
-		});
-
+		// Each frame: advance the dive, then compute the next phase if anything is left to compute.
+		// k from the frame gap while drawing: slower than 1.5 display frames, one pixel in fewer; at
+		// the display's rate for a while, try more (waiting twice as long after a try that failed).
+		// The per-pixel budget (uGuard) follows the same gap: near a parabolic point pixels never
+		// escape, and the full 8192 passes would take seconds a frame.
+		let drew = false;
+		let wait = 180;
+		let tried = false;
 		view.onFrame((dt) => {
-			if (!quad.visible) return false;
+			if (!quad.visible) return (drew = false);
 			if (!exploring) {
 				diveClock += dt;
 				const before = cam.h;
 				diveAt(diveClock);
 				applyView();
-				// Holding at the bottom: no change, so ThreeNode settles to one sharp frame. Rising back up
-				// outgrows the table; those frames wait for the next one (see drawable).
-				return cam.h !== before && drawable();
+				if (cam.h !== before) changed = true;
 			}
-			return false; // exploring: frames come from input; ThreeNode sharpens the settled one
+			// Waiting on a table or reference the view has outgrown: hold the last frame (see drawable).
+			if (!drawable() || (!changed && left <= 0)) return (drew = false);
+			const ms = dt * 1000;
+			if (drew && ms > 0) {
+				period = Math.min(period, Math.max(4, ms));
+				slow = slow ? slow * 0.8 + ms * 0.2 : ms;
+				if (slow > period * 1.5 && k < 4) {
+					k++;
+					if (tried) wait *= 2;
+					[slow, quick, tried] = [0, 0, false];
+				} else if (slow < period * 1.15 && ++quick > wait && k > 1) {
+					k--;
+					[quick, tried] = [0, true];
+				}
+				const g = uniforms.uGuard.value;
+				uniforms.uGuard.value = slow > 120 ? Math.max(1024, g >> 1) : slow < 40 ? Math.min(8192, Math.round(g * 1.25)) : g;
+			}
+			if (changed) left = k * k;
+			changed = false;
+			pass();
+			left--;
+			return (drew = true);
 		});
 
 		// ---- params from the buttons
 		const offParams = scene.params.on((name, value) => {
 			if (name === "relief") {
 				uniforms.uRelief.value = value;
-				view.invalidate("view");
+				changed = true;
 			} else if (name === "pal") {
 				setPalette.current();
 			} else if (name === "dive" && value === 1) {
@@ -520,7 +647,7 @@ export default function Mandelbrot() {
 			redraw();
 		}
 		function redraw() {
-			if (drawable()) view.moving(); // interaction: coarse while it lasts, sharp when it stops
+			changed = true; // interleaved while it lasts, every pixel once it stops
 		}
 
 		const pointers = new Map<number, { x: number; y: number }>();
@@ -606,7 +733,9 @@ export default function Mandelbrot() {
 			canvas.removeEventListener("dblclick", onDbl);
 			host.removeEventListener("keydown", onKey);
 			[...textures].forEach((t) => t.dispose());
-			scene.destroy(); // ThreeNode frees the quad's geometry, material and GL context
+			[...targets, packed].forEach((t) => t.dispose());
+			[quad, shown, resolved].forEach((m) => (m.geometry.dispose(), (m.material as ShaderMaterial).dispose()));
+			scene.destroy(); // and ThreeNode its GL context
 		};
 	}, []);
 

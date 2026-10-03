@@ -1272,11 +1272,27 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
   - [ ] **Next: on the Vercel preview of `dev/t569`, measure on the phone with `?perf`, and each switch alone.
         Record the numbers here. The first reading was against the local
         (likely dev) server.
-  - [ ] Mandelbrot on phones (decided: Lusion's approach): render the dive
-        offline on the laptop's GPU at full quality (75 s down, hold, 12 s up),
-        encode to a short MP4/WebM (a few MB), play it on phones for the dive;
-        drag or pinch switches to live exploring at shallow depth. Laptops
-        unchanged.
+  - [x] Mandelbrot sharp on phones, live (replaces the video plan, which would
+        have lost the skin palettes and relief): interleaved frames. Each frame
+        computes one pixel per k×k block, packed into a target k× smaller each
+        way (scattered, every GPU warp waits on its one pixel and nothing is
+        saved), and a resolve pass moves the rest over from the last frame by the
+        camera's exact zoom and turn (XaoS; checkerboard / temporal upsampling).
+        k (1–4) follows the frame gap. Emulated phone on the Iris: full
+        resolution at ~60 fps for most of the dive (was 0.28 scale, blocky);
+        19–30 fps around 10^8–10^14 with k at 4. Never one whole frame at once:
+        that at depth tripped the GPU watchdog and Chrome disabled WebGL.
+  - [x] Bloom scenes couldn't drop below 0.5 resolution (`applyRatio` snapped
+        to 0.7/0.5 whatever the floor): Kerr's 0.25 floor did nothing on a
+        phone. Now 0.7/0.5/0.35/0.25. The black hole's floor: 0.35.
+  - [ ] Mandelbrot in headless Chrome (Iris, ANGLE D3D11, emulated phone):
+        from ~10^8 down every pixel draws as inside (flat `uInside`). The
+        committed version does the same, so it predates the interleaving.
+        Check on the phone; if it shows there, start with the reference/BLA
+        refresh (`uMaxR` never changed across the dive).
+  - [ ] The lab page crashes ("This page couldn't load") when WebGL can't be
+        created: LabStage makes its renderer without a try/catch. Fall back to
+        the list.
   - [ ] Measure the surfaces in production (a Vercel preview): Laplace is a 9k
         vertex mesh without bloom, so 100+ ms there points at CPU or the
         dev server, not the GPU. If it's CPU: a DevTools trace via
