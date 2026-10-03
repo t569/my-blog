@@ -1290,9 +1290,12 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
         committed version does the same, so it predates the interleaving.
         Check on the phone; if it shows there, start with the reference/BLA
         refresh (`uMaxR` never changed across the dive).
-  - [ ] The lab page crashes ("This page couldn't load") when WebGL can't be
-        created: LabStage makes its renderer without a try/catch. Fall back to
-        the list.
+  - [x] The lab page crashed ("This page couldn't load") when WebGL couldn't
+        be created: each scene's `new ThreeNode` threw in an effect, up to the
+        app's error page. Now `Failed` (Sim.tsx) wraps every scene, and the intro:
+        a box saying it needs WebGL, the queue released. A stage that can't set
+        up sends LabView to the list for that visit (not saved). Checked with
+        `getContext('webgl*')` forced to null: list, 18 notes, 2D scenes running.
   - [ ] Measure the surfaces in production (a Vercel preview): Laplace is a 9k
         vertex mesh without bloom, so 100+ ms there points at CPU or the
         dev server, not the GPU. If it's CPU: a DevTools trace via

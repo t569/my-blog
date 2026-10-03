@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { prefersReducedMotion } from "@/lib/sceneTheme";
 import LabChapters from "./LabChapters";
+import { STAGE_FAILED, stageFailed } from "./LabStage";
 
 const KEY = "lab-view";
 
@@ -20,7 +21,7 @@ export default function LabView({ list, panels }: { list: ReactNode; panels: Rec
 	useEffect(() => {
 		// Phones too: on touch every scene is tap-to-play, so a swipe always moves chapters (LabChapters).
 		// ponytail: the API's presence, not a context made to test it; a failed one leaves its scene blank.
-		const ok = !prefersReducedMotion() && "WebGL2RenderingContext" in window;
+		const ok = !prefersReducedMotion() && "WebGL2RenderingContext" in window && !stageFailed;
 		let saved: string | null = null;
 		try {
 			saved = localStorage.getItem(KEY);
@@ -29,6 +30,14 @@ export default function LabView({ list, panels }: { list: ReactNode; panels: Rec
 		setStage(ok && saved !== "list");
 		// The page's probe guessed the stage before paint; for the list, its curtain lifts here.
 		if (!(ok && saved !== "list")) document.documentElement.removeAttribute("data-lab-stage");
+		// The API was there but no context could be made: the list, this visit only (not saved).
+		const failed = () => {
+			setCanStage(false);
+			setStage(false);
+			document.documentElement.removeAttribute("data-lab-stage");
+		};
+		window.addEventListener(STAGE_FAILED, failed);
+		return () => window.removeEventListener(STAGE_FAILED, failed);
 	}, []);
 
 	// On the stage the prologue opens the page: the list's header steps aside (and comes back with it).

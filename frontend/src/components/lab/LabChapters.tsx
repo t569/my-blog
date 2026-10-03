@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import Sim from "./Sim";
+import Sim, { Failed } from "./Sim";
 import LabLoader from "./LabLoader";
 import { easeMove, fadeIn, fadeOut, setTransition, smooth } from "./LabStage";
 import { ACTS, IMMERSIVE, SCROLL, groupOf, simById } from "./registry";
@@ -315,9 +315,11 @@ export default function LabChapters({ panels, onList }: { panels: Record<string,
 						>
 							<div className="shrink-0" style={{ width }}>
 								{intro ? (
-									<Suspense>
-										<IntroField />
-									</Suspense>
+									<Failed>
+										<Suspense>
+											<IntroField />
+										</Suspense>
+									</Failed>
 								) : (
 									<StageChapter.Provider value={members.length > 1 ? CHAPTERS[onStage]!.id! : null}>
 										<ScrollProgress.Provider value={scroll !== undefined ? progress[scroll]! : null}>

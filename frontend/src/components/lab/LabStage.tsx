@@ -7,6 +7,10 @@ import { prefersReducedMotion } from "@/lib/sceneTheme";
 import { awaitStage } from "./Sim";
 import { setSimplify, simplify } from "./quality";
 
+/** Fired on window when the stage couldn't set up; `stageFailed` says so to whoever mounts later. */
+export const STAGE_FAILED = "lab-stage-failed";
+export let stageFailed = false;
+
 /** Scroll offset for anchor jumps: the sections' scroll-mt-24. */
 const ANCHOR_OFFSET = -96;
 
@@ -138,7 +142,13 @@ export default function LabStage() {
 			if (live) draw = stage.draw;
 			return stage;
 		});
-		awaitStage(ready.catch(() => {}));
+		// No WebGL (disabled, or blocked after GPU resets): LabView falls back to the list.
+		awaitStage(
+			ready.catch(() => {
+				stageFailed = true;
+				window.dispatchEvent(new Event(STAGE_FAILED));
+			}),
+		);
 		return () => {
 			live = false;
 			cancelAnimationFrame(raf);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { Component, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { simById } from "./registry";
 
 /**
@@ -50,6 +50,33 @@ const loader = (id: string) => {
 };
 
 const Box = ({ aspect }: { aspect: number }) => <div className="w-full rounded-xl bg-bg-surface" style={{ aspectRatio: String(aspect) }} />;
+
+/**
+ * A scene that throws (no WebGL: disabled, or blocked after GPU resets) says so in its box,
+ * instead of taking the page down with it. Errors in its effects land here too. Without an
+ * aspect (a decorative scene, the intro's), it just leaves its place empty.
+ */
+export class Failed extends Component<{ aspect?: number; onFail?: () => void; children: ReactNode }, { error: Error | null }> {
+	state = { error: null as Error | null };
+	static getDerivedStateFromError(error: Error) {
+		return { error };
+	}
+	componentDidCatch() {
+		this.props.onFail?.(); // its Mounted never runs: release the queue here
+	}
+	render() {
+		const { error } = this.state;
+		if (!error) return this.props.children;
+		if (!this.props.aspect) return null;
+		return (
+			<div className="flex w-full items-center justify-center rounded-xl bg-bg-surface p-6 text-center text-sm text-text-secondary" style={{ aspectRatio: String(this.props.aspect) }}>
+				{/webgl/i.test(error.message)
+					? "This one needs WebGL, which this browser has switched off for the page. Reloading usually brings it back."
+					: "This simulation couldn't start here."}
+			</div>
+		);
+	}
+}
 
 /** Rendered after the scene, so its effect runs once the scene's own (the mount) have. */
 function Mounted({ then }: { then: () => void }) {
@@ -135,10 +162,10 @@ export default function Sim({ id }: { id: string }) {
 	return (
 		<div ref={box} className="w-full">
 			{Scene ? (
-				<>
+				<Failed aspect={sim.aspect} onFail={onMounted}>
 					<Scene.C />
 					<Mounted then={onMounted} />
-				</>
+				</Failed>
 			) : (
 				<Box aspect={sim.aspect} />
 			)}
