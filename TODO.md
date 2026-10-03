@@ -1268,8 +1268,8 @@ context). It's generic, so it goes upstream to `t569/scene-engine`.
   - [x] The lab page's inline probe `<script>` warned in dev on client-side
         navigation: now `StageProbe.tsx`, a script on the server and an inert
         data block on the client.
-  - [ ] **Next: commit to `dev/t569` and push**, so Vercel builds a production
-        preview; then measure on the phone with `?perf`, and each switch alone.
+  - [x] Committed and pushed to `dev/t569` (b9c4ed5).
+  - [ ] **Next: on the Vercel preview of `dev/t569`, measure on the phone with `?perf`, and each switch alone.
         Record the numbers here. The first reading was against the local
         (likely dev) server.
   - [ ] Mandelbrot on phones (decided: Lusion's approach): render the dive
