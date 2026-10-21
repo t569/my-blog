@@ -58,7 +58,8 @@ async def update_context(
     After saving, triggers background context embedding generation.
     """
     context = await user_context_service.upsert_user_context(db, admin.id, data)
-    await db.flush()
+    # Committed before the task, not by get_db — see admin_posts.create_post.
+    await db.commit()
 
     background_tasks.add_task(
         generate_context_embeddings_background,
