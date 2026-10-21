@@ -134,6 +134,10 @@ style**, and keep blog-specific code out of them.
   production database. A migration applied locally but not yet on `main` makes
   the next Render wake fail (`Can't locate revision`). Push it to `main`
   promptly. See docs/deployment.md, "A migration must reach the deploy branch".
+- `get_db` commits in its exit, and since FastAPI 0.118 that exit runs **after
+  the response and its background tasks**. A route that schedules a background
+  task must `await db.commit()` first, or the task reads the old row and a
+  failed commit still answers 200 (the editor's "Saved" that saved nothing).
 - Don't rename theme names (`dark`/`light`) casually — `next-themes`, the
   navbar toggle, and BlockNote's `resolvedTheme` all key off them.
 

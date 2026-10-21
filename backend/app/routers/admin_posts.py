@@ -84,6 +84,10 @@ async def create_post(
 ):
     """Create a new post."""
     post = await post_service.create_post(db, data, admin.id)
+    # Committed here, not by get_db: since FastAPI 0.118 a yield dependency's
+    # exit runs after the response *and its background tasks*, so the embedder
+    # would read the old row and a failed late commit would still answer 200.
+    await db.commit()
     background_tasks.add_task(generate_embeddings_background, post.id)
     return post
 
@@ -102,6 +106,7 @@ async def update_post(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Post not found.",
         )
+    await db.commit()  # before the background task — see create_post
     # Re-generate embeddings if content or title changed.
     update_fields = data.model_dump(exclude_unset=True)
     if any(f in update_fields for f in ("title", "content")):
