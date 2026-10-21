@@ -180,6 +180,24 @@ export default function BlockNoteEditor({
 			[
 				...getDefaultReactSlashMenuItems(editor),
 				...math.slashItems(editor),
+				// A link is a text mark, not a block, so BlockNote's menu has none —
+				// only the selection toolbar. This inserts one at the cursor.
+				{
+					title: "Link",
+					subtext: "A hyperlink at the cursor",
+					aliases: ["link", "url", "href", "a"],
+					group: "Text", // its own group: joining an earlier one would split it
+					onItemClick: () => {
+						// ponytail: native prompt; a styled dialog when it earns one.
+						const href = window.prompt("Link URL")?.trim();
+						if (!href) return;
+						const text = window.prompt("Link text", href)?.trim() || href;
+						editor.insertInlineContent([
+							{ type: "link", href, content: text },
+							" ",
+						]);
+					},
+				},
 			] as DefaultReactSuggestionItem[],
 		[editor, math],
 	);
