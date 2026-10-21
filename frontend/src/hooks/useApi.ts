@@ -14,6 +14,7 @@ import {
   type UseQueryOptions,
   type UseMutationOptions,
 } from "@tanstack/react-query";
+import { revalidateSite } from "@/lib/revalidate";
 import type {
   AdminStatsResponse,
   AgentRunListItem,
@@ -262,6 +263,7 @@ export function useAdminCreatePost(
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.posts.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
@@ -289,6 +291,7 @@ export function useAdminUpdatePost(
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.posts.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
@@ -307,6 +310,7 @@ export function useAdminDeletePost(
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.posts.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
@@ -411,6 +415,7 @@ export function useAdminCreateSeries(
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.series.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
@@ -436,6 +441,7 @@ export function useAdminUpdateSeries(
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.series.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.series.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
@@ -452,6 +458,7 @@ export function useAdminDeleteSeries(
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.series.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.series.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      revalidateSite(); // the live site's ISR copy, see lib/revalidate.ts
     },
     ...options,
   });
