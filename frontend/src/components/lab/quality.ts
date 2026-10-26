@@ -6,3 +6,7 @@
  */
 export let simplify = 1;
 export const setSimplify = (s: number) => void (simplify = Math.min(1, Math.max(0.1, s)));
+
+/** The stage is moving between chapters (set by LabStage): one-off GPU work waits, or the move stutters. */
+export let moving = false;
+export const setMoving = (m: boolean) => void (moving = m);

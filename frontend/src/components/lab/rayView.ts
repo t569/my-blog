@@ -27,6 +27,10 @@ export interface RayScene {
 	minResolution?: number;
 	/** Handed a redraw, for controls outside the canvas (a slider) that change uniforms. */
 	onReady?: (redraw: () => void) => void;
+	/** The view and its full-screen quad, for a scene that does more than one shader (KerrBlackHole). */
+	onView?: (view: ThreeNode, quad: Mesh) => void;
+	/** A frame is cheap just now: a drag needn't drop to the resolution floor. */
+	cheap?: () => boolean;
 }
 
 export function mountRayView(host: HTMLElement, width: number, height: number, s: RayScene): () => void {
@@ -45,6 +49,7 @@ export function mountRayView(host: HTMLElement, width: number, height: number, s
 	const quad = new Mesh(new PlaneGeometry(2, 2), mat);
 	quad.frustumCulled = false;
 	view.world.add(quad);
+	s.onView?.(view, quad);
 
 	if (s.look) {
 		const look = s.look;
@@ -58,7 +63,8 @@ export function mountRayView(host: HTMLElement, width: number, height: number, s
 			const k = 2 / view.canvas.getBoundingClientRect().height;
 			look((e.clientX - drag.x) * k, (e.clientY - drag.y) * k);
 			drag = { x: e.clientX, y: e.clientY };
-			view.moving();
+			if (!s.cheap?.()) view.moving();
+			else view.invalidate("view");
 			if (!scene.playing) scene.seek(scene.elapsed); // reduced motion: still, but it answers
 		};
 		const pu = () => (drag = null);
