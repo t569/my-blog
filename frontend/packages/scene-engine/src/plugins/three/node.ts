@@ -47,6 +47,8 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import type { Pass } from 'three/addons/postprocessing/Pass.js';
+import { FinishShader, type FinishOptions } from './finish.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BufferGeometry } from 'three';
 import { BaseObject } from '../../objects.ts';
@@ -88,6 +90,10 @@ export interface ThreeOptions extends BaseNodeSpec {
    * frames draw plainly. `threshold` is the luminance (0–1) above which things glow.
    */
   bloom?: { strength?: number; radius?: number; threshold?: number };
+  /** Film grain, vignette and colour fringes, after tone mapping, in one pass. Loads like bloom. */
+  finish?: FinishOptions;
+  /** Tone mapping exposure (ACES filmic). Default 1. */
+  exposure?: number;
 }
 
 /** The part of three's EffectComposer this node uses. */
@@ -95,10 +101,12 @@ interface Composer {
   render(): void;
   /** The finished frame, when it renders off screen (shared mode). */
   readonly texture: Texture;
-  setPixelRatio(r: number): void;
-  setSize(w: number, h: number): void;
+  /** Size and pixel ratio together: every pass reallocates its targets on a resize, so one, not two. */
+  resize(w: number, h: number, ratio: number): void;
   dispose(): void;
 }
+type EffectComposer = import('three/addons/postprocessing/EffectComposer.js').EffectComposer;
+type ShaderPass = import('three/addons/postprocessing/ShaderPass.js').ShaderPass;
 
 export type FrameFn = (dt: number, elapsed: number) => boolean | void;
 
@@ -113,9 +121,14 @@ export type FrameFn = (dt: number, elapsed: number) => boolean | void;
 const GOVERNOR_BUDGET = 1000 / 50;
 
 /**
- * The display's frame period: the least gap over 30 animation frames, measured once, when the first
- * view is made. A 30 Hz display (or a browser held there, as on battery saver) can never give a frame
- * inside a 60 Hz budget, and every view would sit at its lowest resolution however cheap it was.
+ * The display's frame period: the least gap between animation frames, from when the first view is
+ * made. A 30 Hz display (or a browser held there, as on battery saver) can never give a frame inside a
+ * 60 Hz budget, and every view would sit at its lowest resolution however cheap it was.
+ *
+ * Taken after 30 frames, then lowered by any shorter gap over the next ten seconds or so: the first
+ * view is made while the page is busiest (models parsing, shaders linking), and a page whose first 30
+ * frames all ran at 40 ms read as a 25 Hz display, so its governor allowed 48 ms a frame and never
+ * lowered the resolution. A gap can't be shorter than the display's period, so lowering is always safe.
  */
 let framePeriod = 1000 / 60;
 let periodProbed = false;
@@ -128,8 +141,8 @@ function probeFramePeriod(): void {
   const tick = (t: number) => {
     if (last) least = Math.min(least, t - last);
     last = t;
-    if (++n < 30) requestAnimationFrame(tick);
-    else if (least > 4 && least < 100) framePeriod = least;
+    if (++n >= 30 && least > 4 && least < 100) framePeriod = least;
+    if (n < 600) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 }
@@ -172,6 +185,28 @@ export class ResolutionGovernor {
     }
     return false;
   }
+}
+
+/**
+ * What the governor hears about a frame: the gap the reader saw, unless the GPU timer says the GPU
+ * spent under 40% of it drawing. Then the frame was late for some other reason (a busy main thread, a
+ * browser holding the page at 30 Hz), fewer pixels would not have made it sooner, and lowering the
+ * resolution only blurs the picture: a phone page at 4 ms of GPU work in 33 ms frames sat at half
+ * resolution. The margin is for drivers whose timers under-report (ANGLE on Direct3D 11). Pure.
+ */
+export function frameSignal(gap: number, gpu: number | null): number {
+  return gpu !== null && gpu > 0 && gpu < gap * 0.4 ? gpu : gap;
+}
+
+/**
+ * Is the camera gliding to a stop: moved since the last frame, but only a little (under 0.003 rad, and
+ * 0.3% of its distance from the origin)? Still is not crawling: a quaternion's angle to itself comes
+ * back as ~1e-8, not 0, so "moved" means more than float noise. Reading that noise as a crawl drew
+ * every frame of a still camera over animated content sharp, and the governor never saw them. Pure.
+ */
+export function crawling(turn: number, shift: number, distance: number): boolean {
+  const small = 0.003 * Math.max(1, distance);
+  return (turn > 1e-6 || shift > 1e-6 * Math.max(1, distance)) && turn < 0.003 && shift < small;
 }
 
 /**
@@ -370,6 +405,8 @@ export function disposeObject(root: Object3D): void {
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!isCached(mesh.geometry)) mesh.geometry?.dispose();
+    // Its per-copy matrices and colours are buffers of their own, freed only by its own dispose.
+    if ((o as Object3D & { isInstancedMesh?: boolean }).isInstancedMesh) (o as unknown as { dispose(): void }).dispose();
     // A light's shadow map: a shared context would keep it (2048² for a sun) after the scene is gone.
     (o as Object3D & { shadow?: { dispose(): void } }).shadow?.dispose();
     const mats = mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : [];
@@ -393,6 +430,13 @@ const SETTLE_MS = 150;
 const SHARPEN_MS = 250;
 /** Shared mode: one GPU queue for every view and the composite, so a sharpening frame stalls them all. */
 const SHARPEN_SHARED_MS = 50;
+/**
+ * A canvas or composer view may change resolution at most this often: each change reallocates its
+ * buffers (tens of ms with MSAA and bloom). Unlimited, the tail of every eased scroll flipped between
+ * sharp (a camera gliding to a stop) and reduced (moving) frame by frame: 104 reallocations in ten
+ * seconds of wheel scrolling, each a hitch. Shared views change by viewport, for free, and aren't held.
+ */
+const RESIZE_MS = 500;
 let hostRuleAdded = false;
 
 export class ThreeNode extends BaseObject {
@@ -449,6 +493,9 @@ export class ThreeNode extends BaseObject {
   private observer: IntersectionObserver | null = null;
   private cssSize = { w: 0, h: 0 };
   private ratio = 0;
+  /** The canvas's own size and ratio as last set, and when the resolution last changed. */
+  private canvasAt = '';
+  private resizedAt = 0;
   private placed = '';
   private lastOpacity = '';
   private streak = 0;
@@ -467,8 +514,12 @@ export class ThreeNode extends BaseObject {
   private backdrop: HTMLDivElement | null = null;
   private backdropAt = '';
   private composer: Composer | null = null;
+  private composing: Promise<void> | null = null;
+  private fx: { composer: EffectComposer; output: Pass; finish: ShaderPass | null } | null = null;
+  /** Host passes (`addPass`), drawn in linear light between the scene (and bloom) and tone mapping. */
+  private readonly extra: Pass[] = [];
   /** Set on destroy: an import that lands afterwards must not touch the lost context. */
-  private destroyed = false;
+  protected destroyed = false;
   /** Shared mode: where frames are drawn, when there is no composer. */
   private readonly target: WebGLRenderTarget | null = null;
   /** The texture the last frame went into: the target's, or the composer's once bloom has arrived. */
@@ -522,7 +573,10 @@ export class ThreeNode extends BaseObject {
     }
 
     const shared = ThreeNode.sharedRenderer;
-    this.renderer = shared ?? new WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    // A view with post-processing antialiases in the composer's own target and only copies to its
+    // canvas at the end: a multisampled canvas would be memory and bandwidth for nothing.
+    const composed = !!((opts.bloom && !ThreeNode.noBloom) || opts.finish);
+    this.renderer = shared ?? new WebGLRenderer({ canvas: this.canvas, antialias: !composed, alpha: true, powerPreference: 'high-performance' });
     if (shared) {
       // three tone-maps and encodes only into the screen and XR targets; into any other target it
       // writes linear light, and translucent layers then blend in linear space: a different picture,
@@ -544,7 +598,7 @@ export class ThreeNode extends BaseObject {
     const floor = opts.minResolution ?? 0.75;
     this.governor = new ResolutionGovernor(Math.min(1, Math.max(opts.minResolution ? 0.1 : 0.5, floor / this.baseRatio())));
     probeFramePeriod();
-    if (opts.bloom && !ThreeNode.noBloom) void this.loadBloom(opts.bloom);
+    if ((opts.bloom && !ThreeNode.noBloom) || opts.finish) void this.loadComposer();
   }
 
   /** Renderer settings. Shared mode sets them again before each frame: the other nodes have theirs. */
@@ -555,6 +609,7 @@ export class ThreeNode extends BaseObject {
     r.autoClear = true;
     r.outputColorSpace = SRGBColorSpace;
     r.toneMapping = ACESFilmicToneMapping;
+    r.toneMappingExposure = this.opts.exposure ?? 1;
     r.setClearColor(...this.clear);
     r.shadowMap.enabled = this.shadowMode !== 'none';
     r.shadowMap.type = this.shadowMode === 'soft' ? VSMShadowMap : PCFShadowMap;
@@ -580,14 +635,19 @@ export class ThreeNode extends BaseObject {
   }
 
   /**
-   * Shared mode: compile this view's shaders ahead of its first frame, for a view a host keeps
-   * hidden but will show soon: compiled on first draw instead, the program link stalls that frame
-   * (100–200 ms, mid-transition). The programs are the ones the view will draw with: compiled with
-   * its own renderer settings, into its target, or (with bloom) into a target like the composer's.
-   * Uses parallel compilation where the driver has it. Content added later compiles when drawn.
+   * Get everything in the world onto the GPU before it is needed: every shader compiled and every
+   * texture uploaded, hidden objects and ones the camera hasn't turned to yet included. Left to the
+   * first frame that shows them, each program link stalls that frame 100–200 ms and each texture its
+   * upload: mid-scroll, when the camera first faces a pot or a cloud appears (a one-second stall on a
+   * restaurant page). The programs are the ones the view will draw with: its own renderer settings,
+   * into its target, or (with bloom or a finish) into a target like the composer's, so it waits for
+   * the composer's code first. Parallel compilation where the driver has it. scene3d calls this before
+   * `ready` resolves; call it yourself after building a world by code. Content added later compiles
+   * when drawn.
    */
-  warm(): Promise<void> {
-    if (!this.target || this.destroyed) return Promise.resolve();
+  async warm(): Promise<void> {
+    await this.composing;
+    if (this.destroyed) return;
     const r = this.renderer;
     const prev = r.getRenderTarget();
     this.configure();
@@ -596,44 +656,96 @@ export class ThreeNode extends BaseObject {
     r.setRenderTarget(plain ?? this.target);
     const done = r.compileAsync(this.world, this.camera);
     r.setRenderTarget(prev);
-    // Then one frame into a 1x1 target: it uploads the geometry and textures, which the first real
-    // frame would otherwise do mid-transition (tens of MB for a dense mesh). Its pixel is not shown.
-    const upload = () => {
-      if (this.destroyed || this.version) return;
+    const textures = new Set<Texture>();
+    this.world.traverse((o) => {
+      const m = (o as Mesh).material;
+      for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
+        for (const v of Object.values(mat)) if ((v as Texture | null)?.isTexture) textures.add(v as Texture);
+        const uniforms = (mat as Material & { uniforms?: Record<string, { value: unknown } | undefined> }).uniforms ?? {};
+        for (const u of Object.values(uniforms)) if ((u?.value as Texture | null)?.isTexture) textures.add(u!.value as Texture);
+      }
+    });
+    // A render target's texture is already on the GPU; initTexture would only reallocate it.
+    for (const t of textures) if (!(t as Texture & { isRenderTargetTexture?: boolean }).isRenderTargetTexture) r.initTexture(t);
+    try {
+      await done;
+    } catch {
+      /* a program that fails will say so when drawn */
+    }
+    // Shared mode: then one frame into a 1x1 target, which uploads the geometry too (tens of MB for a
+    // dense mesh, otherwise mid-transition). Its pixel is not shown. A view of its own needn't: its
+    // canvas draws again on the next frame anyway.
+    if (this.target && !this.destroyed && !this.version) {
       const before = r.getRenderTarget();
       this.configure();
       r.setRenderTarget(plain ?? this.target);
       r.render(this.world, this.camera);
       r.setRenderTarget(before);
-    };
-    return done.then(upload, () => {}).finally(() => plain?.dispose());
+    }
+    plain?.dispose();
   }
 
-  private async loadBloom({ strength = 0.8, radius = 0.4, threshold = 0.6 }: NonNullable<ThreeOptions['bloom']>): Promise<void> {
-    const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all([
+  /**
+   * Add a post-processing pass (three's `Pass`): it runs on the scene in linear light, after bloom
+   * and before tone mapping and the finish. The composer code loads on the first call, as for bloom;
+   * frames draw plainly until it arrives. The node disposes the pass with itself.
+   */
+  addPass(pass: Pass): void {
+    this.extra.push(pass);
+    const fx = this.fx;
+    if (fx) fx.composer.insertPass(pass, fx.composer.passes.indexOf(fx.output));
+    else void this.loadComposer();
+    this.invalidate('view');
+  }
+
+  private loadComposer(): Promise<void> {
+    return (this.composing ??= this.buildComposer());
+  }
+
+  private async buildComposer(): Promise<void> {
+    const bloomOpts = ThreeNode.noBloom ? undefined : this.opts.bloom;
+    const [{ EffectComposer }, { RenderPass }, { OutputPass }, bloomMod, shaderMod] = await Promise.all([
       import('three/addons/postprocessing/EffectComposer.js'),
       import('three/addons/postprocessing/RenderPass.js'),
-      import('three/addons/postprocessing/UnrealBloomPass.js'),
       import('three/addons/postprocessing/OutputPass.js'),
+      bloomOpts ? import('three/addons/postprocessing/UnrealBloomPass.js') : null,
+      this.opts.finish ? import('three/addons/postprocessing/ShaderPass.js') : null,
     ]);
     if (this.destroyed) return;
     // Multisampled, like the plain path's target: the default composer target has none, so every
     // bloom scene lost its antialiasing (worst on thin lines at reduced resolution).
     const composer = new EffectComposer(this.renderer, new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4 }));
     composer.renderToScreen = !this.target;
-    const bloom = new UnrealBloomPass(new Vector2(1, 1), strength, radius, threshold);
     composer.addPass(new RenderPass(this.world, this.camera));
-    composer.addPass(bloom);
-    composer.addPass(new OutputPass()); // tone mapping and sRGB happen here, after the glow
+    if (bloomMod && bloomOpts) {
+      const { strength = 0.8, radius = 0.4, threshold = 0.6 } = bloomOpts;
+      composer.addPass(new bloomMod.UnrealBloomPass(new Vector2(1, 1), strength, radius, threshold));
+    }
+    for (const p of this.extra) composer.addPass(p);
+    const output = new OutputPass(); // tone mapping and sRGB happen here, after the glow
+    composer.addPass(output);
+    let finish: ShaderPass | null = null;
+    if (shaderMod && this.opts.finish) {
+      finish = new shaderMod.ShaderPass(FinishShader);
+      const { grain = 0, vignette = 0, aberration = 0 } = this.opts.finish;
+      finish.uniforms.uGrain!.value = grain;
+      finish.uniforms.uVignette!.value = vignette;
+      finish.uniforms.uAberration!.value = aberration;
+      composer.addPass(finish);
+    }
+    this.fx = { composer, output, finish };
     this.composer = {
       render: () => composer.render(),
       get texture() {
         return composer.readBuffer.texture;
       },
-      setPixelRatio: (r) => composer.setPixelRatio(r),
-      setSize: (w, h) => composer.setSize(w, h),
+      resize: (w, h, r) => {
+        // setPixelRatio() is itself a full resize; setting the ratio first makes setSize the only one.
+        (composer as unknown as { _pixelRatio: number })._pixelRatio = r;
+        composer.setSize(w, h);
+      },
       dispose: () => {
-        bloom.dispose();
+        for (const p of composer.passes) p.dispose();
         composer.dispose();
       },
     };
@@ -792,17 +904,14 @@ export class ThreeNode extends BaseObject {
       // that is when the eye reads detail, so draw it sharp. A still camera over animated
       // content is not a tail; it may need the reduced resolution as much as an orbit does.
       const cam = this.camera;
-      const turn = cam.quaternion.angleTo(this.lastQ);
-      const shift = cam.position.distanceTo(this.lastP);
-      const small = 0.003 * Math.max(1, cam.position.length());
-      const crawl = !this.needsShadows && (turn > 0 || shift > 0) && turn < 0.003 && shift < small;
+      const crawl = !this.needsShadows && crawling(cam.quaternion.angleTo(this.lastQ), cam.position.distanceTo(this.lastP), cam.position.length());
       this.lastQ.copy(cam.quaternion);
       this.lastP.copy(cam.position);
       const busy = this.streak >= 2 && !crawl;
       // The gap between frames: what the reader sees. (GPU timer queries under-report on some
       // drivers, ANGLE on Direct3D 11 among them.) Judged against the display's own frame period.
       this.governor.budget = Math.max(GOVERNOR_BUDGET, framePeriod * 1.2);
-      if (busy && this.streak > 2) this.governor.sample(now - this.lastRender);
+      if (busy && this.streak > 2) this.governor.sample(frameSignal(now - this.lastRender, this.timer ? this.lastCost : null));
       const auto = (this.opts.quality ?? 'auto') !== 'high';
       const moving = auto && now < this.movingUntil;
       this.drawFrame(moving ? this.governor.min : busy && auto ? this.governor.scale : 1);
@@ -814,9 +923,12 @@ export class ThreeNode extends BaseObject {
       // cost, scaled by the pixels the step adds, stays affordable. Cheap views reach full
       // resolution in a few frames; one whose sharp frame would take seconds (a deep fractal)
       // stops short instead of tripping the GPU watchdog, which kills the context.
+      // Straight to full when that is affordable: each step of a canvas or composer reallocates, and
+      // three steps after every scroll were three hitches just as the picture came to rest.
       if (this.lowRes && performance.now() - this.lastRender > SETTLE_MS) {
-        const next = Math.min(1, this.drawnScale * 1.6);
-        if (this.lastCost * (next / this.drawnScale) ** 2 <= (this.target ? SHARPEN_SHARED_MS : SHARPEN_MS)) this.drawFrame(next);
+        const limit = this.target ? SHARPEN_SHARED_MS : SHARPEN_MS;
+        const next = this.lastCost / this.drawnScale ** 2 <= limit ? 1 : Math.min(1, this.drawnScale * 1.6);
+        if (this.lastCost * (next / this.drawnScale) ** 2 <= limit) this.drawFrame(next);
         else this.lowRes = false; // as sharp as this view affords
       }
     }
@@ -833,6 +945,13 @@ export class ThreeNode extends BaseObject {
     const t = this.timer;
     const q = t && t.queries.length < 4 ? t.gl.createQuery() : null;
     if (q) t!.gl.beginQuery(t!.ext.TIME_ELAPSED_EXT, q);
+    const finish = this.fx?.finish;
+    if (finish) {
+      finish.uniforms.uTime!.value = this.scene?.elapsed ?? 0;
+      // In the output's pixels (the canvas's, at full ratio), so grain keeps its size as resolution moves.
+      const out = this.target ? this.ratio : this.baseRatio();
+      finish.uniforms.uResolution!.value = [Math.max(1, this.cssSize.w * out), Math.max(1, this.cssSize.h * out)];
+    }
     if (this.composer) this.composer.render();
     else this.renderer.render(this.world, this.camera);
     if (this.target) {
@@ -878,7 +997,8 @@ export class ThreeNode extends BaseObject {
       this.outputScale.set(sw / fw, sh / fh);
       return scale;
     }
-    // A canvas or a composer can only be resized, which reallocates: a few levels, not every step.
+    // A canvas or a composer can only be resized, which reallocates: a few levels, not every step,
+    // and not more often than RESIZE_MS (a new size, ratio 0, always goes through).
     // ponytail: snapped levels; a viewport-aware composer if the resizes still hitch.
     // Down to the governor's floor: stopping at 0.5 left a heavy bloom scene (a ray-marched black
     // hole on a phone) unable to shed the cost it was asked to.
@@ -886,14 +1006,23 @@ export class ThreeNode extends BaseObject {
     this.outputScale.set(1, 1);
     const ratio = Math.round(base * scale * 100) / 100;
     if (ratio === this.ratio) return scale;
+    const now = performance.now();
+    if (this.ratio !== 0 && now - this.resizedAt < RESIZE_MS) return this.ratio / base;
     this.ratio = ratio;
-    // With bloom the composer draws into its own targets; this one stays unused at 1x1.
+    this.resizedAt = now;
+    // The canvas: with a composer it stays at full resolution, as the composer's last pass draws a
+    // full-window quad into it and so scales a reduced frame up by itself; only the composer resizes.
+    // Without one, the canvas is the frame. (In shared mode it has no context to size.)
     if (!this.target) {
-      this.renderer.setPixelRatio(ratio);
-      this.renderer.setSize(w, h, false);
+      const canvasRatio = this.composer ? base : ratio;
+      const at = `${w}x${h}@${canvasRatio}`;
+      if (at !== this.canvasAt) {
+        this.renderer.setPixelRatio(canvasRatio);
+        this.renderer.setSize(w, h, false);
+        this.canvasAt = at;
+      }
     }
-    this.composer?.setPixelRatio(ratio);
-    this.composer?.setSize(w, h);
+    this.composer?.resize(w, h, ratio);
     return scale;
   }
 
@@ -979,7 +1108,8 @@ export class ThreeNode extends BaseObject {
     this.frames.clear();
     this.observer?.disconnect();
     this.orbitControls?.dispose();
-    this.composer?.dispose();
+    if (this.composer) this.composer.dispose();
+    else for (const p of this.extra) p.dispose(); // the composer never arrived to own them
     disposeObject(this.world);
     this.world.environment?.dispose();
     if (this.target) {

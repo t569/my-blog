@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BoxGeometry, Group, Texture, Mesh, MeshStandardMaterial, SphereGeometry, Vector3, Box3 } from 'three';
-import { ResolutionGovernor, disposeObject, gltfExtensions, mergeStatic, sameOriginOnly } from './three.ts';
+import { ResolutionGovernor, crawling, disposeObject, frameSignal, gltfExtensions, mergeStatic, sameOriginOnly } from './three.ts';
 import { SceneSpecError, validateSceneSpec } from '../parse.ts';
 
 // DOM- and GPU-free: the pure parts of the three plugin, and scene3d validation
@@ -43,6 +43,29 @@ describe('ResolutionGovernor', () => {
     const g = new ResolutionGovernor();
     feed(g, 2000, 100);
     expect(g.scale).toBe(1);
+  });
+});
+
+describe('frameSignal', () => {
+  it('hears the gap, unless the GPU did under 40% of it: then fewer pixels would not help', () => {
+    expect(frameSignal(33, null)).toBe(33); // no timer: the gap is all there is
+    expect(frameSignal(33, 30)).toBe(33); // GPU-bound: drop resolution
+    expect(frameSignal(33, 4)).toBe(4); // held at 30 Hz, GPU nearly idle: stay sharp
+    expect(frameSignal(33, 0)).toBe(33); // no measurement yet
+    // Fed to the governor, a 30 Hz page that costs the GPU 4 ms keeps full resolution.
+    const g = new ResolutionGovernor(0.5);
+    for (let i = 0; i < 200; i++) g.sample(frameSignal(33, 4));
+    expect(g.scale).toBe(1);
+  });
+});
+
+describe('crawling', () => {
+  it('a still camera is not crawling, even when its angle to itself is float noise', () => {
+    expect(crawling(0, 0, 8)).toBe(false);
+    expect(crawling(1.49e-8, 0, 8)).toBe(false); // what Quaternion.angleTo gives for the same rotation
+    expect(crawling(0.001, 0, 8)).toBe(true); // the tail of an orbit's ease-out
+    expect(crawling(0, 0.01, 8)).toBe(true);
+    expect(crawling(0.05, 0, 8)).toBe(false); // turning: not a tail
   });
 });
 
@@ -197,6 +220,42 @@ describe('scene3d validation', () => {
     bad(scene3d({ bloom: { strength: 50 } }), /bloom\.strength/);
     bad(scene3d({ objects: [cloud, { ...cloud, count: 48_000 }] }), /more than 50000 particles/);
     bad(scene3d({ objects: [{ ...cloud, colors: ['url(javascript:1)'] }] }), /colors\[0\]/);
+  });
+
+  it('takes a cinematic scene as data: flight path, camera binds, HDRI, fog, finish, model parts', () => {
+    const film = scene3d({
+      camera: { fov: 30, path: { points: [[0, 1, 6], [4, 1, 0], [0, 2, -6]], target: [[0, 0, 0], [0, 0.5, 0]], along: 'smoothstep(0, 1, spin)' }, bind: { fov: '30 + 10 * spin' } },
+      environment: { src: 'hdri/studio.hdr', background: true, blur: 0.4, rotation: 90, intensity: 0.8 },
+      fog: { color: '#05050a', near: 4, far: 30 },
+      exposure: 1.2,
+      finish: { grain: 0.3, vignette: 0.5, aberration: 3 },
+      objects: [{ type: 'model', src: 'models/car.glb', parts: { 'wheel FL': { bind: { 'rotation.x': '720 * t' } }, body: { material: { color_by: { param: 'colour', palette: ['#f00', '#00f'] } } } } }],
+    });
+    expect(() => ok(film)).not.toThrow();
+    bad(scene3d({ camera: { path: { points: [[0, 0, 0]], along: 'spin' } } }), /path\.points must be a list of 2 to 64/);
+    bad(scene3d({ camera: { path: { points: [[0, 0, 0], [1, 1]], along: 'spin' } } }), /path\.points\[1\] must be \[x, y, z\]/);
+    bad(scene3d({ camera: { path: { points: [[0, 0, 0], [1, 1, 1]], along: 'fetch(1)' } } }), /unknown function/);
+    bad(scene3d({ camera: { bind: { roll: 'spin' } } }), /camera\.bind\.roll is not bindable/);
+    bad(scene3d({ environment: { src: 'javascript:alert(1)' } }), /environment\.src must be an http\(s\) or relative URL/);
+    bad(scene3d({ fog: { color: '#000', near: 10, far: 5 } }), /fog\.far must be beyond near/);
+    bad(scene3d({ finish: { grain: 4 } }), /finish\.grain/);
+    bad(scene3d({ minResolution: 0.01 }), /minResolution must be a number from 0.25 to 1/);
+    bad(scene3d({ objects: [{ type: 'model', src: 'a.glb', parts: { lid: { bind: { 'material.color': '1' } } } }] }), /parts\.lid\.bind\.material\.color is not bindable/);
+  });
+
+  it('takes seeded scatters and falling grains, and caps the copies', () => {
+    const cumin = { type: 'instances', count: 4000, shape: 'sphere', size: [0.05, 0.02, 0.02], scatter: { shape: 'heap', radius: 0.6, height: 0.25 }, colors: ['#8a5a2b', '#a87440'] };
+    expect(() => ok(scene3d({ objects: [cumin, { ...cumin, scatter: { shape: 'box', size: [4, 0, 4] }, fall: { height: 3, speed: 0.8, spin: 1 } }] }))).not.toThrow();
+    bad(scene3d({ objects: [cumin, { ...cumin, count: 16_001 }] }), /more than 20000 instances/);
+    bad(scene3d({ objects: [{ ...cumin, shape: 'teapot' }] }), /shape must be one of sphere, box, cylinder/);
+    bad(scene3d({ objects: [{ ...cumin, scatter: { shape: 'cloud' } }] }), /scatter\.shape must be one of heap, disc, box/);
+    bad(scene3d({ objects: [{ ...cumin, fall: { height: 0 } }] }), /fall\.height must be a positive number/);
+  });
+
+  it('takes hover as data, checked like clicks', () => {
+    expect(() => ok(scene3d({ objects: [{ type: 'sphere', radius: 1, on_hover: { set: { colour: 2 } } }] }))).not.toThrow();
+    bad(scene3d({ objects: [{ type: 'sphere', radius: 1, on_hover: { set: { nope: 1 } } }] }), /on_hover\.set\.nope must name one of scene.params/);
+    bad(scene3d({ objects: [{ type: 'sphere', radius: 1, on_hover: { set: { colour: 'red' } } }] }), /on_hover\.set\.colour must be a number/);
   });
 
   it('names the path of what is wrong', () => {

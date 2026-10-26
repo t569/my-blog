@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- Scroll smoothness, measured by wheel-scrolling three showcase pages on an integrated GPU (slowest
+  5% of frames: 116 → 50 ms, 83 → 34 ms, 67 → 34 ms; worst stall 1.1 s → under 0.2 s):
+  - Fix: own-canvas views resized up to 100 times in ten seconds of scrolling: resolution flipped
+    between moving and settling frame by frame in the tail of every eased scroll, and each flip
+    reallocated the canvas and every composer target. Changes are now at most every 500 ms.
+  - With bloom or a `finish`, the canvas no longer resizes with the resolution at all, only the
+    composer, once per change (it was resized twice: `setPixelRatio`, then `setSize`); and such a
+    canvas is made without MSAA, which the composer's own target already does.
+  - Settling sharpens straight to full resolution when affordable, not in up to three resizes.
+  - `warm()` works for every view, not only shared ones, and uploads every texture as well as
+    compiling every program; scene3d warms before `ready`. Shaders and textures of things off camera
+    were compiled and uploaded mid-scroll, the frame they first came into view.
+- Fix: the governor lowered the resolution for frames that were late for reasons other than the GPU
+  (a page held at 30 Hz, a busy main thread), blurring a picture that cost the GPU 4 ms. Where the
+  browser has GPU timers it now only drops when the GPU took at least 40% of the frame
+  (`frameSignal()`).
+- Fix: the resolution governor never ran for a still camera over animated content (a live screen, a
+  shader, particles). A quaternion's angle to itself comes back as ~1e-8, not 0, so every such frame read
+  as the tail of a camera glide and was drawn sharp, unsampled. A restaurant page at 38 ms a frame stayed
+  at full resolution; it now drops to its floor (20 ms). `crawling()` is the pure test.
+- Fix: the display's frame period, which sets the governor's budget, was taken from the first 30 frames
+  after the first view, the page's busiest moment: a page loading models read as a 25 Hz display and
+  allowed 48 ms a frame. Any shorter gap over the next ~10 s now lowers it.
+- scene3d `instances`: many copies of one small shape in one draw call, scattered from a seed (`heap`,
+  `disc`, `box`), with per-copy colours; `fall` drops and tumbles them on the GPU as a function of time,
+  so they seek. Capped at 20 000 per scene. `disposeObject` frees an InstancedMesh's own buffers.
+- scene3d, cinematic: `camera.path` (a flight on a curve at `along`, an expression; point k of n at
+  `along = k / (n - 1)`) and `camera.bind`, so a scroll-driven camera is data and seeks; `environment.src`
+  (an .hdr, with `background`, `blur`, `rotation`); `fog`; `exposure`; `finish` (grain, vignette, colour
+  fringes, one pass after tone mapping); `model.parts` to drive named nodes inside a glTF, as offsets
+  from their rest pose, with their own `material` (a livery from a param).
+- `view.addPass(pass)`: a three.js pass into the view's composer, after bloom, before tone mapping.
+  `ThreeOptions.finish` and `exposure` as for scene3d.
+- Expressions: `smoothstep(e0, e1, x)`.
+- scene3d: `on_hover: { set }` on objects (params take the values while the pointer is over it, and go
+  back when it leaves); `minResolution`, as on ThreeNode, for heavy views on integrated GPUs.
 - Fix: bloom views drop to their `minResolution`. A composer's scale snapped to 0.7 or 0.5 whatever the
   floor, so a heavy bloom scene (a ray-marched black hole on a phone) couldn't shed the cost the governor
   asked it to. Levels now go 0.7, 0.5, 0.35, 0.25.

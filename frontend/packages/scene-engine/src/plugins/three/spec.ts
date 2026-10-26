@@ -43,6 +43,8 @@ interface Object3DBase {
   visible_when?: VisibleWhen | VisibleWhen[];
   /** Clicking the object sets params, like 2D `on_click`. */
   on_click?: { set: Record<string, number> };
+  /** While the pointer is over the object these params take these values; on leave they go back. */
+  on_hover?: { set: Record<string, number> };
 }
 
 export interface ModelObject extends Object3DBase {
@@ -60,6 +62,18 @@ export interface ModelObject extends Object3DBase {
   variant_by?: { param: string; variants: string[] };
   /** Play an animation clip (by name), or the first one with `true`. */
   animation?: string | boolean;
+  /**
+   * Drive named nodes inside the model (a wheel, a lid's hinge, a phone's layers). `bind` values are
+   * offsets from the part's own rest pose, so `"position.y": "explode * 0.4"` lifts a layer from where
+   * the artist left it. `material` replaces the part's materials (a livery colour from a param).
+   */
+  parts?: Record<string, PartSpec>;
+}
+
+export interface PartSpec {
+  bind?: Partial<Record<ObjectBindKey, string>>;
+  visible_when?: VisibleWhen | VisibleWhen[];
+  material?: Material3D;
 }
 
 export interface BoxObject extends Object3DBase {
@@ -126,7 +140,35 @@ export interface ParticlesObject extends Object3DBase {
   colors?: string[];
 }
 
-export type Object3DSpec = ModelObject | BoxObject | SphereObject | CylinderObject | PlaneObject | TorusObject | ParticlesObject | GroupObject;
+/**
+ * Many copies of one small shape in one draw call: grains in a heap, seeds on a board, spices
+ * raining down. Placed from a seed, so the same spec gives the same heap on every load. With
+ * `fall`, each copy drops and tumbles through `height` and comes round again: worked out on the GPU
+ * from the clock alone, so it seeks and costs no CPU per frame (and casts no shadow while falling).
+ */
+export interface InstancesObject extends Object3DBase {
+  type: 'instances';
+  count: number;
+  /** One grain: `sphere` (squash it with `size`), `box`, `cylinder` (a thread, a stick). */
+  shape: 'sphere' | 'box' | 'cylinder';
+  /** One grain's size, x y z. */
+  size: Vec3;
+  /** Each grain's size varies by up to this fraction. Default 0.3. */
+  jitter?: number;
+  /**
+   * Where they go. `heap`: a mound (`radius` across, `height` high at the middle). `disc`: flat,
+   * `radius`. `box`: anywhere in `size`. Grains lie at random angles in all three.
+   */
+  scatter: { shape: 'heap' | 'disc' | 'box'; radius?: number; height?: number; size?: Vec3 };
+  /** Drop through `height` units at `speed` units/s, tumbling `spin` turns/s. */
+  fall?: { height: number; speed?: number; spin?: number };
+  seed?: number;
+  /** Each grain takes one of these (multiplied with the material colour). */
+  colors?: string[];
+  material?: Material3D;
+}
+
+export type Object3DSpec = ModelObject | BoxObject | SphereObject | CylinderObject | PlaneObject | TorusObject | ParticlesObject | InstancesObject | GroupObject;
 
 export interface Light3D {
   type: 'directional' | 'point' | 'spot' | 'ambient' | 'hemisphere';
@@ -151,13 +193,35 @@ export interface Scene3DSpec extends BaseNodeSpec {
   type: 'scene3d';
   width: number;
   height: number;
-  camera?: { position?: Vec3; target?: Vec3; fov?: number };
+  camera?: {
+    position?: Vec3;
+    target?: Vec3;
+    fov?: number;
+    /** From expressions, e.g. a `scroll` param the host sets: `position.*`, `target.*`, `fov`. */
+    bind?: Partial<Record<CameraBindKey, string>>;
+    /**
+     * A flight: the camera rides a smooth curve through `points`, at `along` (an expression, 0–1),
+     * looking along `target` (a curve too) or at `camera.target`. Point k of n is reached at
+     * `along = k / (n - 1)`, however far apart the points are. Binds apply on top. Turns `orbit` off.
+     */
+    path?: { points: Vec3[]; target?: Vec3[]; along: string };
+  };
   /** Drag to orbit (default true), or the details. Angles in degrees. */
   orbit?:
     | boolean
     | { autoRotate?: number; minDistance?: number; maxDistance?: number; minPolarAngle?: number; maxPolarAngle?: number; pan?: boolean; zoom?: boolean };
-  /** Soft studio lighting from an environment map. Default `studio`, intensity 1. */
-  environment?: { preset?: 'studio' | 'none'; intensity?: number };
+  /**
+   * Soft studio lighting from an environment map. Default `studio`, intensity 1. `src`: an
+   * equirectangular .hdr instead (loaded through `resolveAsset`; the preset lights until it lands);
+   * `background` shows it behind the scene, softened by `blur` (0–1); `rotation` turns it, degrees.
+   */
+  environment?: { preset?: 'studio' | 'none'; src?: string; intensity?: number; background?: boolean; blur?: number; rotation?: number };
+  /** Distance fog: things fade into `color` from `near` to `far`. */
+  fog?: { color: string; near?: number; far: number };
+  /** Tone mapping exposure. Default 1. */
+  exposure?: number;
+  /** Grain, vignette and colour fringes after tone mapping; see `ThreeOptions.finish`. */
+  finish?: { grain?: number; vignette?: number; aberration?: number };
   /** Clear colour behind the 3D content. Default transparent. */
   background?: string;
   shadows?: ShadowMode;
@@ -166,6 +230,8 @@ export interface Scene3DSpec extends BaseNodeSpec {
   /** An invisible floor that shows only shadows. `false` for none. */
   floor?: false | { shadow?: number; size?: number };
   quality?: Quality;
+  /** The lowest resolution `auto` may drop to while things move, real pixels per CSS pixel. Default 0.75. */
+  minResolution?: number;
   layer?: 'overlay' | 'inline';
   render?: 'demand' | 'always';
   lights?: Light3D[];
@@ -180,6 +246,8 @@ declare module '../../types.js' {
 
 export const OBJECT_BIND_KEYS = ['position.x', 'position.y', 'position.z', 'rotation.x', 'rotation.y', 'rotation.z', 'scale'] as const;
 export const LIGHT_BIND_KEYS = ['intensity', 'position.x', 'position.y', 'position.z'] as const;
+export const CAMERA_BIND_KEYS = ['position.x', 'position.y', 'position.z', 'target.x', 'target.y', 'target.z', 'fov'] as const;
+export type CameraBindKey = (typeof CAMERA_BIND_KEYS)[number];
 export type ObjectBindKey = (typeof OBJECT_BIND_KEYS)[number];
 export type LightBindKey = (typeof LIGHT_BIND_KEYS)[number];
 
@@ -195,6 +263,12 @@ export const LIMITS_3D = {
   /** Points across all `particles` objects in one scene. */
   particles: 50_000,
   particleColors: 8,
+  /** Points on a camera path (and on its target path). */
+  pathPoints: 64,
+  /** Named parts driven on one model. */
+  parts: 64,
+  /** Copies across all `instances` objects in one scene. */
+  instances: 20_000,
 } as const;
 
 /* -------------------------------------------------------------- validation */
@@ -217,6 +291,11 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
     if (v !== undefined && typeof v !== 'boolean') fail(`${where} must be true or false`);
   };
   const color = (v: unknown, where: string) => v !== undefined && ctx.checkColor(v, where);
+  const url = (v: unknown, where: string) => {
+    if (typeof v !== 'string' || v.length === 0 || v.length > LIMITS_3D.srcLength) fail(`${where} must be a URL up to ${LIMITS_3D.srcLength} characters`);
+    // Only web URLs and relative paths: no javascript:, data:, blob:, file:.
+    if (/^\s*[a-z][a-z0-9+.-]*:/i.test(v as string) && !/^https?:\/\//i.test(v as string)) fail(`${where} must be an http(s) or relative URL`);
+  };
   const conditions = (v: unknown, where: string) => {
     if (v === undefined) return;
     const list = Array.isArray(v) ? v : [v];
@@ -249,6 +328,20 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
     vec3(cam.position, `${at}.camera.position`);
     vec3(cam.target, `${at}.camera.target`);
     range(cam.fov, `${at}.camera.fov`, 1, 170);
+    binds(cam.bind, `${at}.camera.bind`, CAMERA_BIND_KEYS);
+    if (cam.path !== undefined) {
+      if (!isRecord(cam.path)) fail(`${at}.camera.path must be { points, target?, along }`);
+      const path = cam.path as Record<string, unknown>;
+      const points = (v: unknown, w: string) => {
+        if (!Array.isArray(v) || v.length < 2 || v.length > LIMITS_3D.pathPoints) fail(`${w} must be a list of 2 to ${LIMITS_3D.pathPoints} points`);
+        (v as unknown[]).forEach((p, i) => {
+          if (!(Array.isArray(p) && p.length === 3 && p.every(num))) fail(`${w}[${i}] must be [x, y, z]`);
+        });
+      };
+      points(path.points, `${at}.camera.path.points`);
+      if (path.target !== undefined) points(path.target, `${at}.camera.path.target`);
+      ctx.checkExpr(path.along, `${at}.camera.path.along`);
+    }
   }
   if (node.orbit !== undefined && typeof node.orbit !== 'boolean') {
     if (!isRecord(node.orbit)) fail(`${at}.orbit must be true, false or an object`);
@@ -266,10 +359,32 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
     const e = node.environment as Record<string, unknown>;
     oneOf(e.preset, `${at}.environment.preset`, ['studio', 'none']);
     range(e.intensity, `${at}.environment.intensity`, 0, 10);
+    if (e.src !== undefined) url(e.src, `${at}.environment.src`);
+    bool(e.background, `${at}.environment.background`);
+    range(e.blur, `${at}.environment.blur`, 0, 1);
+    range(e.rotation, `${at}.environment.rotation`, -360, 360);
+  }
+  if (node.fog !== undefined) {
+    if (!isRecord(node.fog)) fail(`${at}.fog must be { color, near?, far }`);
+    const f = node.fog as Record<string, unknown>;
+    if (f.color === undefined) fail(`${at}.fog.color is required`);
+    color(f.color, `${at}.fog.color`);
+    range(f.near, `${at}.fog.near`, 0, 1e4);
+    range(f.far, `${at}.fog.far`, 0, 1e4);
+    if (!num(f.far) || f.far <= ((f.near as number | undefined) ?? 0)) fail(`${at}.fog.far must be beyond near`);
+  }
+  range(node.exposure, `${at}.exposure`, 0, 10);
+  if (node.finish !== undefined) {
+    if (!isRecord(node.finish)) fail(`${at}.finish must be { grain?, vignette?, aberration? }`);
+    const f = node.finish as Record<string, unknown>;
+    range(f.grain, `${at}.finish.grain`, 0, 1);
+    range(f.vignette, `${at}.finish.vignette`, 0, 1);
+    range(f.aberration, `${at}.finish.aberration`, 0, 20);
   }
   color(node.background, `${at}.background`);
   oneOf(node.shadows, `${at}.shadows`, ['soft', 'sharp', 'none']);
   oneOf(node.quality, `${at}.quality`, ['auto', 'high', 'low']);
+  range(node.minResolution, `${at}.minResolution`, 0.25, 1);
   oneOf(node.layer, `${at}.layer`, ['overlay', 'inline']);
   oneOf(node.render, `${at}.render`, ['demand', 'always']);
   if (node.bloom !== undefined) {
@@ -316,6 +431,7 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
   if (!Array.isArray(node.objects)) fail(`${at}.objects must be a list`);
   let count = 0;
   let points = 0;
+  let copies = 0;
   const material = (m: unknown, w: string) => {
     if (m === undefined) return;
     if (!isRecord(m)) fail(`${w} must be an object`);
@@ -352,18 +468,18 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
     bool(ob.receiveShadow, `${w}.receiveShadow`);
     binds(ob.bind, `${w}.bind`, OBJECT_BIND_KEYS);
     conditions(ob.visible_when, `${w}.visible_when`);
-    if (ob.on_click !== undefined) {
-      if (!isRecord(ob.on_click) || !isRecord((ob.on_click as Record<string, unknown>).set)) fail(`${w}.on_click must be { set: { param: value } }`);
-      for (const [p, v] of Object.entries((ob.on_click as { set: Record<string, unknown> }).set)) {
-        ctx.checkParamRef(p, `${w}.on_click.set.${p}`);
-        if (!num(v)) fail(`${w}.on_click.set.${p} must be a number`);
+    for (const key of ['on_click', 'on_hover'] as const) {
+      const on = ob[key];
+      if (on === undefined) continue;
+      if (!isRecord(on) || !isRecord(on.set)) fail(`${w}.${key} must be { set: { param: value } }`);
+      for (const [p, v] of Object.entries((on as { set: Record<string, unknown> }).set)) {
+        ctx.checkParamRef(p, `${w}.${key}.set.${p}`);
+        if (!num(v)) fail(`${w}.${key}.set.${p} must be a number`);
       }
     }
     switch (ob.type) {
       case 'model': {
-        if (typeof ob.src !== 'string' || ob.src.length === 0 || ob.src.length > LIMITS_3D.srcLength) fail(`${w}.src must be a URL up to ${LIMITS_3D.srcLength} characters`);
-        // Only web URLs and relative paths: no javascript:, data:, blob:, file:.
-        if (/^\s*[a-z][a-z0-9+.-]*:/i.test(ob.src as string) && !/^https?:\/\//i.test(ob.src as string)) fail(`${w}.src must be an http(s) or relative URL`);
+        url(ob.src, `${w}.src`);
         if (ob.fit !== undefined) positive(ob.fit, `${w}.fit`);
         oneOf(ob.fitAxis, `${w}.fitAxis`, ['max', 'width', 'height', 'depth']);
         bool(ob.center, `${w}.center`);
@@ -376,6 +492,18 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
           palette(vb.variants, `${w}.variant_by.variants`, LIMITS_3D.variants, (x, vw) => {
             if (typeof x !== 'string' || x.length > 128) fail(`${vw} must be a variant name`);
           });
+        }
+        if (ob.parts !== undefined) {
+          if (!isRecord(ob.parts) || Object.keys(ob.parts).length > LIMITS_3D.parts) fail(`${w}.parts must be an object of at most ${LIMITS_3D.parts} parts`);
+          for (const [name, part] of Object.entries(ob.parts as Record<string, unknown>)) {
+            const pw = `${w}.parts.${name}`;
+            if (name.length > 128) fail(`${pw}: part names are at most 128 characters`);
+            if (!isRecord(part)) fail(`${pw} must be { bind?, visible_when?, material? }`);
+            const pt = part as Record<string, unknown>;
+            binds(pt.bind, `${pw}.bind`, OBJECT_BIND_KEYS);
+            conditions(pt.visible_when, `${pw}.visible_when`);
+            material(pt.material, `${pw}.material`);
+          }
         }
         return;
       }
@@ -416,13 +544,40 @@ export function validateScene3D(node: Record<string, unknown>, at: string, ctx: 
         range(ob.speed, `${w}.speed`, -10, 10);
         if (ob.colors !== undefined) palette(ob.colors, `${w}.colors`, LIMITS_3D.particleColors, (x, cw) => ctx.checkColor(x, cw));
         return;
+      case 'instances': {
+        if (!(num(ob.count) && Number.isInteger(ob.count) && ob.count >= 1)) fail(`${w}.count must be a whole number, at least 1`);
+        copies += ob.count as number;
+        if (copies > LIMITS_3D.instances) fail(`${at}: more than ${LIMITS_3D.instances} instances in total`);
+        oneOf(ob.shape, `${w}.shape`, ['sphere', 'box', 'cylinder']);
+        if (ob.shape === undefined) fail(`${w}.shape is required`);
+        if (!(Array.isArray(ob.size) && ob.size.length === 3 && ob.size.every((n) => num(n) && n > 0))) fail(`${w}.size must be [x, y, z], all positive`);
+        range(ob.jitter, `${w}.jitter`, 0, 1);
+        if (!isRecord(ob.scatter)) fail(`${w}.scatter must be { shape, radius?, height?, size? }`);
+        const sc = ob.scatter as Record<string, unknown>;
+        oneOf(sc.shape, `${w}.scatter.shape`, ['heap', 'disc', 'box']);
+        if (sc.shape === undefined) fail(`${w}.scatter.shape is required`);
+        range(sc.radius, `${w}.scatter.radius`, 0, 1e4);
+        range(sc.height, `${w}.scatter.height`, 0, 1e4);
+        if (sc.size !== undefined && !(Array.isArray(sc.size) && sc.size.length === 3 && sc.size.every((n) => num(n) && n >= 0))) fail(`${w}.scatter.size must be [x, y, z]`);
+        if (ob.fall !== undefined) {
+          if (!isRecord(ob.fall)) fail(`${w}.fall must be { height, speed?, spin? }`);
+          const f = ob.fall as Record<string, unknown>;
+          positive(f.height, `${w}.fall.height`);
+          range(f.speed, `${w}.fall.speed`, -100, 100);
+          range(f.spin, `${w}.fall.spin`, 0, 20);
+        }
+        range(ob.seed, `${w}.seed`, 0, 2 ** 32);
+        if (ob.colors !== undefined) palette(ob.colors, `${w}.colors`, LIMITS_3D.particleColors, (x, cw) => ctx.checkColor(x, cw));
+        material(ob.material, `${w}.material`);
+        return;
+      }
       case 'group':
         if (!Array.isArray(ob.children)) fail(`${w}.children must be a list`);
         bool(ob.merge, `${w}.merge`);
         (ob.children as unknown[]).forEach((c, i) => object(c, `${w}.children[${i}]`, depth + 1));
         return;
       default:
-        fail(`${w}.type must be one of model, box, sphere, cylinder, plane, torus, particles, group`);
+        fail(`${w}.type must be one of model, box, sphere, cylinder, plane, torus, particles, instances, group`);
     }
   };
   (node.objects as unknown[]).forEach((o, i) => object(o, `${at}.objects[${i}]`, 0));
