@@ -997,6 +997,326 @@ solver, bloom/post chain, zero-GC frames, workers.
       hand-written ones exist. Prior art: Coulon–Matsumoto–Segerman–Trettel.
 - [ ] Other forms (E₄, E₆, j) once one form is right: j has poles, needs clipping.
 
+### 9. The lab as a stage: one canvas, pinned chapters
+
+/lab stops being a document of boxes and becomes a stage: one fixed WebGL
+canvas behind the page, one scene full-bleed at a time, scroll moving between
+chapters with a shader transition, and the words floating over it. Inspired by
+Lusion and Active Theory. Decided 2026-10-01:
+
+- **Layout: pinned chapters.** One full-screen scene at a time; scroll advances.
+- **Acts** (title card each, progress rail shows acts):
+  | Act | Scenes | Transition into it |
+  |---|---|---|
+  | I Chaos & pattern | mandelbrot, lorenz, flow, fluid, life, fibonacci, fourier | fluid displacement |
+  | II Surfaces | puzzle, laplace, torus | surface ripple / fold |
+  | III The modular world | modular, delta, knots | hyperbolic-tiling dissolve |
+  | IV Inside geometries | h3, sl2, s3, nil, sol | geodesic tunnel |
+  | V Black holes | blackhole, kerr | gravitational lens |
+  | Coda: the engine | ad, hero | CSS wipe |
+- **Input: per scene.** `immersive: true` in the registry: click to take all
+  input, Esc gives it back (proposed: black holes, the five geometries,
+  mandelbrot, fluid). Others: drag goes to the scene, the wheel scrolls.
+- **Non-WebGL scenes** (SVG, 2D canvas) keep their DOM; any transition touching
+  one is a CSS mask wipe styled to match. Not ported.
+- **Theme:** follows the site skin (scenes already read `sceneTheme`).
+- **Deps:** `lenis` (smooth scroll), `framer-motion` (kinetic type, phase 4).
+- **Maths in LaTeX**, rendered by KaTeX on the server (it's already a dependency).
+- **The old list stays** (extend by preserving): the layout under reduced
+  motion, without WebGL and on small phones, and behind a "list view" toggle.
+  Posts and the editor keep using `Sim` exactly as now.
+- **The stage is /lab only**, not the root layout: the rest of the blog never
+  pays for three.js.
+
+**The seam.** Every WebGL scene already goes through the engine's `ThreeNode`,
+which made its own `WebGLRenderer` (one context each; ~15 of the browser's ~16).
+Given a shared renderer instead, a node draws into its own render target and
+the stage composites the targets onto the one canvas. That one change gives the
+global canvas, ends the context ceiling and the 150–250 ms context creation per
+scene, and is what makes FBO transitions possible (both scenes' pixels in one
+context). It's generic, so it goes upstream to `t569/scene-engine`.
+
+- [x] **Phase 1: engine seam + stage** (list layout unchanged, so the seam is
+      verified on a page whose look is known)
+  - [x] `ThreeNode` shared mode: `ThreeNode.sharedRenderer` set → nodes borrow it
+        and render into a render target (MSAA, half float); resolution governor
+        sizes the target, not the canvas; never disposes the borrowed renderer.
+        The node's `<canvas>` stays as the DOM box for pointer events and layout.
+        Colour: three skips tone mapping/sRGB when drawing to a target, so a node
+        reports `outputLinear` (built-in materials, no bloom) and the stage encodes.
+        The mount's opaque background is lifted into `node.backdrop` so the stage
+        shows through. README + CHANGELOG.
+  - [x] `LabStage`: fixed canvas behind the page, composites every visible shared
+        node into its box (rounded corners kept), only when something changed;
+        drives Lenis from the same rAF so the boxes don't lag the scroll.
+  - [x] Lenis on /lab, off under reduced motion.
+  - [x] Maths text as LaTeX (registry `maths` → `$…$`, KaTeX on the server).
+  - [x] Verify (2026-10-02): one WebGL context on /lab (was ~15); `tsc`,
+        `build`, engine tests 77/77; three.js still absent from /lab's initial
+        chunks (stage + Lenis: 46 KB). All 15 WebGL scenes pixel-diffed against
+        a worktree of the last commit, frozen under reduced motion, light, dark
+        and a live switch: mean difference < 2.5/255 each, colours identical.
+        Leaving /lab frees the context and unsets `sharedRenderer`, so pages
+        after it (posts) make their own (not checked on a real post: backend
+        was down). Found and fixed on the way:
+        - `scene3d` background set on the renderer, lost when shared: the
+          hero went black. Now `ThreeNode.setClearColor`, re-applied per frame.
+        - `PointsMaterial` sizes points by the renderer's canvas (three), so on
+          the stage canvas the hero's particles were 2.6× too big.
+        - The composite didn't clamp: half-float targets hold > 1 where an
+          8-bit canvas clips, and alpha > 1 subtracted the backdrop (knots).
+        - Boxes at half pixels drew a pixel off (h3's fine detail, knots).
+          Snapped as the browser snaps a canvas. h3 still differs by 4.6
+          because the *original* is resampled (557 px buffer in a 556.5 px
+          box); the stage draws it 1:1.
+        - `LabStage` disposed twice when unmounted before setup finished.
+        Known ceiling until phase 2: native scrolling (touch, scrollbar drag)
+        is composited a frame late, so boxes can trail the page; pinned
+        chapters don't move with scroll, so this goes away there.
+- [x] **Phase 2: pinned chapters.** Chapters, acts, title cards, progress rail,
+      glass panel; scene fitted to cover the viewport; only active ± 1 mounted
+      (so leaks in a shared context now matter: audit `dispose`); the list as
+      fallback + toggle; `immersive` flag and `data-lenis-prevent`.
+  - [x] `LabView`: the server renders the list; the stage replaces it after
+        hydration where it suits (motion allowed, ≥ 768 px, a fine pointer,
+        WebGL2) unless the reader picked the list (toggle, `localStorage`).
+        Touch-first screens get the list: a full-screen scene that takes a
+        drag would swallow the scroll.
+  - [x] `LabChapters`: a sticky layer under the navbar holds the scene on
+        stage; the chapters scroll over it (so the footer follows as usual).
+        Active = the chapter crossing the middle of the screen; it and its
+        neighbours are mounted, the neighbours with no box (`display: none`),
+        so they neither draw nor take input. Title card per act, act rail,
+        glass panel (bottom left, scrolls with its chapter).
+  - [x] Fit: first covered the screen, cropped; now inside it, centred (2b).
+  - [x] Input: over a scene the wheel scrolls the page (captured before an
+        orbit would zoom). `IMMERSIVE` scenes show a click-to-explore layer;
+        clicked, they take everything (Lenis stopped) until Esc or the
+        chapter changes.
+  - [x] The words are made once on the server and shared by list and panels:
+        the KaTeX HTML is not in the payload twice.
+  - [x] Dispose audit (2026-10-02): live GPU objects counted by wrapping
+        WebGL's create/delete, over three walks of all 28 chapters and back.
+        Textures, buffers, framebuffers, renderbuffers, programs and VAOs end
+        each walk exactly where they started; never more than 3 scenes mounted.
+        Known, accepted: 2 shader objects per walk. Mandelbrot precompiles its
+        program (`compileAsync`, saves a ~250 ms freeze on arrival); mounted as
+        a hidden neighbour and unmounted before its first draw, three deletes
+        the program but not its shaders (it frees them on first use only). No
+        textures or buffers; worth an upstream three issue, not a workaround.
+- [x] **Phase 2b: the scenes on the stage** (2026-10-02, from a first look)
+  - [x] Fit inside the screen, centred (flex, not grid: a grid track grows to
+        its content and left-aligns overflow). Cover cropped controls and cost
+        ~5× the list's pixels; the stage keeps the page colour round the sides.
+  - [x] Scroll-driven scenes on a pinned stage: `ScrollProgress` (context)
+        hands the chapter's progress in; `SCROLL` in the registry makes the
+        chapter that many screens. The modular terrain flies again. Off the
+        stage the context is null and it measures its own box, as before.
+  - [x] Lorenz carries on after a remount (time and camera kept for the visit),
+        and no longer erases itself every 30 s: complete, the head goes round.
+  - [x] Lag, measured on a laptop's Intel Iris Plus with one tab (several /lab
+        tabs fight over the GPU and throttle each other to 30 Hz: measure alone):
+        black hole 30 fps at half resolution → 60 fps at full; Kerr 3–10 fps →
+        ~50 fps at ~0.3. How:
+        - Black hole shader 2.1× cheaper, pixel-identical (mean 0.03/255): steps
+          land on the disk's plane exactly (its crossings are known in advance,
+          the ray keeps to its plane), so the coarse steps that sky rays spend
+          most of their time in cost only RK4's own (tiny) error; inside r = 3
+          heading in, light only falls, so the shadow stops there.
+        - Kerr 1.5× cheaper, identical (0.08/255): fine steps only near the gas.
+          Still ~200 ms a full frame there, so its floor is 0.25 (`rayView`'s
+          new `minResolution`): one long GPU job stalls the whole page's frames,
+          not just the scene's, so each frame must be short.
+        - Governor: judged against the display's own frame period; far over
+          budget, drops straight to a scale that fits. Its GPU timer
+          (`frameCost`) under-reports on ANGLE/D3D11 (9 ms reported, ~30 ms
+          real): frame intervals stay the signal.
+        - The stage composites in the frame a view draws (`ThreeNode.onDraw`),
+          not the next: a drag answered a frame late.
+- [x] **Phase 2c: intro, flicks, dissolve, modular forms, phones** (2026-10-02).
+  - [x] One flick (wheel gesture, swipe, key) = one chapter; SCROLL chapters
+        scroll freely to their end. The outgoing scene dissolves into the
+        next on the stage (noise mask, displacement, RGB split, faint edge);
+        SVG/canvas scenes cross-fade; titles rise word by word.
+  - [x] Ads: SpecScene keeps each spec's clock (no replayed intros); the
+        banner is Euler's identity, still pure data.
+  - [x] E₄, E₆, j (`lib/modular.ts`, checked) as one landscape that morphs
+        (registry GROUPS + StageChapter): every form's attributes on one
+        geometry, blended by weights; camera glides per form.
+  - [x] Prologue: three lines over a night galaxy (IntroField, data only),
+        behind a loader counting real work (capped at 5 s by the clock). The
+        page's inline probe drops a static curtain before the first paint,
+        so a phone never shows the list while it hydrates.
+  - [x] Phones get the stage: tap-to-play on touch (a swipe always moves
+        chapters), bottom-sheet panel, progress line, scene above the sheet;
+        stage composite ≤ 1.5×, every view ≤ 1.25× (`ThreeNode.pixelRatioCap`),
+        terrain at a quarter of the points, intro in portrait on portrait.
+        Hydration made cheap: maths as one HTML string per scene (KaTeX on the
+        server, 137 formulas checked), panels rendered only near the stage.
+  - [x] Fixes from a first look (2026-10-02, measured in front, production):
+        - One flick moved two chapters: trackpad coasting decays and thins out,
+          and its tail outlived the 220 ms "gesture over" gap. A new gesture is
+          now a 500 ms pause or a delta that jumps up (coasting never does).
+          Inertia tails up to 3 s: one chapter; two deliberate flicks: two.
+        - The wheel over a panel scrolled the page freely (no panel scroll to
+          take it), stopping between chapters: a panel keeps the wheel only
+          while it can scroll that way; `overscroll-contain`.
+        - Moves stuttered (18–30 fps into 3D scenes): both scenes drew at once,
+          the arriving one at full resolution, and hidden neighbours compiled
+          their shaders on first draw. Now the leaving view holds its frame
+          (`view.hold`), the arriving one draws at its floor for the move
+          (`moving`), neighbours mount once settled and are compiled in idle
+          time (`view.warm()`): 37–57 fps, p95 17 ms on most moves.
+        - Left: one 100–180 ms frame at the start of some moves (likely the
+          React commit of the arriving chapter); Mandelbrot → Lorenz and
+          puzzle → Laplace at ~37 fps.
+        - "Couldn't load page" on a phone: not the site. Windows had the Wi-Fi
+          as a Public network and no firewall rule for Node: inbound blocked.
+  - [ ] **Measure on a real phone, and with the tab in front.** A background
+        tab (even "visible") is throttled to ~1 frame/s and its timers slowed:
+        every timing taken that way was an artifact, /about included.
+- [ ] **Phase 3: transitions.** Outgoing and incoming targets mixed by one
+      shader per act, driven by scroll progress between chapters; CSS wipe
+      whenever an SVG/2D scene is on either side.
+  - [x] Fixes on the way (2026-10-02):
+        - Every 3D scene blank: the composite shader named a variable `half`,
+          a GLSL reserved word, so it never compiled.
+        - The next scene flashed in a corner on arrival. Chrome answers
+          getScreenCTM inside `display: none` with an identity matrix, so a
+          neighbour that drew while hidden (a `seek` at mount) placed its canvas
+          640×400, half a box up-left, with a real frame in it. The engine no
+          longer draws a view that isn't laid out; the stage skips undrawn views.
+        - A 2D scene on either side cross-faded, showing both at once. Now the
+          leaving one is gone by half way, then the arriving one comes in
+          (`fadeOut`/`fadeIn`), in CSS and for 3D views on the stage alike. Two
+          3D scenes still dissolve.
+        - An arriving 3D scene was zoomed twice (shader and CSS scale).
+        - The coda hero's "Open the lab →" button did nothing, in the lab: removed.
+  - [ ] **The next scene still previews during a move** (reported on real
+        hardware after `53e754c`). The corner frame from a hidden neighbour and
+        the 2D cross-fade were fixed, and headless Chrome no longer shows either,
+        so whatever is left was not reproduced there. Start with a DevTools
+        trace or screen recording of puzzle → Laplace on the real GPU: which
+        scene shows, where, and in which frames of the move.
+  - [ ] **3D → 3D can go blank mid-move.** The leaving scene's dissolve is
+        mostly done by ~60% of the move and assumes the arriving one is drawn
+        under it. Hidden neighbours no longer draw, so the arriving scene's
+        first frame comes only once it is shown (seconds on headless Chrome's
+        software GL, Laplace → Torus). Fix: hold the dissolve at 0 until the
+        arriving view has `version > 0`, then run it over what's left.
+  - [ ] Opening `/lab#<scene>` sometimes lands a chapter or two off (seen in
+        headless Chrome: #fluid → Life, #laplace → Torus).
+- [ ] **Phase 4: polish.** framer-motion kinetic type for titles and panels;
+      spring cursor that reacts to scenes and text (none on touch); immersive
+      mode's enter/exit.
+- [ ] **Performance: stop the churn** (2026-10-02, plan from an audit of the
+      engine and the sims against Blender's viewport and WebGL practice).
+      The architecture already matches: draw on demand, one shared context,
+      low resolution while moving. The lag came from rebuilding, reallocating
+      and re-measuring things that hadn't changed.
+  - [x] Scroll rebuilt every 3D scene: `useThemeKey` watched `class`/`style`
+        on `<html>`, which Lenis toggles at every scroll start and stop. Now
+        it watches `data-theme`/`data-skin` only.
+  - [x] Composite: no `Vector2`s allocated per frame, and each box's radius is
+        cached (`getComputedStyle` per view per draw was a style flush).
+  - [x] A morph inside the Δ/E4/E6/j group runs at the move's floor
+        resolution (`moving`), like a move between chapters.
+  - [x] Engine, dynamic resolution without reallocation. A shared target
+        stays at full size, and a reduced frame fills its corner
+        (`ThreeNode.outputScale`, which the stage samples). Canvas and bloom
+        views snap to ≤3 levels instead of resizing at every ×1.6 step.
+        Bloom views no longer size the unused 4× MSAA target.
+  - [x] `SHARPEN_SHARED_MS = 50`: with one GPU queue, a 250 ms sharpening
+        frame froze every view. The cost is that deep fractals settle softer;
+        this constant is the knob.
+  - [x] `warm()` also draws one 1×1 frame, so geometry (about 22 MB for the
+        terrain) uploads in idle time, not mid-move. Lights' shadow maps are
+        disposed with their scene.
+  - [x] Committed; scene-engine subtree pushed (`66ff4d4`), 78/78 tests pass
+        in `D:/Repos/scene-engine`.
+  - [ ] Measure with the tab in front: a DevTools trace of scroll, Δ→E4→E6→j
+        and Mandelbrot, before and after. Then a phone, or 4× CPU throttle.
+  - [ ] Only if the trace names them:
+        - The terrain fetches all 12 morph attributes even when idle. Rebind
+          to one form plus a no-morph define once a morph settles.
+        - Layout reads interleaved with writes during moves (`fit()`, the
+          stage's rect sweep, `steer()`).
+        - Space3D/SVG re-projection; Phyllotaxis's 620 circles.
+        - Contexts per sim in posts.
+  - [x] Bug found on the way: `disposeObject` on a model copy disposed
+        geometry and materials shared with the cached glTF. Now it skips the
+        glTF's geometry and whatever `parser.associations` records (materials,
+        textures, variants). Test in `three.test.ts`; subtree pushed (`07b2ea8`), 79/79 pass in
+        `D:/Repos/scene-engine`.
+  - Skipped: worker index transfer (already zero-copy); graph force buffers
+    (dozens of nodes); OffscreenCanvas (no gain for a shared compositor).
+- [ ] **Phones** (2026-10-02, Android Chrome; plan in
+      `~/.claude/plans/the-current-simulation-engine-unified-reef.md`).
+      First reading (`?perf`, local server): intro fine but soft; Mandelbrot
+      231 ms a frame; worst ~280 ms; surfaces soft, or slow when dragged;
+      `?nobloom` made little difference. A phone GPU is ~10× short of a laptop's
+      for per-pixel work, so resolution alone can't close it.
+  - [x] `?perf` HUD (stage fps, draw calls, per view fps / cost / scale) and
+        switches `?nobloom`, `?noblur`, `?dpr=x`, `?simplify=x`.
+  - [x] Bloom scenes lost antialiasing (composer target had no MSAA): 4×.
+  - [x] Stage composited at 1.5× over views at 1.25×: always resampled. One ratio.
+  - [x] Dither in the composite: glow on night skies banded.
+  - [x] `simplify` (`lab/quality.ts`, 0.5 on phones): ODE marches (black hole,
+        Kerr) take longer steps; sphere-traced ones (Nil, S³, SL₂ℝ, H³, and Sol,
+        whose grid blurred under longer steps) see less far. Compared at 0.5 and 1
+        in headless Chrome: indistinguishable except Kerr's gas, a shade smoother.
+  - [x] The lab page's inline probe `<script>` warned in dev on client-side
+        navigation: now `StageProbe.tsx`, a script on the server and an inert
+        data block on the client.
+  - [x] Committed and pushed to `dev/t569` (b9c4ed5).
+  - [ ] **Next: on the Vercel preview of `dev/t569`, measure on the phone with `?perf`, and each switch alone.
+        Record the numbers here. The first reading was against the local
+        (likely dev) server.
+  - [x] Mandelbrot sharp on phones, live (replaces the video plan, which would
+        have lost the skin palettes and relief): interleaved frames. Each frame
+        computes one pixel per k×k block, packed into a target k× smaller each
+        way (scattered, every GPU warp waits on its one pixel and nothing is
+        saved), and a resolve pass moves the rest over from the last frame by the
+        camera's exact zoom and turn (XaoS; checkerboard / temporal upsampling).
+        k (1–4) follows the frame gap. Emulated phone on the Iris: full
+        resolution at ~60 fps for most of the dive (was 0.28 scale, blocky);
+        19–30 fps around 10^8–10^14 with k at 4. Never one whole frame at once:
+        that at depth tripped the GPU watchdog and Chrome disabled WebGL.
+  - [x] Bloom scenes couldn't drop below 0.5 resolution (`applyRatio` snapped
+        to 0.7/0.5 whatever the floor): Kerr's 0.25 floor did nothing on a
+        phone. Now 0.7/0.5/0.35/0.25. The black hole's floor: 0.35.
+  - [ ] Mandelbrot in headless Chrome (Iris, ANGLE D3D11, emulated phone):
+        from ~10^8 down every pixel draws as inside (flat `uInside`). The
+        committed version does the same, so it predates the interleaving.
+        Check on the phone; if it shows there, start with the reference/BLA
+        refresh (`uMaxR` never changed across the dive).
+  - [x] The lab page crashed ("This page couldn't load") when WebGL couldn't
+        be created: each scene's `new ThreeNode` threw in an effect, up to the
+        app's error page. Now `Failed` (Sim.tsx) wraps every scene, and the intro:
+        a box saying it needs WebGL, the queue released. A stage that can't set
+        up sends LabView to the list for that visit (not saved). Checked with
+        `getContext('webgl*')` forced to null: list, 18 notes, 2D scenes running.
+  - [ ] Measure the surfaces in production (a Vercel preview): Laplace is a 9k
+        vertex mesh without bloom, so 100+ ms there points at CPU or the
+        dev server, not the GPU. If it's CPU: a DevTools trace via
+        `chrome://inspect`, looking for Layout in frames (`fit()`, the stage's
+        rect sweep, Lenis).
+  - [ ] Only if the phone numbers ask for it (plan, phases 2–3):
+        - A 30 fps cap on phones (`frameInterval` in ThreeNode): steady beats
+          chasing 60 and throttling.
+        - Bloom at a lower internal resolution, or off, on phones.
+        - MSAA 2× instead of 4× on phones, if the new composer MSAA costs.
+        - The bottom sheet's `backdrop-blur` off on phones (`?noblur` tells).
+        - `webglcontextlost` / `restored` on the stage canvas: Android drops
+          contexts under memory pressure; today every scene goes blank.
+        - Particle counts in `scene3d` scaled by `simplify` (intro).
+        - A `toneMapping` option (AgX, as Blender) — a look, not a fix.
+        - One ticker instead of a rAF per scene: only if a trace blames it.
+  - [ ] Race, reproducible: `/lab?simplify=0.5` with reduced motion forced
+        (headless), Sol alone: its one frame is placed half a box up-left
+        (the last `fit()` read a CTM without the node's translate). A
+        ResizeObserver repaint did not fix it. Still scenes only.
+
 ---
 
 ## Explicitly skipped

@@ -2,6 +2,79 @@
 
 ## Unreleased
 
+- Scroll smoothness, measured by wheel-scrolling three showcase pages on an integrated GPU (slowest
+  5% of frames: 116 → 50 ms, 83 → 34 ms, 67 → 34 ms; worst stall 1.1 s → under 0.2 s):
+  - Fix: own-canvas views resized up to 100 times in ten seconds of scrolling: resolution flipped
+    between moving and settling frame by frame in the tail of every eased scroll, and each flip
+    reallocated the canvas and every composer target. Changes are now at most every 500 ms.
+  - With bloom or a `finish`, the canvas no longer resizes with the resolution at all, only the
+    composer, once per change (it was resized twice: `setPixelRatio`, then `setSize`); and such a
+    canvas is made without MSAA, which the composer's own target already does.
+  - Settling sharpens straight to full resolution when affordable, not in up to three resizes.
+  - `warm()` works for every view, not only shared ones, and uploads every texture as well as
+    compiling every program; scene3d warms before `ready`. Shaders and textures of things off camera
+    were compiled and uploaded mid-scroll, the frame they first came into view.
+- Fix: the governor lowered the resolution for frames that were late for reasons other than the GPU
+  (a page held at 30 Hz, a busy main thread), blurring a picture that cost the GPU 4 ms. Where the
+  browser has GPU timers it now only drops when the GPU took at least 40% of the frame
+  (`frameSignal()`).
+- Fix: the resolution governor never ran for a still camera over animated content (a live screen, a
+  shader, particles). A quaternion's angle to itself comes back as ~1e-8, not 0, so every such frame read
+  as the tail of a camera glide and was drawn sharp, unsampled. A restaurant page at 38 ms a frame stayed
+  at full resolution; it now drops to its floor (20 ms). `crawling()` is the pure test.
+- Fix: the display's frame period, which sets the governor's budget, was taken from the first 30 frames
+  after the first view, the page's busiest moment: a page loading models read as a 25 Hz display and
+  allowed 48 ms a frame. Any shorter gap over the next ~10 s now lowers it.
+- scene3d `instances`: many copies of one small shape in one draw call, scattered from a seed (`heap`,
+  `disc`, `box`), with per-copy colours; `fall` drops and tumbles them on the GPU as a function of time,
+  so they seek. Capped at 20 000 per scene. `disposeObject` frees an InstancedMesh's own buffers.
+- scene3d, cinematic: `camera.path` (a flight on a curve at `along`, an expression; point k of n at
+  `along = k / (n - 1)`) and `camera.bind`, so a scroll-driven camera is data and seeks; `environment.src`
+  (an .hdr, with `background`, `blur`, `rotation`); `fog`; `exposure`; `finish` (grain, vignette, colour
+  fringes, one pass after tone mapping); `model.parts` to drive named nodes inside a glTF, as offsets
+  from their rest pose, with their own `material` (a livery from a param).
+- `view.addPass(pass)`: a three.js pass into the view's composer, after bloom, before tone mapping.
+  `ThreeOptions.finish` and `exposure` as for scene3d.
+- Expressions: `smoothstep(e0, e1, x)`.
+- scene3d: `on_hover: { set }` on objects (params take the values while the pointer is over it, and go
+  back when it leaves); `minResolution`, as on ThreeNode, for heavy views on integrated GPUs.
+- Fix: bloom views drop to their `minResolution`. A composer's scale snapped to 0.7 or 0.5 whatever the
+  floor, so a heavy bloom scene (a ray-marched black hole on a phone) couldn't shed the cost the governor
+  asked it to. Levels now go 0.7, 0.5, 0.35, 0.25.
+- Fix: bloom views keep their antialiasing. The composer's default target had no MSAA; it now has 4x,
+  like the plain path's.
+- `ThreeNode.noBloom`: ignore every view's `bloom`, for a host measuring what the glow costs or a
+  device that can't afford it.
+- Fix: a view that isn't laid out (`display: none` above it) no longer draws. Chrome's `getScreenCTM`
+  answers there with an identity matrix, so the canvas was placed and sized wrongly, and a host showing
+  it later showed that frame in the wrong place.
+- Fix: `disposeObject` on a model copy no longer frees the geometry, materials and textures it
+  shares with the cached glTF, which broke other copies and the next load of that URL.
+- `ThreeNode.sharedRenderer`: many views, one WebGL context. Views made while it is set draw into
+  their own render target (`output`, `version`, `background`) for a host to composite
+  onto its canvas, instead of each holding one of the browser's ~16 contexts. The README has the details.
+- `view.hold`: keep the last frame and draw nothing, for a host dissolving a view away (two views
+  drawing at once was what made a transition stutter). The clock runs on; clear it to catch up.
+- `view.warm()`: compile a hidden view's shaders ahead of its first frame, with the renderer state it
+  will draw with (its target, or a plain one under bloom), in parallel where the driver allows. A
+  program linked on first draw stalled that frame by 100–200 ms.
+- `ThreeNode.pixelRatioCap`: a ceiling on every view's pixel ratio, under each one's `maxPixelRatio`, for
+  a host that knows the device can't afford what its screen offers (a phone at 3x).
+- `ThreeNode.onDraw`: called whenever a shared view has drawn, so a host composites in the same
+  frame. Compositing from the host's own animation frame showed the frame before: a drag answered late.
+- The resolution governor judges frames against the display's own period (measured once, at the first
+  view), never less than the 20 ms budget. Unchanged at 60 Hz; at 30 Hz (battery saver, some displays)
+  every frame used to read as slow and every view sat at its lowest resolution.
+- Far over budget (3x), the governor decides in three frames and drops straight to the scale that would
+  fit (cost goes with scale squared), rather than 20 % per twenty-frame window: at 200 ms a frame, that
+  was half a minute of stalls.
+- `ThreeNode.setClearColor`: the clear colour kept per view and restored before each shared frame.
+  `scene3d`'s `background` uses it; it was lost on a shared renderer.
+- `scene3d` particles are sized by what they are drawn into, not the renderer's canvas (three's
+  `PointsMaterial` reads the canvas). Unchanged alone; on a shared renderer they were too big.
+- `disposeObject` also disposes textures held in a `ShaderMaterial`'s uniforms. Losing a view's own
+  context used to free them; a shared context keeps them until something disposes them.
+
 - `scene3d`: `bloom` and a `particles` object (`count`, `radius`, `shape`, `size`, `speed`, `colors`), both
   validated and capped (50 000 points per scene). Points move in the vertex shader from the time alone:
   seekable, no CPU per frame, deterministic seeding so a still frame is the same on every load.

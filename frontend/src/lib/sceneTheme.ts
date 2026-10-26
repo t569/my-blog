@@ -36,7 +36,9 @@ export function useThemeKey(): number {
 		const mo = new MutationObserver(() => setKey((k) => k + 1));
 		mo.observe(document.documentElement, {
 			attributes: true,
-			attributeFilter: ["class", "data-theme", "data-skin", "style"],
+			// Not class/style: Lenis toggles classes there at every scroll start and stop, and
+			// each bump rebuilds every keyed scene. next-themes writes data-theme (providers.tsx).
+			attributeFilter: ["data-theme", "data-skin"],
 		});
 		return () => mo.disconnect();
 	}, []);

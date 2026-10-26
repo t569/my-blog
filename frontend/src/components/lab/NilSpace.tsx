@@ -37,7 +37,7 @@ void main() {
 	vec3 col = vec3(0.0);
 	float t = 0.0;
 	bool inWall = false;
-	for (int i = 0; i < 140; i++) {
+	for (int i = 0; i < int(140.0 * SIMPLIFY); i++) {
 		vec3 g = helix(X, t);
 		vec3 p = vec3(P.xy + g.xy, P.z + g.z + (P.x * g.y - P.y * g.x) * 0.5); // P · g
 		vec2 f = abs(p.xy - floor(p.xy + 0.5));

@@ -18,7 +18,8 @@
 		"check:hyperbolic": "node --experimental-strip-types --no-warnings scripts/check-hyperbolic.ts",
 		"check:sl2": "node --experimental-strip-types --no-warnings scripts/check-sl2.ts",
 		"check:thurston": "node --experimental-strip-types --no-warnings scripts/check-thurston.ts",
-		"check:blackhole": "node --experimental-strip-types --no-warnings scripts/check-blackhole.ts"
+		"check:blackhole": "node --experimental-strip-types --no-warnings scripts/check-blackhole.ts",
+		"check:kerr": "node --experimental-strip-types --no-warnings scripts/check-kerr.ts"
 	},
 	"dependencies": {
 		"@blocknote/code-block": "^0.49.0",
@@ -37,6 +38,7 @@
 		"highlight.js": "^11.11.1",
 		"jsonwebtoken": "^9.0.3",
 		"katex": "^0.18.7",
+		"lenis": "^1.3.26",
 		"lucide-react": "^1.11.0",
 		"next": "16.2.3",
 		"next-auth": "^4.24.14",

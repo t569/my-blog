@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Scene } from "@t569/scene-engine";
 import { ThreeNode } from "@t569/scene-engine/three";
-import { BufferAttribute, BufferGeometry, Color, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, SphereGeometry } from "three";
+import { BufferAttribute, BufferGeometry, Color, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
 import { runWhileVisible, themeColors, useThemeKey } from "@/lib/sceneTheme";
 
 type Vec3 = [number, number, number];
@@ -51,10 +51,14 @@ function integrate(n: number, h: number): Vec3[] {
 }
 
 const PATH = integrate(9000, 0.006);
-const DRAW = 24; // seconds to draw the whole path
-const HOLD = 6; // then hold, then start again
+const DRAW = 24; // seconds to draw the whole path, and for the head to go round it after
 const W = 640;
 const H = 420;
+
+// Where the path and the camera were when it last unmounted: the lab's stage mounts only the
+// chapters near the reader, and a theme change remounts it too. Back again, it carries on.
+let resumeAt = DRAW * 0.6;
+const resumeCam = new Vector3(4.2, 1.2, 8.5);
 
 export default function LorenzAttractor() {
 	const hostRef = useRef<HTMLDivElement>(null);
@@ -81,7 +85,7 @@ export default function LorenzAttractor() {
 		const head = new Mesh(new SphereGeometry(0.07, 12, 8), new MeshBasicMaterial({ color: to }));
 		view.world.add(new Line(geometry, new LineBasicMaterial({ vertexColors: true })), head);
 
-		view.camera.position.set(4.2, 1.2, 8.5);
+		view.camera.position.copy(resumeCam);
 		const controls = view.orbit([0, 0, 0]);
 		controls.autoRotate = true;
 		controls.autoRotateSpeed = 0.7;
@@ -89,17 +93,21 @@ export default function LorenzAttractor() {
 
 		let drawn = -1;
 		view.onFrame((_, t) => {
-			const k = Math.max(2, Math.round(Math.min(1, (t % (DRAW + HOLD)) / DRAW) * PATH.length));
-			if (k === drawn) return false;
-			drawn = k;
+			const i = Math.floor((t / DRAW) * PATH.length);
+			const k = Math.max(2, Math.min(PATH.length, i)); // drawn so far: once complete, it stays complete
+			const h = i < PATH.length ? k - 1 : i % PATH.length; // and the head keeps going round it
+			if (h === drawn) return false;
+			drawn = h;
 			geometry.setDrawRange(0, k);
-			head.position.fromArray(pos, (k - 1) * 3);
+			head.position.fromArray(pos, h * 3);
 			return true;
 		});
-		scene.seek(DRAW * 0.6);
+		scene.seek(resumeAt);
 		const stop = runWhileVisible(host, scene);
 		return () => {
 			stop();
+			resumeAt = scene.elapsed;
+			resumeCam.copy(view.camera.position);
 			scene.destroy(); // ThreeNode frees the geometry, materials and GL context
 		};
 	}, [themeKey]);

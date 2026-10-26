@@ -159,7 +159,7 @@ export default function PublicNavbar() {
 				{/* Brand */}
 				<Link
 					href="/"
-					className="font-mono text-lg font-bold tracking-wider text-accent uppercase"
+					className="min-w-0 truncate font-mono text-lg font-bold tracking-wider text-accent uppercase"
 					style={{ textShadow: "var(--shadow-neon-accent)" }}
 				>
 					{SITE.name}
@@ -269,7 +269,7 @@ export default function PublicNavbar() {
 			{isMobileMenuOpen && (
 				<div id="mobile-menu" ref={mobilePanelRef} className="md:hidden border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-md">
 					{renderSearchBar(mobileSearchRef, true)}
-					<div className="mt-3 flex items-center gap-4 border-t border-border-subtle pt-3">
+					<div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border-subtle pt-3">
 						<Link
 							href="/series"
 							className="flex items-center gap-1.5 text-sm font-mono text-text-secondary hover:text-accent transition-colors"

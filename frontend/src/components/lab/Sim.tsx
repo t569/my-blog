@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { Component, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { simById } from "./registry";
 
 /**
@@ -15,6 +15,9 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	lorenz: () => import("./LorenzAttractor"),
 	modular: () => import("./ModularTiling"),
 	delta: () => import("./ModularTerrain"),
+	e4: () => import("./ModularTerrain").then((m) => ({ default: () => <m.default form="e4" /> })),
+	e6: () => import("./ModularTerrain").then((m) => ({ default: () => <m.default form="e6" /> })),
+	jinv: () => import("./ModularTerrain").then((m) => ({ default: () => <m.default form="j" /> })),
 	knots: () => import("./ModularFlow"),
 	torus: () => import("./TorusGeodesics"),
 	h3: () => import("./HyperbolicSpace"),
@@ -23,6 +26,7 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 	nil: () => import("./NilSpace"),
 	sol: () => import("./SolSpace"),
 	blackhole: () => import("./BlackHole"),
+	kerr: () => import("./KerrBlackHole"),
 	flow: () => import("./FlowField"),
 	fluid: () => import("./FluidStir"),
 	life: () => import("./GameOfLife"),
@@ -35,7 +39,44 @@ const LOAD: Record<string, () => Promise<{ default: ComponentType }>> = {
 /** Idle mounts, in page order, one after another. */
 let queue = Promise.resolve();
 
+/** LabStage while it sets up: scenes load after it, so their 3D is made on its shared renderer. */
+let stage: Promise<unknown> = Promise.resolve();
+export const awaitStage = (setUp: Promise<unknown>) => void (stage = setUp);
+/** For a loader: the stage's set-up. */
+export const stageReady = () => stage;
+const loader = (id: string) => {
+	const load = LOAD[id.trim()];
+	return load && (() => stage.then(load));
+};
+
 const Box = ({ aspect }: { aspect: number }) => <div className="w-full rounded-xl bg-bg-surface" style={{ aspectRatio: String(aspect) }} />;
+
+/**
+ * A scene that throws (no WebGL: disabled, or blocked after GPU resets) says so in its box,
+ * instead of taking the page down with it. Errors in its effects land here too. Without an
+ * aspect (a decorative scene, the intro's), it just leaves its place empty.
+ */
+export class Failed extends Component<{ aspect?: number; onFail?: () => void; children: ReactNode }, { error: Error | null }> {
+	state = { error: null as Error | null };
+	static getDerivedStateFromError(error: Error) {
+		return { error };
+	}
+	componentDidCatch() {
+		this.props.onFail?.(); // its Mounted never runs: release the queue here
+	}
+	render() {
+		const { error } = this.state;
+		if (!error) return this.props.children;
+		if (!this.props.aspect) return null;
+		return (
+			<div className="flex w-full items-center justify-center rounded-xl bg-bg-surface p-6 text-center text-sm text-text-secondary" style={{ aspectRatio: String(this.props.aspect) }}>
+				{/webgl/i.test(error.message)
+					? "This one needs WebGL, which this browser has switched off for the page. Reloading usually brings it back."
+					: "This simulation couldn't start here."}
+			</div>
+		);
+	}
+}
 
 /** Rendered after the scene, so its effect runs once the scene's own (the mount) have. */
 function Mounted({ then }: { then: () => void }) {
@@ -66,7 +107,7 @@ export default function Sim({ id }: { id: string }) {
 	// and invisible while the reader is still at the top. Mounted early costs nothing per frame:
 	// every scene pauses while off screen. Scrolling near (below) still mounts it if idle never came.
 	useEffect(() => {
-		const load = LOAD[id.trim()];
+		const load = loader(id);
 		if (!load) return;
 		const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
 		const cancel = window.cancelIdleCallback ?? window.clearTimeout;
@@ -101,7 +142,7 @@ export default function Sim({ id }: { id: string }) {
 	// Scrolled near before its idle turn came: load it now, out of the queue.
 	useEffect(() => {
 		const el = box.current;
-		const load = LOAD[id.trim()];
+		const load = loader(id);
 		if (!el || Scene || !load) return;
 		let live = true;
 		const io = new IntersectionObserver(
@@ -121,10 +162,10 @@ export default function Sim({ id }: { id: string }) {
 	return (
 		<div ref={box} className="w-full">
 			{Scene ? (
-				<>
+				<Failed aspect={sim.aspect} onFail={onMounted}>
 					<Scene.C />
 					<Mounted then={onMounted} />
-				</>
+				</Failed>
 			) : (
 				<Box aspect={sim.aspect} />
 			)}
