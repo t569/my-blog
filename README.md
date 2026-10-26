@@ -138,7 +138,9 @@ The last two go out and come back, the shape of a pulse or a shake. `smooth`,
 ```
 
 Surfaces: `klein8`, `torus`, `sphere`, `mobius`. Curves: `helix`, `torusKnot`,
-`lissajous`. All items share one camera and are depth-sorted together, so a
+`lissajous`. Polyhedra (edges only): `tetrahedron`, `cube`, `octahedron`,
+`cuboctahedron`, `icosahedron`, `dodecahedron`, params `size` (circumradius,
+default 2) and `sx`/`sy`/`sz` to stretch an axis; `draw` reveals the edges. All items share one camera and are depth-sorted together, so a
 curve can pass behind a surface and out again. Omit `distance` for
 orthographic. `steps` sets resolution. Shapes are named, not formula strings,
 because a spec may come from a model and a formula string would be code. In
@@ -346,16 +348,22 @@ driven by the same params as the 2D nodes around it:
 
 | `scene3d` field | |
 |---|---|
-| `camera` | `position`, `target` ([x, y, z]), `fov` |
+| `camera` | `position`, `target` ([x, y, z]), `fov`; `bind` (`position.*`, `target.*`, `fov`); `path: { points, target?, along }`: a flight on a smooth curve, point k of n reached at `along = k / (n - 1)`. A driven camera turns `orbit` off |
 | `orbit` | `true` (default), `false`, or `autoRotate`, `min/maxDistance`, `min/maxPolarAngle` (degrees), `pan`, `zoom` |
-| `environment` | `{ preset: 'studio' \| 'none', intensity }`: soft image-based light, default studio |
+| `environment` | `{ preset: 'studio' \| 'none', intensity }`: soft image-based light, default studio; `src` an .hdr instead (through `resolveAsset`), `background` to show it, `blur` (0–1), `rotation` (degrees) |
+| `fog` | `{ color, near, far }`: distance fog |
+| `exposure` | tone mapping exposure, default 1 |
+| `finish` | `{ grain, vignette, aberration }`: film grain, vignette and colour fringes in one pass after tone mapping; loads like bloom |
 | `shadows` | `soft` (default), `sharp`, `none`; `floor: { shadow, size }` or `false` |
 | `lights` | ≤ 16 of `directional`, `point`, `spot`, `ambient`, `hemisphere`; ≤ 4 cast shadows; `bind` (`intensity`, `position.*`), `visible_when` |
-| `objects` | ≤ 500 of `model`, `box` (`radius` rounds it), `sphere`, `cylinder`, `plane`, `torus`, `group` (`merge: true` for static detail) |
-| per object | `position`, `rotation` (degrees), `scale`, `castShadow`, `receiveShadow`, `bind` (`position.*`, `rotation.*`, `scale`), `visible_when`, `on_click` |
-| `model` | `src`, `fit` + `fitAxis`, `center`, `variant`, `variant_by`, `animation` |
+| `objects` | ≤ 500 of `model`, `box` (`radius` rounds it), `sphere`, `cylinder`, `plane`, `torus`, `particles`, `instances`, `group` (`merge: true` for static detail) |
+| per object | `position`, `rotation` (degrees), `scale`, `castShadow`, `receiveShadow`, `bind` (`position.*`, `rotation.*`, `scale`), `visible_when`, `on_click`, `on_hover` (params set while hovered, restored on leave) |
+| `model` | `src`, `fit` + `fitAxis`, `center`, `variant`, `variant_by`, `animation`; `parts: { name: { bind, visible_when, material } }` drives named nodes inside the model, `bind` as offsets from each part's rest pose |
+| `instances` | `count` (≤ 20 000 per scene), `shape` (`sphere`, `box`, `cylinder`), `size`, `jitter`, `scatter: { shape: heap \| disc \| box, radius, height, size }`, `seed`, `colors`, `material`; `fall: { height, speed, spin }` drops and tumbles them on the GPU: grains, seeds, spices |
+| `particles` | `count` (≤ 50 000 per scene), `radius`, `shape` (`disc`, `shell`), `size`, `speed`, `colors` (≤ 8): glowing points circling the y axis, moved on the GPU as a function of time, so they seek and cost no CPU per frame |
+| `bloom` | `{ strength, radius, threshold }`: glow, as below; the code loads only when set |
 | `material` | `color`, `color_by`, `roughness`, `metalness`, `emissive`, `emissiveIntensity`, `opacity`, `clearcoat`, `transmission`, `flatShading`, `side` |
-| `quality`, `layer`, `render` | `auto`/`high`/`low`; `overlay`/`inline`; `demand`/`always` (see below) |
+| `quality`, `layer`, `render` | `auto`/`high`/`low`; `overlay`/`inline`; `demand`/`always` (see below); `minResolution` (0.25–1) |
 
 Model URLs pass through `parseScene(spec, mount, { resolveAsset })`; without
 one, only same-origin and relative URLs load, so a spec from a stranger can't
@@ -382,20 +390,67 @@ view.onFrame((dt) => { spinner.rotation.y += dt; return true; }); // true = I mo
   camera change (shadows reused). Controls, resizes and `scene3d` bindings do it
   for you. `render: 'always'` opts out.
 - **Adaptive resolution** (`quality: 'auto'`): renders fewer pixels while frames
-  come back slow, never below 0.75 real pixels per CSS pixel, and draws one sharp
-  frame as soon as motion settles.
+  come back slow, never below 0.75 real pixels per CSS pixel (`minResolution`
+  lowers it for fill-bound shaders), and sharpens as soon as motion settles —
+  in steps, each taken only if the last frame's cost says it's affordable, so a
+  view whose sharp frame would take seconds stops short rather than lose the
+  GPU context.
+- **Input at low resolution.** Drags, wheels and keys render in bursts the
+  governor can't judge; call `view.moving()` from such a handler to draw at the
+  floor while it continues and sharpen when it stops. (Orbit is handled already.)
 - **Fewer draw calls.** `mergeStatic(part)` merges meshes sharing a material,
   within a part: less CPU per frame, which matters most on weaker devices.
 - **Compressed models.** Meshopt, KTX2 and Draco glTFs load; each decoder is
   fetched only when a file needs it. KTX2 and Draco need their decoder files
   hosted: `configureLoaders({ ktx2TranscoderPath, dracoDecoderPath })` (three
   ships both under `examples/jsm/libs/`). Parsed models are cached per URL.
+- **No first-sight stalls.** `view.warm()` compiles every shader and uploads every
+  texture in the world up front, hidden objects and ones the camera hasn't faced
+  yet included; `scene3d` does it before `ready` resolves. Otherwise each would
+  stall the frame it first appears in, mid-scroll.
+- **Resolution changes are cheap or rare.** Shared views change by viewport. A
+  view with its own canvas reallocates on each change, so it changes at most
+  every 500 ms, and with bloom or a `finish` only the composer resizes (its last
+  pass scales the frame up into a canvas that keeps its size). The governor
+  drops resolution only when the GPU timer says the GPU is the bottleneck.
 - **Pauses off screen**; frees GPU memory and its WebGL context on destroy.
+- **Glow on request.** `bloom: { strength, radius, threshold }` bleeds light
+  from anything brighter than `threshold` (three's UnrealBloomPass). The
+  post-processing code is imported only when set, so views without it pay
+  nothing; it follows the adaptive resolution like the plain render.
+- **Your own passes.** `view.addPass(pass)` adds any three.js `Pass` to the
+  same composer, in linear light after bloom and before tone mapping and the
+  `finish`. The view disposes it with itself.
 
 **Layering.** By default (`layer: 'overlay'`) the canvas sits under the SVG
 and every SVG node draws on top of the 3D view: labels, hotspots and controls
 over a product. It measured smoother than a canvas inside the SVG. Use
 `layer: 'inline'` when an SVG node must sit *under* the 3D view in array order.
+
+**Many views, one context.** Browsers allow about 16 WebGL contexts per page,
+and each one costs 150–250 ms to create. A page full of views can share one:
+set `ThreeNode.sharedRenderer` to your own `WebGLRenderer` before the views
+are made. Each view then draws into a render target instead of a canvas of its
+own. Its `canvas` still sits where it always did, transparent, as its box for
+layout and pointer events, and the view's opaque background is moved to
+`view.background` (a CSS colour). The host composites every view in
+`ThreeNode.shared` into the box where `view.canvas` sits, painting the
+background under `view.output`, and redraws only when `view.version` or a box
+has changed. `output` holds final colours, premultiplied: tone-mapped,
+encoded, and blended exactly as the view's own canvas would have been, so
+the host copies it and never converts it. It is half float and not clamped:
+clamp it to 0–1 as a canvas would, or additive layers leave alpha above 1.
+Snap each box to device pixels the way the browser snaps a canvas (corner
+rounded, then size), or fine detail lands a pixel off. The host owns the
+renderer, and destroying a view never disposes it.
+
+A shared renderer's state belongs to whoever drew last, so a view's clear
+colour goes through `view.setClearColor(colour, alpha)`, not the renderer's.
+
+Composite from `ThreeNode.onDraw` (coalesced, e.g. in a microtask) as well as
+from your own animation frame: views draw in their animation frames, after a
+host's that was registered first, so a host compositing only there shows each
+view's previous frame.
 
 ### `@t569/scene-engine/dicebear`
 

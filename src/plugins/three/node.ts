@@ -18,9 +18,13 @@
  * - By default the canvas is an overlay under the SVG rather than inside a
  *   `<foreignObject>`: measured smoother (a third of the janky frames) and it
  *   avoids Safari's foreignObject bugs. `layer: 'inline'` keeps the old way.
+ * - Shared mode (`ThreeNode.sharedRenderer`): many views, one WebGL context.
+ *   Each node draws into a render target; a host composites them. See there.
  */
 import {
   ACESFilmicToneMapping,
+  Color,
+  HalfFloatType,
   Matrix4,
   Mesh,
   Object3D,
@@ -34,13 +38,17 @@ import {
   VSMShadowMap,
   Vector2,
   Vector3,
+  WebGLRenderTarget,
   WebGLRenderer,
+  type ColorRepresentation,
   type Intersection,
   type Material,
   type Texture,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import type { Pass } from 'three/addons/postprocessing/Pass.js';
+import { FinishShader, type FinishOptions } from './finish.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BufferGeometry } from 'three';
 import { BaseObject } from '../../objects.ts';
@@ -70,7 +78,35 @@ export interface ThreeOptions extends BaseNodeSpec {
   quality?: Quality;
   /** Cap on device pixel ratio. Default 2: a 3× phone would otherwise render 9× the pixels. */
   maxPixelRatio?: number;
+  /**
+   * The lowest resolution `auto` may drop to while moving, in real pixels per CSS pixel.
+   * Default 0.75. Lower suits per-pixel shaders (fractals, ray marching), where cost is
+   * all fill rate and motion hides the softness; the settled frame is always sharp.
+   */
+  minResolution?: number;
+  /**
+   * Glow: bright parts bleed light (three's UnrealBloomPass). The post-processing code is
+   * imported only when this is set, so scenes without it pay nothing; until it arrives,
+   * frames draw plainly. `threshold` is the luminance (0–1) above which things glow.
+   */
+  bloom?: { strength?: number; radius?: number; threshold?: number };
+  /** Film grain, vignette and colour fringes, after tone mapping, in one pass. Loads like bloom. */
+  finish?: FinishOptions;
+  /** Tone mapping exposure (ACES filmic). Default 1. */
+  exposure?: number;
 }
+
+/** The part of three's EffectComposer this node uses. */
+interface Composer {
+  render(): void;
+  /** The finished frame, when it renders off screen (shared mode). */
+  readonly texture: Texture;
+  /** Size and pixel ratio together: every pass reallocates its targets on a resize, so one, not two. */
+  resize(w: number, h: number, ratio: number): void;
+  dispose(): void;
+}
+type EffectComposer = import('three/addons/postprocessing/EffectComposer.js').EffectComposer;
+type ShaderPass = import('three/addons/postprocessing/ShaderPass.js').ShaderPass;
 
 export type FrameFn = (dt: number, elapsed: number) => boolean | void;
 
@@ -82,6 +118,35 @@ export type FrameFn = (dt: number, elapsed: number) => boolean | void;
  * raises it again after a run of good frames. Hysteresis stops it hunting:
  * after a drop it wants twice the evidence before trying to go back up. Pure.
  */
+const GOVERNOR_BUDGET = 1000 / 50;
+
+/**
+ * The display's frame period: the least gap between animation frames, from when the first view is
+ * made. A 30 Hz display (or a browser held there, as on battery saver) can never give a frame inside a
+ * 60 Hz budget, and every view would sit at its lowest resolution however cheap it was.
+ *
+ * Taken after 30 frames, then lowered by any shorter gap over the next ten seconds or so: the first
+ * view is made while the page is busiest (models parsing, shaders linking), and a page whose first 30
+ * frames all ran at 40 ms read as a 25 Hz display, so its governor allowed 48 ms a frame and never
+ * lowered the resolution. A gap can't be shorter than the display's period, so lowering is always safe.
+ */
+let framePeriod = 1000 / 60;
+let periodProbed = false;
+function probeFramePeriod(): void {
+  if (periodProbed || typeof requestAnimationFrame === 'undefined') return;
+  periodProbed = true;
+  let last = 0;
+  let n = 0;
+  let least = Infinity;
+  const tick = (t: number) => {
+    if (last) least = Math.min(least, t - last);
+    last = t;
+    if (++n >= 30 && least > 4 && least < 100) framePeriod = least;
+    if (n < 600) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 export class ResolutionGovernor {
   scale = 1;
   private window: number[] = [];
@@ -91,7 +156,7 @@ export class ResolutionGovernor {
   constructor(
     readonly min = 0.5,
     /** Milliseconds a frame may take: a little over 60 Hz, so vsync itself reads as good. */
-    readonly budget = 1000 / 50,
+    public budget = GOVERNOR_BUDGET,
     readonly size = 20,
   ) {}
 
@@ -99,11 +164,15 @@ export class ResolutionGovernor {
   sample(ms: number): boolean {
     if (!(ms > 0) || ms > 250) return false; // a stall or a tab switch, not a signal
     this.window.push(ms);
-    if (this.window.length < this.size) return false;
     const avg = this.window.reduce((a, b) => a + b, 0) / this.window.length;
+    // Far over budget, three frames are evidence enough: at 200 ms a frame, a full window is 4 s of stalls.
+    const far = this.window.length >= 3 && avg > this.budget * 3;
+    if (this.window.length < this.size && !far) return false;
     this.window.length = 0;
     if (avg > this.budget * 1.15 && this.scale > this.min) {
-      this.scale = Math.max(this.min, Math.round(this.scale * 0.8 * 100) / 100);
+      // Cost goes with the pixel count, the scale squared: far over, straight to where it would fit.
+      const fit = far ? Math.min(0.8, Math.sqrt(this.budget / avg)) : 0.8;
+      this.scale = Math.max(this.min, Math.round(this.scale * fit * 100) / 100);
       this.good = 0;
       this.need = 6;
       return true;
@@ -116,6 +185,28 @@ export class ResolutionGovernor {
     }
     return false;
   }
+}
+
+/**
+ * What the governor hears about a frame: the gap the reader saw, unless the GPU timer says the GPU
+ * spent under 40% of it drawing. Then the frame was late for some other reason (a busy main thread, a
+ * browser holding the page at 30 Hz), fewer pixels would not have made it sooner, and lowering the
+ * resolution only blurs the picture: a phone page at 4 ms of GPU work in 33 ms frames sat at half
+ * resolution. The margin is for drivers whose timers under-report (ANGLE on Direct3D 11). Pure.
+ */
+export function frameSignal(gap: number, gpu: number | null): number {
+  return gpu !== null && gpu > 0 && gpu < gap * 0.4 ? gpu : gap;
+}
+
+/**
+ * Is the camera gliding to a stop: moved since the last frame, but only a little (under 0.003 rad, and
+ * 0.3% of its distance from the origin)? Still is not crawling: a quaternion's angle to itself comes
+ * back as ~1e-8, not 0, so "moved" means more than float noise. Reading that noise as a crawl drew
+ * every frame of a still camera over animated content sharp, and the governor never saw them. Pure.
+ */
+export function crawling(turn: number, shift: number, distance: number): boolean {
+  const small = 0.003 * Math.max(1, distance);
+  return (turn > 1e-6 || shift > 1e-6 * Math.max(1, distance)) && turn < 0.003 && shift < small;
 }
 
 /**
@@ -296,14 +387,37 @@ export function mergeStatic(root: Object3D, keep: (o: Object3D) => boolean = () 
   return { before, after: before - merged };
 }
 
-/** Free an object tree's GPU memory: geometries, materials and their textures. */
+/**
+ * Free an object tree's GPU memory: geometries, materials and their textures.
+ * A model copy's geometry, materials and textures belong to the cached glTF
+ * (other copies, the next load of that URL), so those are left alone.
+ */
 export function disposeObject(root: Object3D): void {
+  const cached = new Set<unknown>();
+  const gltfs: GLTF[] = [];
+  root.traverse((o) => {
+    const g = o.userData.gltf as GLTF | undefined;
+    if (g && !gltfs.includes(g)) gltfs.push(g);
+  });
+  for (const g of gltfs) g.scene.traverse((o) => cached.add((o as Mesh).geometry));
+  // The parser records every material and texture it made: variants and assignFinalMaterial's clones too.
+  const isCached = (x: unknown) => cached.has(x) || gltfs.some((g) => g.parser.associations.has(x as Material));
   root.traverse((o) => {
     const mesh = o as Mesh;
-    mesh.geometry?.dispose();
+    if (!isCached(mesh.geometry)) mesh.geometry?.dispose();
+    // Its per-copy matrices and colours are buffers of their own, freed only by its own dispose.
+    if ((o as Object3D & { isInstancedMesh?: boolean }).isInstancedMesh) (o as unknown as { dispose(): void }).dispose();
+    // A light's shadow map: a shared context would keep it (2048² for a sun) after the scene is gone.
+    (o as Object3D & { shadow?: { dispose(): void } }).shadow?.dispose();
     const mats = mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : [];
     for (const m of mats as Material[]) {
-      for (const v of Object.values(m)) if ((v as Texture | null)?.isTexture) (v as Texture).dispose();
+      if (isCached(m)) continue;
+      // A material cloned from a cached one still shares its textures.
+      for (const v of Object.values(m)) if ((v as Texture | null)?.isTexture && !isCached(v)) (v as Texture).dispose();
+      // A shader's textures (a palette, a reference orbit) live in its uniforms. With a context per
+      // node, losing the context freed them anyway; a shared context keeps them until disposed.
+      const uniforms = (m as Material & { uniforms?: Record<string, { value: unknown } | undefined> }).uniforms ?? {};
+      for (const u of Object.values(uniforms)) if ((u?.value as Texture | null)?.isTexture) (u!.value as Texture).dispose();
       m.dispose();
     }
   });
@@ -312,9 +426,52 @@ export function disposeObject(root: Object3D): void {
 /* -------------------------------------------------------------------- node */
 
 const SETTLE_MS = 150;
+/** A sharpening step is taken only if its predicted cost stays under this. */
+const SHARPEN_MS = 250;
+/** Shared mode: one GPU queue for every view and the composite, so a sharpening frame stalls them all. */
+const SHARPEN_SHARED_MS = 50;
+/**
+ * A canvas or composer view may change resolution at most this often: each change reallocates its
+ * buffers (tens of ms with MSAA and bloom). Unlimited, the tail of every eased scroll flipped between
+ * sharp (a camera gliding to a stop) and reduced (moving) frame by frame: 104 reallocations in ten
+ * seconds of wheel scrolling, each a hitch. Shared views change by viewport, for free, and aren't held.
+ */
+const RESIZE_MS = 500;
 let hostRuleAdded = false;
 
 export class ThreeNode extends BaseObject {
+  /**
+   * Many views, one WebGL context. Browsers allow ~16 contexts a page, and each costs 150–250 ms
+   * to create. While a host sets this, new nodes borrow the renderer instead of making their own:
+   * each draws into its own render target (`output`), and the host composites the targets onto its
+   * canvas, wherever each node's `canvas` sits on screen. That canvas then gets no context: it stays
+   * as the node's box, for layout and pointer events, and is transparent. The host owns the renderer.
+   */
+  static sharedRenderer: WebGLRenderer | null = null;
+  /** The live nodes drawing into `sharedRenderer`, for the host to composite. */
+  static readonly shared = new Set<ThreeNode>();
+  /**
+   * Shared mode: called each time a node has drawn a frame. A host compositing from its own
+   * animation frame would otherwise show the frame before (its callback runs ahead of the views'),
+   * so a drag answers a frame late; compositing here shows it in the frame it was drawn.
+   */
+  static onDraw: (() => void) | null = null;
+  /**
+   * A ceiling on every view's pixel ratio, under each one's own `maxPixelRatio`: for a host that
+   * knows the device can't afford what the screen offers (a phone at 3× with a phone's GPU, where
+   * a full-screen view at 2× is millions of pixels a frame). Null: no ceiling.
+   */
+  static pixelRatioCap: number | null = null;
+  /** Ignore every view's `bloom`: for a host measuring what the glow costs, or a device that can't afford it. */
+  static noBloom = false;
+
+  /**
+   * Keep the last frame and draw nothing new: for a host taking the view away (dissolving it into
+   * another), where a still frame can't be told from a moving one and the GPU is wanted elsewhere.
+   * The scene's clock runs on; clear it and the next frame catches up.
+   */
+  hold = false;
+
   /** The three.js scene. Named `world` so it can't be confused with the engine's `Scene`. */
   readonly world = new World();
   readonly camera: PerspectiveCamera;
@@ -336,16 +493,51 @@ export class ThreeNode extends BaseObject {
   private observer: IntersectionObserver | null = null;
   private cssSize = { w: 0, h: 0 };
   private ratio = 0;
+  /** The canvas's own size and ratio as last set, and when the resolution last changed. */
+  private canvasAt = '';
+  private resizedAt = 0;
   private placed = '';
   private lastOpacity = '';
   private streak = 0;
   private lastRender = 0;
   private lowRes = false;
+  private movingUntil = 0;
+  private drawnScale = 1;
+  private drawnAt = 0;
+  /** The last drawn frame's cost in ms: GPU time where timer queries exist, else how long it held up the next. */
+  private lastCost = 0;
+  /** EXT_disjoint_timer_query_webgl2, where the browser exposes it; queries awaiting results, oldest first. */
+  private timer: { gl: WebGL2RenderingContext; ext: { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }; queries: WebGLQuery[] } | null = null;
   private readonly lastQ = new Quaternion();
   private readonly lastP = new Vector3();
   private restore: Array<() => void> = [];
   private backdrop: HTMLDivElement | null = null;
   private backdropAt = '';
+  private composer: Composer | null = null;
+  private composing: Promise<void> | null = null;
+  private fx: { composer: EffectComposer; output: Pass; finish: ShaderPass | null } | null = null;
+  /** Host passes (`addPass`), drawn in linear light between the scene (and bloom) and tone mapping. */
+  private readonly extra: Pass[] = [];
+  /** Set on destroy: an import that lands afterwards must not touch the lost context. */
+  protected destroyed = false;
+  /** Shared mode: where frames are drawn, when there is no composer. */
+  private readonly target: WebGLRenderTarget | null = null;
+  /** The texture the last frame went into: the target's, or the composer's once bloom has arrived. */
+  private lastOutput: Texture | null = null;
+  /**
+   * Shared mode: the part of `output` the last frame filled, from its bottom-left corner. Below 1
+   * when it was drawn at reduced resolution; a host samples `uv * outputScale`.
+   */
+  readonly outputScale = new Vector2(1, 1);
+  /** Shared mode: bumped on every drawn frame, so a host composites only when something changed. */
+  version = 0;
+  /**
+   * Shared mode: the CSS colour that was behind the canvas (the SVG's background, else the mount's),
+   * lifted off so the host's canvas shows through. The host paints it under `output`.
+   */
+  background = '';
+  /** This view's clear colour and alpha (see `setClearColor`). */
+  private clear: [Color, number] = [new Color(0x000000), 0];
 
   constructor(private readonly opts: ThreeOptions) {
     const g = document.createElementNS(SVG_NS, 'g');
@@ -380,18 +572,195 @@ export class ThreeNode extends BaseObject {
       fo.appendChild(this.canvas);
     }
 
-    this.renderer = new WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.shadowMap.enabled = this.shadowMode !== 'none';
-    this.renderer.shadowMap.type = this.shadowMode === 'soft' ? VSMShadowMap : PCFShadowMap;
-    // We decide when shadows are redrawn (see `invalidate`), except in `always` mode.
-    this.renderer.shadowMap.autoUpdate = opts.render === 'always';
+    const shared = ThreeNode.sharedRenderer;
+    // A view with post-processing antialiases in the composer's own target and only copies to its
+    // canvas at the end: a multisampled canvas would be memory and bandwidth for nothing.
+    const composed = !!((opts.bloom && !ThreeNode.noBloom) || opts.finish);
+    this.renderer = shared ?? new WebGLRenderer({ canvas: this.canvas, antialias: !composed, alpha: true, powerPreference: 'high-performance' });
+    if (shared) {
+      // three tone-maps and encodes only into the screen and XR targets; into any other target it
+      // writes linear light, and translucent layers then blend in linear space: a different picture,
+      // that no conversion afterwards can undo. Marked as an output, the target gets exactly what a
+      // canvas would. Half float, so the encoded values are stored as they are (no hardware sRGB).
+      this.target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4, colorSpace: SRGBColorSpace });
+      (this.target as WebGLRenderTarget & { isXRRenderTarget: boolean }).isXRRenderTarget = true;
+      ThreeNode.shared.add(this);
+    }
+    this.configure();
+
+    const gl = this.renderer.getContext();
+    const ext = 'createQuery' in gl ? gl.getExtension('EXT_disjoint_timer_query_webgl2') : null;
+    if (ext) this.timer = { gl: gl as WebGL2RenderingContext, ext, queries: [] };
 
     this.camera = new PerspectiveCamera(opts.fov ?? 45, w / h, 0.05, 500);
-    // The floor is in real pixels: never below 0.75 per CSS pixel. On a 2x phone that is half
-    // resolution and looks fine; on a 1x laptop, half would be visibly soft.
-    this.governor = new ResolutionGovernor(Math.min(1, Math.max(0.5, 0.75 / this.baseRatio())));
+    // The floor is in real pixels: by default never below 0.75 per CSS pixel. On a 2x phone that
+    // is half resolution and looks fine; on a 1x laptop, half would be visibly soft.
+    const floor = opts.minResolution ?? 0.75;
+    this.governor = new ResolutionGovernor(Math.min(1, Math.max(opts.minResolution ? 0.1 : 0.5, floor / this.baseRatio())));
+    probeFramePeriod();
+    if ((opts.bloom && !ThreeNode.noBloom) || opts.finish) void this.loadComposer();
+  }
+
+  /** Renderer settings. Shared mode sets them again before each frame: the other nodes have theirs. */
+  private configure(): void {
+    const r = this.renderer;
+    // A shared renderer comes with the host's settings; without a clear, a target keeps its last
+    // frame and translucent layers pile up a little more each frame.
+    r.autoClear = true;
+    r.outputColorSpace = SRGBColorSpace;
+    r.toneMapping = ACESFilmicToneMapping;
+    r.toneMappingExposure = this.opts.exposure ?? 1;
+    r.setClearColor(...this.clear);
+    r.shadowMap.enabled = this.shadowMode !== 'none';
+    r.shadowMap.type = this.shadowMode === 'soft' ? VSMShadowMap : PCFShadowMap;
+    // We decide when shadows are redrawn (see `invalidate`), except in `always` mode.
+    r.shadowMap.autoUpdate = this.opts.render === 'always';
+  }
+
+  /**
+   * Set the clear colour through this, not `renderer.setClearColor`: a shared renderer's clear
+   * colour belongs to whoever drew last, so each view keeps its own and puts it back per frame.
+   */
+  setClearColor(color: ColorRepresentation, alpha = 1): void {
+    this.clear = [new Color(color), alpha];
+    this.renderer.setClearColor(color, alpha);
+  }
+
+  /**
+   * Shared mode: the last drawn frame, for the host to composite. Null until one is drawn, and when
+   * not shared. Final colours, premultiplied, as the node's own canvas would have shown them.
+   */
+  get output(): Texture | null {
+    return this.lastOutput;
+  }
+
+  /**
+   * Get everything in the world onto the GPU before it is needed: every shader compiled and every
+   * texture uploaded, hidden objects and ones the camera hasn't turned to yet included. Left to the
+   * first frame that shows them, each program link stalls that frame 100–200 ms and each texture its
+   * upload: mid-scroll, when the camera first faces a pot or a cloud appears (a one-second stall on a
+   * restaurant page). The programs are the ones the view will draw with: its own renderer settings,
+   * into its target, or (with bloom or a finish) into a target like the composer's, so it waits for
+   * the composer's code first. Parallel compilation where the driver has it. scene3d calls this before
+   * `ready` resolves; call it yourself after building a world by code. Content added later compiles
+   * when drawn.
+   */
+  async warm(): Promise<void> {
+    await this.composing;
+    if (this.destroyed) return;
+    const r = this.renderer;
+    const prev = r.getRenderTarget();
+    this.configure();
+    // Bloom draws the scene into the composer's own (plain, linear) targets: any plain target keys alike.
+    const plain = this.composer ? new WebGLRenderTarget(1, 1, { type: HalfFloatType }) : null;
+    r.setRenderTarget(plain ?? this.target);
+    const done = r.compileAsync(this.world, this.camera);
+    r.setRenderTarget(prev);
+    const textures = new Set<Texture>();
+    this.world.traverse((o) => {
+      const m = (o as Mesh).material;
+      for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
+        for (const v of Object.values(mat)) if ((v as Texture | null)?.isTexture) textures.add(v as Texture);
+        const uniforms = (mat as Material & { uniforms?: Record<string, { value: unknown } | undefined> }).uniforms ?? {};
+        for (const u of Object.values(uniforms)) if ((u?.value as Texture | null)?.isTexture) textures.add(u!.value as Texture);
+      }
+    });
+    // A render target's texture is already on the GPU; initTexture would only reallocate it.
+    for (const t of textures) if (!(t as Texture & { isRenderTargetTexture?: boolean }).isRenderTargetTexture) r.initTexture(t);
+    try {
+      await done;
+    } catch {
+      /* a program that fails will say so when drawn */
+    }
+    // Shared mode: then one frame into a 1x1 target, which uploads the geometry too (tens of MB for a
+    // dense mesh, otherwise mid-transition). Its pixel is not shown. A view of its own needn't: its
+    // canvas draws again on the next frame anyway.
+    if (this.target && !this.destroyed && !this.version) {
+      const before = r.getRenderTarget();
+      this.configure();
+      r.setRenderTarget(plain ?? this.target);
+      r.render(this.world, this.camera);
+      r.setRenderTarget(before);
+    }
+    plain?.dispose();
+  }
+
+  /**
+   * Add a post-processing pass (three's `Pass`): it runs on the scene in linear light, after bloom
+   * and before tone mapping and the finish. The composer code loads on the first call, as for bloom;
+   * frames draw plainly until it arrives. The node disposes the pass with itself.
+   */
+  addPass(pass: Pass): void {
+    this.extra.push(pass);
+    const fx = this.fx;
+    if (fx) fx.composer.insertPass(pass, fx.composer.passes.indexOf(fx.output));
+    else void this.loadComposer();
+    this.invalidate('view');
+  }
+
+  private loadComposer(): Promise<void> {
+    return (this.composing ??= this.buildComposer());
+  }
+
+  private async buildComposer(): Promise<void> {
+    const bloomOpts = ThreeNode.noBloom ? undefined : this.opts.bloom;
+    const [{ EffectComposer }, { RenderPass }, { OutputPass }, bloomMod, shaderMod] = await Promise.all([
+      import('three/addons/postprocessing/EffectComposer.js'),
+      import('three/addons/postprocessing/RenderPass.js'),
+      import('three/addons/postprocessing/OutputPass.js'),
+      bloomOpts ? import('three/addons/postprocessing/UnrealBloomPass.js') : null,
+      this.opts.finish ? import('three/addons/postprocessing/ShaderPass.js') : null,
+    ]);
+    if (this.destroyed) return;
+    // Multisampled, like the plain path's target: the default composer target has none, so every
+    // bloom scene lost its antialiasing (worst on thin lines at reduced resolution).
+    const composer = new EffectComposer(this.renderer, new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4 }));
+    composer.renderToScreen = !this.target;
+    composer.addPass(new RenderPass(this.world, this.camera));
+    if (bloomMod && bloomOpts) {
+      const { strength = 0.8, radius = 0.4, threshold = 0.6 } = bloomOpts;
+      composer.addPass(new bloomMod.UnrealBloomPass(new Vector2(1, 1), strength, radius, threshold));
+    }
+    for (const p of this.extra) composer.addPass(p);
+    const output = new OutputPass(); // tone mapping and sRGB happen here, after the glow
+    composer.addPass(output);
+    let finish: ShaderPass | null = null;
+    if (shaderMod && this.opts.finish) {
+      finish = new shaderMod.ShaderPass(FinishShader);
+      const { grain = 0, vignette = 0, aberration = 0 } = this.opts.finish;
+      finish.uniforms.uGrain!.value = grain;
+      finish.uniforms.uVignette!.value = vignette;
+      finish.uniforms.uAberration!.value = aberration;
+      composer.addPass(finish);
+    }
+    this.fx = { composer, output, finish };
+    this.composer = {
+      render: () => composer.render(),
+      get texture() {
+        return composer.readBuffer.texture;
+      },
+      resize: (w, h, r) => {
+        // setPixelRatio() is itself a full resize; setting the ratio first makes setSize the only one.
+        (composer as unknown as { _pixelRatio: number })._pixelRatio = r;
+        composer.setSize(w, h);
+      },
+      dispose: () => {
+        for (const p of composer.passes) p.dispose();
+        composer.dispose();
+      },
+    };
+    this.ratio = 0; // size the composer on the next frame
+    this.invalidate('view');
+    this.repaint();
+  }
+
+  /**
+   * Something arrived asynchronously (the bloom code, a model). A playing scene draws it on its next
+   * frame; a stopped one (reduced motion: one `seek`, then nothing) never would, so the still frame
+   * would keep the plain picture. Paint this node now, at the scene's own time, as a seek would.
+   */
+  protected repaint(): void {
+    if (this.scene && !this.scene.playing && !this.destroyed) this.onUpdate(0, this.scene.elapsed);
   }
 
   override onMount(scene: SceneLike): void {
@@ -416,8 +785,17 @@ export class ThreeNode extends BaseObject {
           document.head.appendChild(style);
           hostRuleAdded = true;
         }
+        // Shared: the host's canvas is behind the page, so nothing here may be opaque. The colour
+        // goes to the host to paint instead (the SVG's first: it's the one over the canvas).
+        if (this.target) {
+          const mountBg = mount.style.background;
+          this.background = prev.bg || getComputedStyle(mount).backgroundColor;
+          svg.style.background = 'transparent';
+          mount.style.background = 'transparent';
+          this.restore.push(() => (mount.style.background = mountBg));
+        }
         // An opaque SVG background would hide the canvas under it: it moves to a layer behind both, the SVG's size.
-        if (prev.bg) {
+        else if (prev.bg) {
           this.backdrop = document.createElement('div');
           this.backdrop.style.cssText = `position:absolute;pointer-events:none;background:${prev.bg};`;
           svg.style.background = 'transparent';
@@ -438,7 +816,10 @@ export class ThreeNode extends BaseObject {
     if (typeof IntersectionObserver !== 'undefined') {
       this.observer = new IntersectionObserver(([e]) => {
         this.onScreen = e?.isIntersecting ?? true;
-        if (this.onScreen) this.needsRender = true;
+        if (!this.onScreen) return;
+        this.needsRender = true;
+        // A stopped scene that mounted off screen skipped its one frame; nothing would draw it now.
+        this.repaint();
       });
       this.observer.observe(this.canvas);
     }
@@ -448,6 +829,25 @@ export class ThreeNode extends BaseObject {
    * Ask for a frame. `world`: something in the scene changed (shadows are
    * redrawn too). `view`: only the camera, a colour or a light's brightness did.
    */
+  /**
+   * Code-driven motion (a drag, a wheel, a key) that isn't OrbitControls: draw a frame now, at the
+   * resolution floor, and keep that resolution until `ms` after the last call; then one sharp frame.
+   * Input renders in bursts, so the governor, which needs a run of frames to judge, never sees it.
+   */
+  /**
+   * The last drawn frame's cost in ms: measured GPU time where the browser has timer queries (a
+   * frame or two late), else how long it held up the next frame. For work that adapts to the device
+   * (an iteration budget, a sample count). Changes only when a new measurement arrives.
+   */
+  get frameCost(): number {
+    return this.lastCost;
+  }
+
+  moving(ms = 200): void {
+    this.movingUntil = performance.now() + ms;
+    this.invalidate('view');
+  }
+
   invalidate(what: 'world' | 'view' = 'world'): void {
     this.needsRender = true;
     if (what === 'world') this.needsShadows = true;
@@ -477,8 +877,25 @@ export class ThreeNode extends BaseObject {
 
   override onUpdate(dt: number, elapsed: number): void {
     super.onUpdate(dt, elapsed);
+    if (this.drawnAt) {
+      if (!this.timer) this.lastCost = performance.now() - this.drawnAt;
+      this.drawnAt = 0;
+    }
+    // Timer results arrive a frame or two late; a disjoint (clock reset) one is discarded.
+    const t = this.timer;
+    while (t?.queries[0] && t.gl.getQueryParameter(t.queries[0], t.gl.QUERY_RESULT_AVAILABLE)) {
+      const q = t.queries.shift()!;
+      if (!t.gl.getParameter(t.ext.GPU_DISJOINT_EXT)) this.lastCost = t.gl.getQueryParameter(q, t.gl.QUERY_RESULT) / 1e6;
+      t.gl.deleteQuery(q);
+    }
     for (const fn of this.frames) if (fn(dt, elapsed) === true) this.invalidate('world');
-    if (!this.onScreen) return;
+    // Not laid out (display: none somewhere above): getScreenCTM still answers, with an identity
+    // matrix, so fit() would place and size the canvas wrongly and the frame would be drawn at that
+    // size. A host showing it later would show that frame there until the next one.
+    if (!this.onScreen || this.hold || !this.canvas.getClientRects().length) return;
+    // The clock writes the transform after onUpdate; fit() measures it, so write it first. Otherwise a
+    // lone frame (a seek, then paused off screen) leaves the canvas half a box off, over the page.
+    this.applyTransform();
     this.fit();
     const always = this.opts.render === 'always';
     if (this.needsRender || always) {
@@ -487,45 +904,126 @@ export class ThreeNode extends BaseObject {
       // that is when the eye reads detail, so draw it sharp. A still camera over animated
       // content is not a tail; it may need the reduced resolution as much as an orbit does.
       const cam = this.camera;
-      const turn = cam.quaternion.angleTo(this.lastQ);
-      const shift = cam.position.distanceTo(this.lastP);
-      const small = 0.003 * Math.max(1, cam.position.length());
-      const crawl = !this.needsShadows && (turn > 0 || shift > 0) && turn < 0.003 && shift < small;
+      const crawl = !this.needsShadows && crawling(cam.quaternion.angleTo(this.lastQ), cam.position.distanceTo(this.lastP), cam.position.length());
       this.lastQ.copy(cam.quaternion);
       this.lastP.copy(cam.position);
       const busy = this.streak >= 2 && !crawl;
-      if (busy && this.streak > 2) this.governor.sample(now - this.lastRender);
+      // The gap between frames: what the reader sees. (GPU timer queries under-report on some
+      // drivers, ANGLE on Direct3D 11 among them.) Judged against the display's own frame period.
+      this.governor.budget = Math.max(GOVERNOR_BUDGET, framePeriod * 1.2);
+      if (busy && this.streak > 2) this.governor.sample(frameSignal(now - this.lastRender, this.timer ? this.lastCost : null));
       const auto = (this.opts.quality ?? 'auto') !== 'high';
-      this.drawFrame(busy && auto ? this.governor.scale : 1);
+      const moving = auto && now < this.movingUntil;
+      this.drawFrame(moving ? this.governor.min : busy && auto ? this.governor.scale : 1);
       this.lastRender = now;
       this.streak++;
     } else {
       this.streak = 0;
-      // Settled after a burst of reduced-resolution frames: one sharp frame.
-      if (this.lowRes && performance.now() - this.lastRender > SETTLE_MS) this.drawFrame(1);
+      // Settled after reduced-resolution frames: sharpen in steps, each only if the last frame's
+      // cost, scaled by the pixels the step adds, stays affordable. Cheap views reach full
+      // resolution in a few frames; one whose sharp frame would take seconds (a deep fractal)
+      // stops short instead of tripping the GPU watchdog, which kills the context.
+      // Straight to full when that is affordable: each step of a canvas or composer reallocates, and
+      // three steps after every scroll were three hitches just as the picture came to rest.
+      if (this.lowRes && performance.now() - this.lastRender > SETTLE_MS) {
+        const limit = this.target ? SHARPEN_SHARED_MS : SHARPEN_MS;
+        const next = this.lastCost / this.drawnScale ** 2 <= limit ? 1 : Math.min(1, this.drawnScale * 1.6);
+        if (this.lastCost * (next / this.drawnScale) ** 2 <= limit) this.drawFrame(next);
+        else this.lowRes = false; // as sharp as this view affords
+      }
     }
   }
 
   private drawFrame(scale: number): void {
-    this.applyRatio(scale);
+    scale = this.applyRatio(scale);
+    const prev = this.renderer.getRenderTarget();
+    if (this.target) {
+      this.configure();
+      this.renderer.setRenderTarget(this.target);
+    }
     if (this.opts.render !== 'always') this.renderer.shadowMap.needsUpdate = this.needsShadows;
-    this.renderer.render(this.world, this.camera);
+    const t = this.timer;
+    const q = t && t.queries.length < 4 ? t.gl.createQuery() : null;
+    if (q) t!.gl.beginQuery(t!.ext.TIME_ELAPSED_EXT, q);
+    const finish = this.fx?.finish;
+    if (finish) {
+      finish.uniforms.uTime!.value = this.scene?.elapsed ?? 0;
+      // In the output's pixels (the canvas's, at full ratio), so grain keeps its size as resolution moves.
+      const out = this.target ? this.ratio : this.baseRatio();
+      finish.uniforms.uResolution!.value = [Math.max(1, this.cssSize.w * out), Math.max(1, this.cssSize.h * out)];
+    }
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.world, this.camera);
+    if (this.target) {
+      this.renderer.setRenderTarget(prev);
+      this.lastOutput = this.composer?.texture ?? this.target.texture;
+    }
+    this.version++;
+    if (this.target) ThreeNode.onDraw?.();
+    if (q) {
+      t!.gl.endQuery(t!.ext.TIME_ELAPSED_EXT);
+      t!.queries.push(q);
+    }
     this.needsRender = false;
     this.needsShadows = false;
     this.lowRes = scale < 1;
+    this.drawnScale = scale;
+    this.drawnAt = performance.now();
   }
 
   private baseRatio(): number {
     const cap = this.opts.quality === 'low' ? 1 : (this.opts.maxPixelRatio ?? 2);
-    return Math.min(globalThis.devicePixelRatio || 1, cap);
+    return Math.min(globalThis.devicePixelRatio || 1, cap, ThreeNode.pixelRatioCap ?? Infinity);
   }
 
-  private applyRatio(scale: number): void {
-    const ratio = Math.round(this.baseRatio() * scale * 100) / 100;
-    if (ratio === this.ratio) return;
+  /** Size for `scale`; returns the scale actually drawn at. */
+  private applyRatio(scale: number): number {
+    const { w, h } = this.cssSize;
+    const base = this.baseRatio();
+    // Shared, no bloom: the target stays at full size and a reduced frame fills its corner (as
+    // engines do dynamic resolution). Resizing it reallocated a 4x MSAA buffer every scale step.
+    if (this.target && !this.composer) {
+      const fw = Math.max(1, Math.round(w * base));
+      const fh = Math.max(1, Math.round(h * base));
+      if (base !== this.ratio) {
+        this.ratio = base;
+        this.target.setSize(fw, fh);
+      }
+      const sw = Math.max(1, Math.round(fw * scale));
+      const sh = Math.max(1, Math.round(fh * scale));
+      this.target.viewport.set(0, 0, sw, sh);
+      this.target.scissor.set(0, 0, sw, sh);
+      this.target.scissorTest = sw < fw || sh < fh;
+      this.outputScale.set(sw / fw, sh / fh);
+      return scale;
+    }
+    // A canvas or a composer can only be resized, which reallocates: a few levels, not every step,
+    // and not more often than RESIZE_MS (a new size, ratio 0, always goes through).
+    // ponytail: snapped levels; a viewport-aware composer if the resizes still hitch.
+    // Down to the governor's floor: stopping at 0.5 left a heavy bloom scene (a ray-marched black
+    // hole on a phone) unable to shed the cost it was asked to.
+    if (scale < 1) scale = Math.max(this.governor.min, [0.7, 0.5, 0.35, 0.25].find((l) => l <= scale) ?? this.governor.min);
+    this.outputScale.set(1, 1);
+    const ratio = Math.round(base * scale * 100) / 100;
+    if (ratio === this.ratio) return scale;
+    const now = performance.now();
+    if (this.ratio !== 0 && now - this.resizedAt < RESIZE_MS) return this.ratio / base;
     this.ratio = ratio;
-    this.renderer.setPixelRatio(ratio);
-    this.renderer.setSize(this.cssSize.w, this.cssSize.h, false);
+    this.resizedAt = now;
+    // The canvas: with a composer it stays at full resolution, as the composer's last pass draws a
+    // full-window quad into it and so scales a reduced frame up by itself; only the composer resizes.
+    // Without one, the canvas is the frame. (In shared mode it has no context to size.)
+    if (!this.target) {
+      const canvasRatio = this.composer ? base : ratio;
+      const at = `${w}x${h}@${canvasRatio}`;
+      if (at !== this.canvasAt) {
+        this.renderer.setPixelRatio(canvasRatio);
+        this.renderer.setSize(w, h, false);
+        this.canvasAt = at;
+      }
+    }
+    this.composer?.resize(w, h, ratio);
+    return scale;
   }
 
   /**
@@ -606,14 +1104,22 @@ export class ThreeNode extends BaseObject {
   }
 
   override onDestroy(): void {
+    this.destroyed = true;
     this.frames.clear();
     this.observer?.disconnect();
     this.orbitControls?.dispose();
+    if (this.composer) this.composer.dispose();
+    else for (const p of this.extra) p.dispose(); // the composer never arrived to own them
     disposeObject(this.world);
     this.world.environment?.dispose();
-    this.renderer.dispose();
-    // Browsers allow ~16 live WebGL contexts per page; give this one back now, not at GC.
-    this.renderer.forceContextLoss();
+    if (this.target) {
+      this.target.dispose();
+      ThreeNode.shared.delete(this);
+    } else {
+      this.renderer.dispose();
+      // Browsers allow ~16 live WebGL contexts per page; give this one back now, not at GC.
+      this.renderer.forceContextLoss();
+    }
     for (const fn of this.restore.splice(0)) fn();
     super.onDestroy();
   }
