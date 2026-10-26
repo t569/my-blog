@@ -5,7 +5,7 @@ import Lenis from "lenis";
 import "lenis/dist/lenis.css";
 import { prefersReducedMotion } from "@/lib/sceneTheme";
 import { awaitStage } from "./Sim";
-import { setSimplify, simplify } from "./quality";
+import { setMoving, setSimplify, simplify } from "./quality";
 
 /** Fired on window when the stage couldn't set up; `stageFailed` says so to whoever mounts later. */
 export const STAGE_FAILED = "lab-stage-failed";
@@ -87,7 +87,10 @@ void main() {
  * along (0–1). Set every frame of the move by the chapters; null when still.
  */
 let transition: { from: Element | null; to: Element | null; t: number } | null = null;
-export const setTransition = (next: typeof transition) => void (transition = next);
+export const setTransition = (next: typeof transition) => {
+	transition = next;
+	setMoving(next !== null);
+};
 
 /**
  * A move with a 2D scene (SVG, canvas) on either side can't dissolve one scene through the other:
