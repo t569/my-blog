@@ -9,6 +9,7 @@
 import apiClient from "@/lib/apiClient";
 import type {
   AdminStatsResponse,
+  AnalyticsSummary,
   AgentRunListItem,
   AgentRunResponse,
   AgentScheduleResponse,
@@ -469,6 +470,14 @@ export async function adminGetStats(): Promise<AdminStatsResponse> {
   const { data } = await apiClient.get<AdminStatsResponse>(
     "/admin/posts/stats",
   );
+  return data;
+}
+
+/** (Admin) Page views and visitors over the last `days` days. */
+export async function adminGetAnalytics(days: number): Promise<AnalyticsSummary> {
+  const { data } = await apiClient.get<AnalyticsSummary>("/admin/analytics", {
+    params: { days },
+  });
   return data;
 }
 

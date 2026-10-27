@@ -68,12 +68,27 @@ export const SITE = {
    */
   constellation: process.env.NEXT_PUBLIC_SITE_CONSTELLATION === "true",
   /**
+   * Cookieless page-view counting and /admin/analytics. Off by default, so
+   * upstream sends no beacon and has no admin link.
+   */
+  analytics: process.env.NEXT_PUBLIC_SITE_ANALYTICS === "true",
+  /**
    * Home feed layout. "list" is upstream's single column, and the default.
    * "panels" lays posts out like a newspaper page or a comic: the lead story
    * across the top, posts with a picture as tall panels, text posts packed
    * into the gaps around them.
    */
   feed: (process.env.NEXT_PUBLIC_SITE_FEED ?? "list") as "list" | "panels",
+  /**
+   * What agent-authored posts are called in /feed.xml, and so in newsletter
+   * emails: "[Agent] Title". Matches the site's own "✦ AGENT" badge by default.
+   */
+  agentLabel: process.env.NEXT_PUBLIC_SITE_AGENT_LABEL ?? "Agent",
+  /**
+   * Signup page of an RSS-to-email newsletter service (Brevo, Sender, …) that
+   * polls /feed.xml. Unset = no subscribe box anywhere, which is upstream's site.
+   */
+  newsletter: process.env.NEXT_PUBLIC_SITE_NEWSLETTER_URL ?? "",
 } as const;
 
 /**

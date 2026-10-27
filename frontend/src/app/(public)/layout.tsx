@@ -1,7 +1,8 @@
 import PublicNavbar from "@/components/layout/PublicNavbar";
 import PublicFooter from "@/components/layout/PublicFooter";
 import AssistantMount from "@/components/assistant/AssistantMount";
-import { ASSISTANT } from "@/lib/constants";
+import PageViewBeacon from "@/components/layout/PageViewBeacon";
+import { ASSISTANT, SITE } from "@/lib/constants";
 
 export default function PublicLayout({
 	children,
@@ -14,6 +15,7 @@ export default function PublicLayout({
 			<div className="flex-1">{children}</div>
 			<PublicFooter />
 			{ASSISTANT.enabled && <AssistantMount />}
+			{SITE.analytics && <PageViewBeacon />}
 		</div>
 	);
 }

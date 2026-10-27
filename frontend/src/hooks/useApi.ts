@@ -17,6 +17,7 @@ import {
 import { revalidateSite } from "@/lib/revalidate";
 import type {
   AdminStatsResponse,
+  AnalyticsSummary,
   AgentRunListItem,
   FeatureState,
   AgentRunResponse,
@@ -121,6 +122,7 @@ export const queryKeys = {
     all: ["tags"] as const,
   },
   stats: ["admin", "stats"] as const,
+  analytics: (days: number) => ["admin", "analytics", days] as const,
   health: ["health"] as const,
 } as const;
 
@@ -758,5 +760,13 @@ export function useAdminUpdateCharacters() {
   return useMutation<api.CharactersState, ApiError, api.CharactersState["characters"]>({
     mutationFn: api.adminUpdateCharacters,
     onSuccess: (data) => queryClient.setQueryData(queryKeys.admin.characters.all, data),
+  });
+}
+
+/** (Admin) Traffic summary for the analytics page. */
+export function useAdminAnalytics(days: number) {
+  return useQuery<AnalyticsSummary, ApiError>({
+    queryKey: queryKeys.analytics(days),
+    queryFn: () => api.adminGetAnalytics(days),
   });
 }

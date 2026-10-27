@@ -36,12 +36,15 @@ export const PUBLIC_TIMEOUT_MS = 20_000;
 /**
  * True for callers that may wait through a cold start.
  *
+ * The page-view beacon is one of them: nobody is watching it, and giving up
+ * would drop exactly the visit that woke the backend.
+ *
  * Accepts both path shapes in use: the client passes a path relative to the
  * `/api/proxy` base (`/admin/posts`, `/health`), the proxy passes the resolved
  * backend path (`/api/v1/admin/posts`, `/api/v1/health`).
  */
 export const mayWaitForColdStart = (path: string | undefined): boolean =>
-	!!path && /^(\/api\/v1)?\/(admin|health)\b/.test(path);
+	!!path && /^(\/api\/v1)?\/(admin|health|analytics)\b/.test(path);
 
 /** The timeout a given path gets, in ms. */
 export const timeoutFor = (path: string | undefined): number =>
