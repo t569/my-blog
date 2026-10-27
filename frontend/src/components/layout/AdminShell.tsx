@@ -16,7 +16,7 @@ import {
 	Network,
 	SlidersHorizontal,
 	TerminalSquare,
-	Tag, Smile, Brain } from "lucide-react";
+	Tag, Smile, Brain, ChartColumn } from "lucide-react";
 import { useAdminStats } from "@/hooks/useApi";
 
 export default function AdminShell({
@@ -67,6 +67,9 @@ export default function AdminShell({
 			label: "ACTIVITY",
 			items: [
 				{ href: "/admin/agent/runs", label: "Run Log", icon: TerminalSquare },
+				...(SITE.analytics
+					? [{ href: "/admin/analytics", label: "Analytics", icon: ChartColumn }]
+					: []),
 			],
 		},
 	];

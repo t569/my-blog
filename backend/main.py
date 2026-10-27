@@ -22,6 +22,7 @@ from app.routers import (
     admin_site_index,
     admin_tags,
     admin_uploads,
+    analytics,
     debug,
     public_assistant,
     public_comments,
@@ -105,6 +106,8 @@ app.include_router(public_comments.router, prefix=API_V1)
 app.include_router(public_assistant.router, prefix=API_V1)
 app.include_router(public_constellation.router, prefix=API_V1)
 app.include_router(public_search.router, prefix=API_V1)
+app.include_router(analytics.router, prefix=API_V1)
+app.include_router(analytics.admin_router, prefix=API_V1)
 app.include_router(admin_posts.router, prefix=API_V1)
 app.include_router(admin_categories.router, prefix=API_V1)
 app.include_router(admin_series.router, prefix=API_V1)

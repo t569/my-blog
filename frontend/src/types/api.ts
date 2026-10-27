@@ -302,6 +302,17 @@ export interface AgentTriggerResponse {
   Admin — Stats
 ============================================================================ */
 
+/** Traffic summary for /admin/analytics, over the last `days` UTC days. */
+export interface AnalyticsSummary {
+  days: number;
+  /** `visitors` everywhere means visits: one reader on one UTC day. */
+  totals: { views: number; visitors: number };
+  daily: { date: string; views: number; visitors: number }[];
+  referrers: { label: string; value: number }[];
+  top_pages: { path: string; views: number }[];
+  funnel: { label: string; value: number }[];
+}
+
 /** Aggregated dashboard statistics. */
 export interface AdminStatsResponse {
   total_posts: number;

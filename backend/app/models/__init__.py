@@ -10,6 +10,7 @@ from app.models.agent import (
 from app.models.category import Category
 from app.models.comment import Comment
 from app.models.owner import Owner
+from app.models.page_view import PageView
 from app.models.post import Post, PostTag, Tag
 from app.models.series import Series
 from app.models.site_chunk import SiteChunk, SiteLink
@@ -22,6 +23,7 @@ __all__ = [
     "Comment",
     "ContextEmbedding",
     "Owner",
+    "PageView",
     "Post",
     "PostEmbedding",
     "PostFeedback",

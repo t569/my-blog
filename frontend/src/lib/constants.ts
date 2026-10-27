@@ -68,6 +68,11 @@ export const SITE = {
    */
   constellation: process.env.NEXT_PUBLIC_SITE_CONSTELLATION === "true",
   /**
+   * Cookieless page-view counting and /admin/analytics. Off by default, so
+   * upstream sends no beacon and has no admin link.
+   */
+  analytics: process.env.NEXT_PUBLIC_SITE_ANALYTICS === "true",
+  /**
    * Home feed layout. "list" is upstream's single column, and the default.
    * "panels" lays posts out like a newspaper page or a comic: the lead story
    * across the top, posts with a picture as tall panels, text posts packed
