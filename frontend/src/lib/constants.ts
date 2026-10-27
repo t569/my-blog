@@ -74,6 +74,16 @@ export const SITE = {
    * into the gaps around them.
    */
   feed: (process.env.NEXT_PUBLIC_SITE_FEED ?? "list") as "list" | "panels",
+  /**
+   * What agent-authored posts are called in /feed.xml, and so in newsletter
+   * emails: "[Agent] Title". Matches the site's own "✦ AGENT" badge by default.
+   */
+  agentLabel: process.env.NEXT_PUBLIC_SITE_AGENT_LABEL ?? "Agent",
+  /**
+   * Signup page of an RSS-to-email newsletter service (Brevo, Sender, …) that
+   * polls /feed.xml. Unset = no subscribe box anywhere, which is upstream's site.
+   */
+  newsletter: process.env.NEXT_PUBLIC_SITE_NEWSLETTER_URL ?? "",
 } as const;
 
 /**

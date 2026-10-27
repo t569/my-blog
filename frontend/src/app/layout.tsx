@@ -12,6 +12,8 @@ export const metadata: Metadata = {
 	description: SITE.description,
 	metadataBase: new URL(SITE.url),
 	icons: { icon: SITE.icon },
+	// Lets feed readers find /feed.xml from any page.
+	alternates: { types: { "application/rss+xml": "/feed.xml" } },
 	openGraph: {
 		type: "website",
 		siteName: SITE.name,

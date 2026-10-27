@@ -12,6 +12,7 @@
 		"check:accent": "node --experimental-strip-types --no-warnings scripts/check-accent.ts",
 		"check:flip": "node --experimental-strip-types --no-warnings scripts/check-flip.ts",
 		"check:slug": "node --experimental-strip-types --no-warnings scripts/check-slug.ts",
+		"check:rss": "node --experimental-strip-types --no-warnings scripts/check-rss.ts",
 		"check:mandelbrot": "node --experimental-strip-types --no-warnings scripts/check-mandelbrot.ts",
 		"check:modular": "node --experimental-strip-types --no-warnings scripts/check-modular.ts",
 		"check:riemann": "node --experimental-strip-types --no-warnings scripts/check-riemann.ts",

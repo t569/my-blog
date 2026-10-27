@@ -9,6 +9,7 @@ import { useSeriesDetail } from "@/hooks/useApi";
 import MarkdownRenderer from "./MarkdownRenderer";
 import PostToc from "./PostToc";
 import PostComments from "./PostComments";
+import Subscribe from "./Subscribe";
 
 interface PostDetailClientProps {
 	post: Post;
@@ -94,6 +95,9 @@ export default function PostDetailClient({ post }: PostDetailClientProps) {
 					<article>
 						<MarkdownRenderer content={post.content} />
 					</article>
+
+					{/* Readers who finish a post are the likeliest to subscribe. */}
+					<Subscribe />
 
 					{/* Series Navigation */}
 					{seriesData && (

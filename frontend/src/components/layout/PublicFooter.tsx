@@ -1,4 +1,5 @@
 import { SITE } from "@/lib/constants";
+import Subscribe from "@/components/blog/Subscribe";
 
 export default function PublicFooter() {
 	return (
@@ -28,6 +29,7 @@ export default function PublicFooter() {
 							LinkedIn
 						</a>
 					)}
+					<Subscribe compact />
 				</div>
 
 				{/* Right: Copyright */}
