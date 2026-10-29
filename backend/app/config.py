@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # Default is upstream's, so his seed script behaves exactly as before.
     ADMIN_EMAIL: str = "admin@d3jusdevspace.com"
 
+    # Signs draft preview links. Its own secret, so rotating it cancels every
+    # outstanding link without signing the admin out. Unset = previews off.
+    PREVIEW_SECRET: str = ""
+
     # --- Cloudinary ---
     # Unset = image upload/delete return 503; everything else works.
     CLOUDINARY_CLOUD_NAME: str = ""

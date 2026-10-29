@@ -139,6 +139,7 @@ Environment:
 |---|---|---|
 | `DATABASE_URL` | **Yes** | The only value the app cannot boot without |
 | `NEXTAUTH_SECRET` | For admin | Must be byte-identical to Vercel's, or every admin call is a 401. Unset = admin API closed to everyone |
+| `PREVIEW_SECRET` | For draft previews | Render only, 32+ chars. Signs preview links; rotate it to cancel every outstanding link without signing out. Unset = previews off (503 on minting) |
 | `ADMIN_EMAIL` | For admin | Must match Vercel's — it is the JWT claim the backend resolves to the owner row |
 | `CORS_ORIGINS` | Recommended | `https://<your-domain>` |
 | `ENVIRONMENT` | Optional | `production` |

@@ -10,9 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import get_current_admin
 from app.db.base import get_db
 from app.models.owner import Owner
+from app.auth.preview import make_preview_token
+from app.schemas.comment import CommentResponse
 from app.schemas.common import AdminStatsResponse, MessageResponse, PaginatedResponse
-from app.schemas.post import PostCreate, PostListItem, PostResponse, PostUpdate
-from app.services import post_service
+from app.schemas.post import (
+    PostCreate,
+    PostListItem,
+    PostResponse,
+    PostUpdate,
+    PreviewLinkCreate,
+    PreviewLinkResponse,
+)
+from app.services import comment_service, post_service
 from app.services.embedding_service import generate_embeddings_background
 from app.services.stats_service import get_admin_stats
 
@@ -127,3 +136,34 @@ async def delete_post(
             detail="Post not found.",
         )
     return MessageResponse(detail="Post deleted.")
+
+
+@router.post("/{post_id}/preview-link", response_model=PreviewLinkResponse)
+async def create_preview_link(
+    post_id: uuid.UUID,
+    data: PreviewLinkCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Mint a signed, expiring link that opens this post whatever its status."""
+    if await post_service.get_admin_post_by_id(db, post_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found.",
+        )
+    minted = make_preview_token(post_id, data.hours, data.suggest)
+    if minted is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Preview links are not configured (set PREVIEW_SECRET).",
+        )
+    token, expires_at = minted
+    return PreviewLinkResponse(token=token, expires_at=expires_at)
+
+
+@router.get("/{post_id}/suggestions", response_model=list[CommentResponse])
+async def list_post_suggestions(
+    post_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Open suggestions left through preview links. Dismiss via DELETE /admin/comments/{id}."""
+    return await comment_service.list_suggestions(db, post_id)

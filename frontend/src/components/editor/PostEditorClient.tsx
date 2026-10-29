@@ -30,6 +30,8 @@ import { SITE } from "@/lib/constants";
 import { needsRawEditor } from "@/lib/math";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import SharePreview from "./SharePreview";
+import { withCredit } from "@/lib/credit";
 
 // Dynamically import BlockNote to avoid SSR issues
 const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
@@ -71,6 +73,8 @@ type SavedPost = { slug?: string } | void;
 interface PostEditorClientProps {
 	initialData: Partial<EditorData> & { is_agent_authored?: boolean };
 	isNew?: boolean;
+	/** Set for a saved post; enables preview links and suggestions. */
+	postId?: string;
 	onSave: (data: EditorData) => Promise<SavedPost>;
 	onPublish?: (data: EditorData) => Promise<SavedPost>;
 }
@@ -90,6 +94,7 @@ function reasonFor(error: unknown, fallback: string): string {
 export default function PostEditorClient({
 	initialData,
 	isNew = false,
+	postId,
 	onSave,
 	onPublish,
 }: PostEditorClientProps) {
@@ -117,6 +122,9 @@ export default function PostEditorClient({
 		"rich" | "raw" | "preview" | null
 	>(null);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
+	// BlockNote reads its markdown once, on mount; bump this to remount it
+	// after changing the content from outside (crediting a suggester).
+	const [editorKey, setEditorKey] = useState(0);
 
 	const toast = useToast();
 
@@ -242,6 +250,14 @@ export default function PostEditorClient({
 	const handleChange = (field: keyof EditorData, value: any) => {
 		setData((prev) => ({ ...prev, [field]: value }));
 		setHasUnsavedChanges(true);
+	};
+
+	const handleCredit = (name: string) => {
+		const next = withCredit(data.content, name);
+		if (next === data.content) return;
+		handleChange("content", next);
+		setEditorKey((k) => k + 1);
+		toast.success("Credit added at the end of the post");
 	};
 
 	const handleRemoveTag = (tagToRemove: string) => {
@@ -444,7 +460,8 @@ export default function PostEditorClient({
 								<BlockNoteEditor
 									// The schema is fixed when the editor is created, so a
 									// changed plugin set has to remount rather than update.
-									key={enabledFeatures.join(",")}
+									// editorKey bumps when content changes from outside (a credit).
+									key={`${enabledFeatures.join(",")}#${editorKey}`}
 									// data.content, not initialData.content: switching back
 									// from raw remounts this, and it must pick up the edits
 									// rather than resurrect the version loaded at mount.
@@ -746,6 +763,10 @@ export default function PostEditorClient({
 									</p>
 								)}
 							</div>
+
+							{postId && (
+								<SharePreview postId={postId} onCredit={handleCredit} />
+							)}
 						</div>
 					</div>
 				</aside>

@@ -104,3 +104,23 @@ class PostListItem(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PreviewLinkCreate(BaseModel):
+    """Request body for minting a draft preview link."""
+
+    hours: int = Field(default=72, ge=1, le=720)
+    suggest: bool = False
+
+
+class PreviewLinkResponse(BaseModel):
+    token: str
+    expires_at: datetime
+
+
+class PreviewResponse(BaseModel):
+    """A post opened through a preview link, and what the link allows."""
+
+    post: PostResponse
+    can_suggest: bool
+    expires_at: datetime

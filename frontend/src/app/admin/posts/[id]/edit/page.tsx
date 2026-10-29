@@ -64,6 +64,7 @@ export default function EditPostPage() {
 	return (
 		<PostEditorClient
 			isNew={false}
+			postId={postId}
 			initialData={{
 				title: post.title,
 				content: post.content,
