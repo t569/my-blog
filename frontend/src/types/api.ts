@@ -155,6 +155,8 @@ export interface PostListItem {
 
 export interface Post extends PostListItem {
   content: string;
+  /** People credited on the post, in the order the author added them. */
+  collaborators: string[];
 }
 
 export interface PostCreate {
@@ -164,6 +166,7 @@ export interface PostCreate {
   content: string;
   category_id: string;
   tags?: string[];
+  collaborators?: string[];
   series_id?: string | null;
   series_order?: number | null;
   status?: "draft" | "published";
@@ -175,6 +178,7 @@ export interface PostUpdate {
   content?: string | null;
   category_id?: string | null;
   tags?: string[] | null;
+  collaborators?: string[];
   series_id?: string | null;
   series_order?: number | null;
   status?: PostStatus | null;
@@ -190,6 +194,25 @@ export interface Comment {
   display_name: string | null;
   body: string;
   created_at: string;
+}
+
+/** A post opened through a signed, expiring preview link. */
+export interface PreviewResponse {
+  post: Post;
+  can_suggest: boolean;
+  expires_at: string;
+}
+
+export interface PreviewLink {
+  token: string;
+  expires_at: string;
+}
+
+export interface SuggestionCreate {
+  display_name: string;
+  quote: string;
+  body: string;
+  honeypot: string;
 }
 
 export interface CommentCreate {

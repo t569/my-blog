@@ -21,6 +21,7 @@ export default function NewPostPage() {
 				series_id: data.series_id || null,
 				series_order: data.series_order || null,
 				tags: data.tag_names || [],
+				collaborators: data.collaborators || [],
 				status: data.status,
 			});
 

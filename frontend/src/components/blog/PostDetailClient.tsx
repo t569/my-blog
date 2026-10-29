@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
@@ -13,9 +14,14 @@ import Subscribe from "./Subscribe";
 
 interface PostDetailClientProps {
 	post: Post;
+	/** Replaces the comments section, e.g. a draft preview's suggestion box. */
+	footer?: ReactNode;
 }
 
-export default function PostDetailClient({ post }: PostDetailClientProps) {
+export default function PostDetailClient({
+	post,
+	footer,
+}: PostDetailClientProps) {
 	// Fetch full series data if the post belongs to a series.
 	const { data: seriesData } = useSeriesDetail(post.series?.slug || "", {
 		enabled: !!post.series?.slug,
@@ -75,6 +81,16 @@ export default function PostDetailClient({ post }: PostDetailClientProps) {
 							<dd className="text-accent">The agent</dd>
 						</div>
 					)}
+					{post.collaborators?.length > 0 && (
+						<div>
+							<dt>In collaboration with</dt>
+							<dd>
+								{new Intl.ListFormat("en", { type: "conjunction" }).format(
+									post.collaborators,
+								)}
+							</dd>
+						</div>
+					)}
 				</dl>
 
 				{post.tags && post.tags.length > 0 && (
@@ -105,7 +121,7 @@ export default function PostDetailClient({ post }: PostDetailClientProps) {
 					)}
 
 					{/* Comments Section */}
-					<PostComments postId={post.id} postSlug={post.slug} />
+					{footer ?? <PostComments postId={post.id} postSlug={post.slug} />}
 				</main>
 
 				{/* Right TOC Sidebar (sticky, width 260px) */}

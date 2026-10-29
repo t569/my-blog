@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.comment import Comment
 from app.models.post import Post
-from app.schemas.comment import CommentCreate
+from app.schemas.comment import CommentCreate, SuggestionCreate
 
 # Simple keyword blocklist for spam filtering.
 _SPAM_KEYWORDS: set[str] = {
@@ -99,3 +99,47 @@ async def delete_comment(
     await db.delete(comment)
     await db.flush()
     return True
+
+
+async def create_suggestion(
+    db: AsyncSession,
+    post: Post,
+    data: SuggestionCreate,
+) -> Comment:
+    """Store a preview reader's suggestion as a ``status="suggestion"`` comment.
+
+    Suggestions ride on the comments table so they need no migration, and they
+    can never appear publicly: every public read filters ``status="approved"``.
+    The quoted passage is kept as a markdown blockquote ahead of the note.
+    """
+    if _is_spam(data.body) or _is_spam(data.quote):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Suggestion rejected by spam filter.",
+        )
+
+    quote = "\n".join(f"> {line}" for line in data.quote.strip().splitlines())
+    comment = Comment(
+        post_id=post.id,
+        owner_id=post.owner_id,
+        display_name=data.display_name,
+        body=f"{quote}\n\n{data.body}" if quote else data.body,
+        status="suggestion",
+    )
+    db.add(comment)
+    await db.flush()
+    await db.refresh(comment)
+    return comment
+
+
+async def list_suggestions(
+    db: AsyncSession,
+    post_id: uuid.UUID,
+) -> list[Comment]:
+    """Return a post's open suggestions, oldest first (admin view)."""
+    result = await db.execute(
+        select(Comment)
+        .where(Comment.post_id == post_id, Comment.status == "suggestion")
+        .order_by(Comment.created_at.asc())
+    )
+    return list(result.scalars().all())

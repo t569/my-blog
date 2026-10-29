@@ -123,6 +123,7 @@ Only `DATABASE_URL` is required. Everything else degrades:
 | Unset | Effect |
 |---|---|
 | `NEXTAUTH_SECRET` | Admin API returns 401 for everyone (fails closed, never open) |
+| `PREVIEW_SECRET` | Draft preview links can't be minted (503) and none open |
 | `CLOUDINARY_*` | Image upload/delete return 503 |
 | `HUGGINGFACE_TOKEN` | Search falls back to keyword-only (Postgres FTS) |
 | `GROQ_API_KEY` / `AGENT_ENABLED=false` | Agent pipeline never runs |

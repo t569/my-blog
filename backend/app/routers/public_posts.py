@@ -1,18 +1,23 @@
 """Public post and series endpoints — no authentication required."""
 
 import math
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.preview import read_preview_token
 from app.db.base import get_db
+from app.middleware.rate_limit import suggestion_rate_limiter, suggestion_total_limiter
+from app.models.post import Post
+from app.schemas.comment import CommentResponse, SuggestionCreate
 from app.schemas.common import PaginatedResponse
-from app.schemas.post import PostListItem, PostResponse
+from app.schemas.post import PostListItem, PostResponse, PreviewResponse
 from app.schemas.category import CategoryResponse
 from app.schemas.tag import TagResponse
 from app.schemas.series import SeriesListItem, SeriesResponse
-from app.services import post_service, category_service, tag_service, series_service
+from app.services import post_service, category_service, tag_service, series_service, comment_service
 
 router = APIRouter(prefix="", tags=["Public API"])
 
@@ -86,3 +91,62 @@ async def get_post(
             detail="Post not found.",
         )
     return post
+
+
+# Drafts are private: the response must never be stored by a browser, CDN or
+# proxy, and the token in the URL must not leak onward through Referer.
+_PREVIEW_HEADERS = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+
+
+async def _open_preview(db: AsyncSession, token: str) -> tuple[Post, bool, datetime]:
+    """Resolve a preview token to its post, or 404 — one answer for every failure.
+
+    Expired, forged and deleted-post links all look the same, so a link
+    reveals nothing about why it stopped working.
+    """
+    grant = read_preview_token(token)
+    post = await post_service.get_admin_post_by_id(db, grant[0]) if grant else None
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preview not found.",
+            headers=_PREVIEW_HEADERS,
+        )
+    return post, grant[1], grant[2]
+
+
+@router.get("/preview/{token}", response_model=PreviewResponse)
+async def get_preview(
+    token: str,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Open a post of any status through a signed, expiring preview link."""
+    post, can_suggest, expires_at = await _open_preview(db, token)
+    response.headers.update(_PREVIEW_HEADERS)
+    return PreviewResponse(post=post, can_suggest=can_suggest, expires_at=expires_at)
+
+
+@router.post(
+    "/preview/{token}/suggestions",
+    response_model=CommentResponse,
+    status_code=201,
+)
+async def submit_suggestion(
+    token: str,
+    data: SuggestionCreate,
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Leave a suggested edit, if the preview link allows it."""
+    suggestion_rate_limiter.check(request)
+    suggestion_total_limiter.check(request, key="all")
+    post, can_suggest, _ = await _open_preview(db, token)
+    if not can_suggest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This preview link does not accept suggestions.",
+        )
+    response.headers.update(_PREVIEW_HEADERS)
+    return await comment_service.create_suggestion(db, post, data)
