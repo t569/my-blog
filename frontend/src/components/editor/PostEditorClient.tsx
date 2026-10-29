@@ -128,7 +128,11 @@ export default function PostEditorClient({
 	const { data: categories } = useAdminCategories();
 	const { data: seriesList } = useAdminSeries();
 	const createSeriesMutation = useAdminCreateSeries();
-	const { data: features } = useAdminFeatures();
+	const {
+		data: features,
+		isError: featuresFailed,
+		refetch: retryFeatures,
+	} = useAdminFeatures();
 
 	/** Feature ids that are both possible here and switched on. */
 	const enabledFeatures = useMemo(
@@ -156,10 +160,16 @@ export default function PostEditorClient({
 	// yanks the editor out from under someone mid-edit. Note it reads
 	// `initialData.content`, not `data.content`: typing display math into the
 	// rich editor must not eject you into the textarea mid-sentence.
+	//
+	// A failed load (a sleeping backend that outlived the retry, a dropped
+	// phone connection) lands in Markdown, not on the spinner forever: the
+	// textarea is the one editor that can't corrupt what it was given.
 	const mode =
 		modeOverride ??
 		(features === undefined
-			? null
+			? featuresFailed
+				? "raw"
+				: null
 			: needsRawEditor(initialData.content || "", activePluginIds)
 				? "raw"
 				: "rich");
@@ -441,6 +451,10 @@ export default function PostEditorClient({
 									initialMarkdown={data.content}
 									enabledFeatures={enabledFeatures}
 									onChange={(markdown) => handleChange("content", markdown)}
+									onLoadError={() => {
+										toast.error("Rich editor couldn't read this post — opened in Markdown.");
+										setModeOverride("raw");
+									}}
 								/>
 							)}
 						</div>
@@ -677,8 +691,15 @@ export default function PostEditorClient({
 											key={value}
 											onClick={() => setModeOverride(value)}
 											aria-pressed={mode === value}
-											title={label}
-											className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2.5 font-mono text-xs font-bold transition-colors ${
+											// Rich without the math switches would parse formulas as
+											// prose and save the damage.
+											disabled={value === "rich" && features === undefined}
+											title={
+												value === "rich" && features === undefined
+													? "Waiting for editor settings"
+													: label
+											}
+											className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2.5 font-mono text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
 												mode === value
 													? "bg-accent-muted text-accent"
 													: "bg-transparent text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
@@ -689,7 +710,20 @@ export default function PostEditorClient({
 										</button>
 									))}
 								</div>
-								{needsRawEditor(data.content, activePluginIds) && (
+								{featuresFailed && features === undefined && (
+									<p className="font-mono text-[0.65rem] leading-snug text-warning">
+										Editor settings didn&apos;t load, so Rich is off to protect
+										math.{" "}
+										<button
+											type="button"
+											onClick={() => retryFeatures()}
+											className="cursor-pointer underline hover:text-accent"
+										>
+											Retry
+										</button>
+									</p>
+								)}
+								{features !== undefined && needsRawEditor(data.content, activePluginIds) && (
 									<p className="font-mono text-[0.65rem] leading-snug text-text-tertiary">
 										{enabledFeatures.includes("display_math") ? (
 											<>

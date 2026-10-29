@@ -893,6 +893,30 @@ body {
 	border-radius: var(--radius-md);
 }
 
+/* ── BlockNote Editor — slash menu on phones ──
+   BlockNote sizes the menu to the layout viewport, which on a phone includes
+   the area under the on-screen keyboard, and its 52px two-line rows fit about
+   five to a screen. Compact rows and a cap at 40dvh keep it above the keyboard.
+   !important because BlockNote's own sheet loads later with equal specificity.
+   ponytail: a fixed cap, not keyboard-aware. visualViewport sizing if 40dvh
+   still lands under the keyboard on some phone. */
+@media (max-width: 640px) {
+	.bn-mantine .bn-suggestion-menu {
+		max-height: 40dvh !important;
+		max-width: calc(100vw - 20px);
+	}
+	.bn-mantine .bn-suggestion-menu-item:not(.bn-suggestion-menu-item-small) {
+		height: 40px !important;
+	}
+	.bn-mantine .bn-suggestion-menu-item .bn-mt-suggestion-menu-item-subtitle,
+	.bn-mantine .bn-suggestion-menu-item .bn-mt-suggestion-menu-item-section[data-position="right"] {
+		display: none;
+	}
+	.bn-mantine .bn-suggestion-menu-item .bn-mt-suggestion-menu-item-section[data-position="left"] {
+		padding: 4px;
+	}
+}
+
 /* ============================================================================
   Utilities
 ============================================================================ */

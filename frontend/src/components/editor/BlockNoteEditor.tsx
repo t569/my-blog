@@ -110,6 +110,9 @@ interface BlockNoteEditorProps {
 	 * keys on it.
 	 */
 	enabledFeatures?: readonly string[];
+	/** The markdown couldn't be parsed. Showing an empty editor instead would
+	 *  let the first keystroke overwrite the post, so the caller decides. */
+	onLoadError?: (error: unknown) => void;
 }
 
 export default function BlockNoteEditor({
@@ -117,6 +120,7 @@ export default function BlockNoteEditor({
 	onChange,
 	editable = true,
 	enabledFeatures = [],
+	onLoadError,
 }: BlockNoteEditorProps) {
 	const [initialContentLoaded, setInitialContentLoaded] = useState(false);
 	const toast = useToast();
@@ -217,8 +221,15 @@ export default function BlockNoteEditor({
 		}
 
 		if (!initialContentLoaded && editor) {
-			loadMarkdown();
+			// A throw here used to vanish as an unhandled rejection, leaving
+			// "Loading editor..." up for good.
+			loadMarkdown().catch((error) => {
+				console.error("Failed to load markdown into the editor", error);
+				onLoadError?.(error);
+			});
 		}
+		// onLoadError omitted: an inline arrow from the caller, and this runs once.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [editor, initialMarkdown, initialContentLoaded, math]);
 
 	// Listen for changes and convert back to markdown.
