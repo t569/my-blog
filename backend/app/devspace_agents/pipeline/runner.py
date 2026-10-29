@@ -93,12 +93,13 @@ async def run_agent_pipeline(
         "last_generated_topic": last_generated_topic,
     }
 
+    # Outside the try, so a run that fails partway still records its topic.
+    result_state: dict = {}
     try:
         async with async_session_factory() as session:
             # `astream` instead of `ainvoke`: the same run, but it reports each
             # node as it finishes. "values" carries the accumulated state, whose
             # last value is exactly what `ainvoke` would have returned.
-            result_state: dict = {}
             async for mode, chunk in pipeline.astream(
                 initial_state,
                 config={"configurable": {"db": session}},
@@ -145,6 +146,7 @@ async def run_agent_pipeline(
             await _update_agent_run(
                 session, run_id,
                 status="completed",
+                topic=result_state.get("topic"),
                 output_post_id=post.id,
                 run_log=run_log,
             )
@@ -161,14 +163,17 @@ async def run_agent_pipeline(
 
     except Exception as exc:
         logger.exception("Agent pipeline failed for run %s", run_id)
-        tracker.failed()
         async with async_session_factory() as session:
             await _update_agent_run(
                 session, run_id,
                 status="failed",
+                topic=result_state.get("topic"),
                 run_log={"error": str(exc)},
             )
             await session.commit()
+        # After the commit, as on success: the admin refetches the run when
+        # this arrives, and must not read it still "running".
+        tracker.failed()
 
         root_span.update(
             output={"status": "failed", "error": str(exc)},
@@ -187,6 +192,7 @@ async def _update_agent_run(
     run_id: uuid.UUID,
     *,
     status: str,
+    topic: str | None = None,
     output_post_id: uuid.UUID | None = None,
     run_log: dict | None = None,
 ) -> None:
@@ -199,6 +205,8 @@ async def _update_agent_run(
 
     run.status = status
     run.completed_at = datetime.now()
+    if topic is not None:
+        run.topic = topic
     if output_post_id is not None:
         run.output_post_id = output_post_id
     if run_log is not None:

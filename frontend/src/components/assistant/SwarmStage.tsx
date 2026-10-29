@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { getSession } from "next-auth/react";
 import { useSwarm } from "@t569/ai-assistant";
 import CharacterFace from "./CharacterFace";
-import { useAdminCharacters } from "@/hooks/useApi";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys, useAdminCharacters } from "@/hooks/useApi";
 import { ASSISTANT } from "@/lib/constants";
 import { CHARACTER_ROLES, defaultChoice, type CharacterChoice, type CharacterId } from "@/lib/assistant/characters";
 
@@ -54,6 +55,16 @@ export default function SwarmStage({ runId }: { runId: string }) {
 		terminal: TERMINAL,
 		init: auth ?? undefined,
 	});
+	// The run's row, the run log, the drafts list and the sidebar badge were all
+	// fetched before the run ended. The backend saves before it reports the end,
+	// so refetching now reads the finished run.
+	const queryClient = useQueryClient();
+	useEffect(() => {
+		if (run === "done" || run === "failed") {
+			void queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+		}
+	}, [run, queryClient]);
+
 	const { data: stored } = useAdminCharacters();
 	const face = (id: CharacterId): CharacterChoice =>
 		(stored?.characters[id] as CharacterChoice | null | undefined) ?? defaultChoice(id, ASSISTANT.seed);
