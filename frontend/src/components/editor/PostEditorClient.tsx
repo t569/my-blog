@@ -25,7 +25,6 @@ import CustomSelect from "@/components/ui/CustomSelect";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import SharePreview from "./SharePreview";
-import { withCredit } from "@/lib/credit";
 
 // Dynamically import BlockNote to avoid SSR issues
 const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
@@ -45,6 +44,7 @@ interface EditorData {
 	slug: string;
 	category_id: string;
 	tag_names: string[]; // Simplification: we'll handle tag IDs at the API boundary
+	collaborators: string[];
 	series_id: string;
 	series_order: number | null;
 	status: PostStatus;
@@ -72,6 +72,7 @@ export default function PostEditorClient({
 		slug: initialData.slug || "",
 		category_id: initialData.category_id || "",
 		tag_names: initialData.tag_names || [],
+		collaborators: initialData.collaborators || [],
 		series_id: initialData.series_id || "",
 		series_order: initialData.series_order ?? null,
 		status: initialData.status || "draft",
@@ -83,9 +84,7 @@ export default function PostEditorClient({
 	const [showPublishModal, setShowPublishModal] = useState(false);
 	const [showNewSeries, setShowNewSeries] = useState(false);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
-	// BlockNote reads its markdown once, on mount; bump this to remount it
-	// after changing the content from outside (crediting a suggester).
-	const [editorKey, setEditorKey] = useState(0);
+	const [newCollaborator, setNewCollaborator] = useState("");
 
 	const toast = useToast();
 
@@ -121,7 +120,9 @@ export default function PostEditorClient({
 							`You have unsaved local changes from ${new Date(parsed.timestamp).toLocaleString()}. Restore them?`,
 						)
 					) {
-						setData(parsed.data);
+						// Over the current state, so a draft saved before a field existed
+						// still has it (collaborators).
+						setData((prev) => ({ ...prev, ...parsed.data }));
 						setHasUnsavedChanges(true);
 					} else {
 						localStorage.removeItem(DRAFT_KEY);
@@ -150,12 +151,18 @@ export default function PostEditorClient({
 		setHasUnsavedChanges(true);
 	};
 
+	const addCollaborator = (raw: string) => {
+		const name = raw.trim().slice(0, 50);
+		if (!name) return;
+		const taken = data.collaborators.some(
+			(c) => c.toLowerCase() === name.toLowerCase(),
+		);
+		if (!taken) handleChange("collaborators", [...data.collaborators, name]);
+	};
+
 	const handleCredit = (name: string) => {
-		const next = withCredit(data.content, name);
-		if (next === data.content) return;
-		handleChange("content", next);
-		setEditorKey((k) => k + 1);
-		toast.success("Credit added at the end of the post");
+		addCollaborator(name);
+		toast.success(`${name} added to collaborators — save to keep it`);
 	};
 
 	const handleRemoveTag = (tagToRemove: string) => {
@@ -319,8 +326,7 @@ export default function PostEditorClient({
 						{/* BlockNote */}
 						<div className="min-h-125">
 							<BlockNoteEditor
-								key={editorKey}
-								initialMarkdown={editorKey ? data.content : initialData.content}
+								initialMarkdown={initialData.content}
 								onChange={(markdown) => handleChange("content", markdown)}
 							/>
 						</div>
@@ -504,6 +510,53 @@ export default function PostEditorClient({
 							}}
 							onRemoveTag={handleRemoveTag}
 						/>
+
+						{/* Collaborators */}
+						<div className="flex flex-col gap-2">
+							<label className="font-mono text-xs font-bold uppercase tracking-widest text-text-tertiary">
+								Collaborators
+							</label>
+							{data.collaborators.length > 0 && (
+								<div className="flex flex-wrap gap-1.5">
+									{data.collaborators.map((name) => (
+										<span
+											key={name}
+											className="tag inline-flex items-center gap-1 text-[0.65rem]"
+										>
+											{name}
+											<button
+												type="button"
+												aria-label={`Remove ${name}`}
+												onClick={() =>
+													handleChange(
+														"collaborators",
+														data.collaborators.filter((c) => c !== name),
+													)
+												}
+												className="hover:text-danger"
+											>
+												<X size={10} />
+											</button>
+										</span>
+									))}
+								</div>
+							)}
+							<input
+								type="text"
+								className="input h-8 text-sm"
+								placeholder="Add a name, press Enter"
+								maxLength={50}
+								value={newCollaborator}
+								onChange={(e) => setNewCollaborator(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										e.preventDefault();
+										addCollaborator(newCollaborator);
+										setNewCollaborator("");
+									}
+								}}
+							/>
+						</div>
 
 						{/* Slug */}
 						<div className="flex flex-col gap-2">

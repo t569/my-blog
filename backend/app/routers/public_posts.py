@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.preview import read_preview_token
 from app.db.base import get_db
-from app.middleware.rate_limit import suggestion_rate_limiter
+from app.middleware.rate_limit import suggestion_rate_limiter, suggestion_total_limiter
 from app.models.post import Post
 from app.schemas.comment import CommentResponse, SuggestionCreate
 from app.schemas.common import PaginatedResponse
@@ -141,6 +141,7 @@ async def submit_suggestion(
 ):
     """Leave a suggested edit, if the preview link allows it."""
     suggestion_rate_limiter.check(request)
+    suggestion_total_limiter.check(request, key="all")
     post, can_suggest, _ = await _open_preview(db, token)
     if not can_suggest:
         raise HTTPException(

@@ -98,6 +98,18 @@ export default function PostDetailClient({
 							)}
 						</div>
 
+						{/* Collaborators */}
+						{post.collaborators?.length > 0 && (
+							<p className="mb-6 font-mono text-[0.7rem] text-text-secondary">
+								In collaboration with{" "}
+								<span className="text-text-primary">
+									{new Intl.ListFormat("en", { type: "conjunction" }).format(
+										post.collaborators,
+									)}
+								</span>
+							</p>
+						)}
+
 						{/* Tags */}
 						{post.tags && post.tags.length > 0 && (
 							<div className="flex flex-wrap gap-2">

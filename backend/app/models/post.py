@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    ARRAY,
     Boolean,
     ForeignKey,
     Index,
@@ -105,6 +106,14 @@ class Post(Base):
     series_order: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
+    )
+    # People credited on the post (e.g. preview-link suggesters). Plain names,
+    # in the order the author added them.
+    collaborators: Mapped[list[str]] = mapped_column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        server_default="{}",
     )
     published_at: Mapped[datetime | None] = mapped_column(nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
