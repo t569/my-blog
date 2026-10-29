@@ -42,3 +42,6 @@ class RateLimiter:
 
 # Singleton instance — 3 comments per IP per hour.
 comment_rate_limiter = RateLimiter(max_requests=3, window_seconds=3600)
+
+# A reviewer leaves several notes in one sitting; still caps a leaked link.
+suggestion_rate_limiter = RateLimiter(max_requests=20, window_seconds=3600)

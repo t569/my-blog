@@ -25,10 +25,13 @@ import type {
   PostCreate,
   PostListItem,
   PostUpdate,
+  PreviewLink,
+  PreviewResponse,
   SeriesCreate,
   SeriesListItem,
   SeriesResponse,
   SeriesUpdate,
+  SuggestionCreate,
   Tag,
   TagCreate,
   TagUpdate,
@@ -155,6 +158,30 @@ export async function submitComment(
 }
 
 /* ============================================================================
+  Public — Draft previews
+============================================================================ */
+
+/** Open a post of any status through a preview link token. */
+export async function getPreview(token: string): Promise<PreviewResponse> {
+  const { data } = await apiClient.get<PreviewResponse>(
+    `/preview/${encodeURIComponent(token)}`,
+  );
+  return data;
+}
+
+/** Leave a suggested edit through a preview link that allows it. */
+export async function submitSuggestion(
+  token: string,
+  payload: SuggestionCreate,
+): Promise<Comment> {
+  const { data } = await apiClient.post<Comment>(
+    `/preview/${encodeURIComponent(token)}/suggestions`,
+    payload,
+  );
+  return data;
+}
+
+/* ============================================================================
   Admin — Posts
 ============================================================================ */
 
@@ -198,6 +225,26 @@ export async function adminUpdatePost(
   const { data } = await apiClient.patch<Post>(
     `/admin/posts/${postId}`,
     payload,
+  );
+  return data;
+}
+
+/** (Admin) Mint a signed, expiring preview link for a post. */
+export async function adminCreatePreviewLink(
+  postId: string,
+  payload: { hours: number; suggest: boolean },
+): Promise<PreviewLink> {
+  const { data } = await apiClient.post<PreviewLink>(
+    `/admin/posts/${postId}/preview-link`,
+    payload,
+  );
+  return data;
+}
+
+/** (Admin) Open suggestions left on a post through preview links. */
+export async function adminListSuggestions(postId: string): Promise<Comment[]> {
+  const { data } = await apiClient.get<Comment[]>(
+    `/admin/posts/${postId}/suggestions`,
   );
   return data;
 }

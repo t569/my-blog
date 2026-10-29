@@ -9,7 +9,6 @@ import {
 	Check,
 	Circle,
 	SlidersHorizontal,
-	Eye,
 	Plus,
 	X,
 	Sparkles,
@@ -25,6 +24,8 @@ import TagSelector from "./TagSelector";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { useToast } from "@/hooks/useToast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import SharePreview from "./SharePreview";
+import { withCredit } from "@/lib/credit";
 
 // Dynamically import BlockNote to avoid SSR issues
 const BlockNoteEditor = dynamic(() => import("./BlockNoteEditor"), {
@@ -52,6 +53,8 @@ interface EditorData {
 interface PostEditorClientProps {
 	initialData: Partial<EditorData> & { is_agent_authored?: boolean };
 	isNew?: boolean;
+	/** Set for a saved post; enables preview links and suggestions. */
+	postId?: string;
 	onSave: (data: EditorData) => Promise<void>;
 	onPublish?: (data: EditorData) => Promise<void>;
 }
@@ -59,6 +62,7 @@ interface PostEditorClientProps {
 export default function PostEditorClient({
 	initialData,
 	isNew = false,
+	postId,
 	onSave,
 	onPublish,
 }: PostEditorClientProps) {
@@ -79,6 +83,9 @@ export default function PostEditorClient({
 	const [showPublishModal, setShowPublishModal] = useState(false);
 	const [showNewSeries, setShowNewSeries] = useState(false);
 	const [newSeriesTitle, setNewSeriesTitle] = useState("");
+	// BlockNote reads its markdown once, on mount; bump this to remount it
+	// after changing the content from outside (crediting a suggester).
+	const [editorKey, setEditorKey] = useState(0);
 
 	const toast = useToast();
 
@@ -141,6 +148,14 @@ export default function PostEditorClient({
 	const handleChange = (field: keyof EditorData, value: any) => {
 		setData((prev) => ({ ...prev, [field]: value }));
 		setHasUnsavedChanges(true);
+	};
+
+	const handleCredit = (name: string) => {
+		const next = withCredit(data.content, name);
+		if (next === data.content) return;
+		handleChange("content", next);
+		setEditorKey((k) => k + 1);
+		toast.success("Credit added at the end of the post");
 	};
 
 	const handleRemoveTag = (tagToRemove: string) => {
@@ -304,7 +319,8 @@ export default function PostEditorClient({
 						{/* BlockNote */}
 						<div className="min-h-125">
 							<BlockNoteEditor
-								initialMarkdown={initialData.content}
+								key={editorKey}
+								initialMarkdown={editorKey ? data.content : initialData.content}
 								onChange={(markdown) => handleChange("content", markdown)}
 							/>
 						</div>
@@ -524,10 +540,9 @@ export default function PostEditorClient({
 								</div>
 							</div>
 
-							<button className="flex w-full items-center justify-center gap-2 rounded-md border border-border-default bg-transparent py-2.5 font-mono text-xs font-bold text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
-								<Eye size={16} />
-								Preview Post
-							</button>
+							{postId && (
+								<SharePreview postId={postId} onCredit={handleCredit} />
+							)}
 						</div>
 					</div>
 				</aside>

@@ -188,6 +188,25 @@ export interface Comment {
   created_at: string;
 }
 
+/** A post opened through a signed, expiring preview link. */
+export interface PreviewResponse {
+  post: Post;
+  can_suggest: boolean;
+  expires_at: string;
+}
+
+export interface PreviewLink {
+  token: string;
+  expires_at: string;
+}
+
+export interface SuggestionCreate {
+  display_name: string;
+  quote: string;
+  body: string;
+  honeypot: string;
+}
+
 export interface CommentCreate {
   post_id: string;
   display_name?: string | null;

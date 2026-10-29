@@ -28,6 +28,15 @@ async def get_current_admin(
     Raises ``HTTPException(401)`` if the token is invalid, expired,
     or does not correspond to a registered owner.
     """
+    # Fail closed: an empty secret would make jwt.decode verify against an
+    # empty HMAC key, so anyone could mint a valid admin token. No secret
+    # means no admin access at all, not open access.
+    if not settings.NEXTAUTH_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication is not configured.",
+        )
+
     token = credentials.credentials
 
     try:

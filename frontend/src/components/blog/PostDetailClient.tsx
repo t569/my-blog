@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
@@ -17,9 +18,14 @@ import PostComments from "./PostComments";
 
 interface PostDetailClientProps {
 	post: Post;
+	/** Replaces the comments section, e.g. a draft preview's suggestion box. */
+	footer?: ReactNode;
 }
 
-export default function PostDetailClient({ post }: PostDetailClientProps) {
+export default function PostDetailClient({
+	post,
+	footer,
+}: PostDetailClientProps) {
 	// Fetch full series data if the post belongs to a series.
 	const { data: seriesData } = useSeriesDetail(post.series?.slug || "", {
 		enabled: !!post.series?.slug,
@@ -117,7 +123,7 @@ export default function PostDetailClient({ post }: PostDetailClientProps) {
 					)}
 
 					{/* Comments Section */}
-					<PostComments postId={post.id} postSlug={post.slug} />
+					{footer ?? <PostComments postId={post.id} postSlug={post.slug} />}
 				</main>
 
 				{/* Right TOC Sidebar (sticky, width 260px) */}

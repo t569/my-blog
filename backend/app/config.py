@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     # --- Auth ---
     NEXTAUTH_SECRET: str
+    # Signs draft preview links. Its own secret, so rotating it cancels every
+    # outstanding link without signing the admin out. Unset = previews off.
+    PREVIEW_SECRET: str = ""
 
     # --- Cloudinary ---
     CLOUDINARY_CLOUD_NAME: str
