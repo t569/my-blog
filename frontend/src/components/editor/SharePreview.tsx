@@ -21,7 +21,7 @@ const EXPIRY_OPTIONS = [
 
 interface SharePreviewProps {
 	postId: string;
-	/** Credit a suggester in the post body. */
+	/** Add a suggester to the post's collaborators. */
 	onCredit: (name: string) => void;
 }
 
@@ -136,7 +136,7 @@ export default function SharePreview({ postId, onCredit }: SharePreviewProps) {
 								type="button"
 								onClick={() => onCredit(s.display_name!)}
 								className="btn-ghost flex h-7 flex-1 items-center justify-center gap-1 text-[0.65rem]"
-								title="Add to the post's closing thanks"
+								title="Add to the post's collaborators"
 							>
 								<UserPlus size={10} />
 								Credit

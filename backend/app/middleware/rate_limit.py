@@ -73,4 +73,15 @@ class RateLimiter:
 comment_rate_limiter = RateLimiter(max_requests=3, window_seconds=3600)
 
 # A reviewer leaves several notes in one sitting; still caps a leaked link.
-suggestion_rate_limiter = RateLimiter(max_requests=20, window_seconds=3600)
+suggestion_rate_limiter = RateLimiter(
+    max_requests=20,
+    window_seconds=3600,
+    detail="Too many suggestions. Please try again later.",
+)
+# client_ip is forgeable by anyone calling the backend directly, so the
+# per-IP limit alone can be dodged; this total is the real ceiling.
+suggestion_total_limiter = RateLimiter(
+    max_requests=200,
+    window_seconds=3600,
+    detail="Too many suggestions right now. Please try again later.",
+)

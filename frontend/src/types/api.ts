@@ -155,6 +155,8 @@ export interface PostListItem {
 
 export interface Post extends PostListItem {
   content: string;
+  /** People credited on the post, in the order the author added them. */
+  collaborators: string[];
 }
 
 export interface PostCreate {
@@ -164,6 +166,7 @@ export interface PostCreate {
   content: string;
   category_id: string;
   tags?: string[];
+  collaborators?: string[];
   series_id?: string | null;
   series_order?: number | null;
   status?: "draft" | "published";
@@ -175,6 +178,7 @@ export interface PostUpdate {
   content?: string | null;
   category_id?: string | null;
   tags?: string[] | null;
+  collaborators?: string[];
   series_id?: string | null;
   series_order?: number | null;
   status?: PostStatus | null;

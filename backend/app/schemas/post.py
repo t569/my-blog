@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
 from app.schemas.category import CategoryResponse
 from app.schemas.tag import TagResponse
@@ -25,6 +26,25 @@ class PostSeriesInfo(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _dedupe(names: list[str]) -> list[str]:
+    """Drop repeats (case-insensitively), keeping the first spelling and the order."""
+    seen: set[str] = set()
+    kept: list[str] = []
+    for name in names:
+        if name.casefold() not in seen:
+            seen.add(name.casefold())
+            kept.append(name)
+    return kept
+
+
+# Names are shown as plain text (React escapes them), so only size is policed.
+Collaborators = Annotated[
+    list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]],
+    Field(max_length=20),
+    AfterValidator(_dedupe),
+]
+
+
 class PostCreate(BaseModel):
     """Request body for creating a post."""
 
@@ -36,6 +56,7 @@ class PostCreate(BaseModel):
     content: str = Field(..., min_length=1)
     category_id: uuid.UUID
     tags: list[str] = Field(default_factory=list)
+    collaborators: Collaborators = Field(default_factory=list)
     series_id: uuid.UUID | None = None
     series_order: int | None = Field(None, ge=1)
     status: str = Field(default="draft", pattern=r"^(draft|published)$")
@@ -50,6 +71,7 @@ class PostUpdate(BaseModel):
     content: str | None = Field(None, min_length=1)
     category_id: uuid.UUID | None = None
     tags: list[str] | None = None
+    collaborators: Collaborators | None = None
     series_id: uuid.UUID | None = None
     series_order: int | None = Field(None, ge=1)
     status: str | None = Field(
@@ -74,6 +96,7 @@ class PostResponse(BaseModel):
     category: CategoryResponse
     tags: list[TagResponse]
     series: PostSeriesInfo | None = None
+    collaborators: list[str] = []
     status: str
     is_agent_authored: bool
     reading_time_mins: int | None

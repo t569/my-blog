@@ -199,6 +199,7 @@ async def create_post(
         category_id=data.category_id,
         series_id=data.series_id,
         series_order=data.series_order,
+        collaborators=data.collaborators,
         status=data.status,
         reading_time_mins=reading_time,
         published_at=datetime.now() if data.status == "published" else None,

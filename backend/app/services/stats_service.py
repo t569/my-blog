@@ -53,11 +53,16 @@ async def get_admin_stats(
 
     # --- Comments ---
     total_comments = await db.scalar(
-        select(func.count(Comment.id)).where(Comment.owner_id == owner_id)
+        select(func.count(Comment.id)).where(
+            Comment.owner_id == owner_id, Comment.status != "suggestion"
+        )
     )
     pending_comments = await db.scalar(
         select(func.count(Comment.id)).where(
-            Comment.owner_id == owner_id, Comment.status != "approved"
+            Comment.owner_id == owner_id,
+            # Preview-link suggestions live in this table too, but they are
+            # the editor's to-do list, not comments awaiting moderation.
+            Comment.status.not_in(("approved", "suggestion")),
         )
     )
 

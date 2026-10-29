@@ -81,6 +81,16 @@ export default function PostDetailClient({
 							<dd className="text-accent">The agent</dd>
 						</div>
 					)}
+					{post.collaborators?.length > 0 && (
+						<div>
+							<dt>In collaboration with</dt>
+							<dd>
+								{new Intl.ListFormat("en", { type: "conjunction" }).format(
+									post.collaborators,
+								)}
+							</dd>
+						</div>
+					)}
 				</dl>
 
 				{post.tags && post.tags.length > 0 && (
