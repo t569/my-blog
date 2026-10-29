@@ -18,6 +18,7 @@ import {
 	TerminalSquare,
 	Tag, Smile, Brain, ChartColumn } from "lucide-react";
 import { useAdminStats } from "@/hooks/useApi";
+import { OWNER_KEY } from "@/components/layout/PageViewBeacon";
 
 export default function AdminShell({
 	children,
@@ -28,6 +29,13 @@ export default function AdminShell({
 	const router = useRouter();
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const { data: stats } = useAdminStats();
+
+	// This browser belongs to the owner: stop counting its public page views.
+	useEffect(() => {
+		try {
+			localStorage.setItem(OWNER_KEY, "1");
+		} catch {}
+	}, []);
 
 	const navGroups = [
 		{
