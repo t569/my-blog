@@ -681,7 +681,11 @@ export function useAdminStats(
   return useQuery<AdminStatsResponse, ApiError>({
     queryKey: queryKeys.stats,
     queryFn: api.adminGetStats,
-    staleTime: STALE.taxonomy,
+    // ponytail: refreshed on returning to the tab, not polled — a scheduled run
+    // that lands while you're elsewhere shows up when you look. Poll
+    // (refetchInterval) only if a badge going stale *while watched* matters.
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
     ...options,
   });
 }
