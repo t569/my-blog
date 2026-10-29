@@ -36,7 +36,14 @@ async def context_node(state: AgentState, config: RunnableConfig) -> dict:
             }
 
         topic = state["topic"]
-        vectors = await get_embeddings([topic])
+        # Ranking is enrichment, not a requirement: an embedding outage (the
+        # HF free credit running out answers 402) costs the ranking, not the
+        # run. The orchestrator treats its own embedding call the same way.
+        try:
+            vectors = await get_embeddings([topic])
+        except Exception:
+            logger.exception("Embedding failed in context node — continuing without ranking")
+            vectors = []
         relevant_fields = []
 
         if vectors:

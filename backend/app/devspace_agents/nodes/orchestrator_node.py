@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.devspace_agents.langfuse.client import langfuse
+from app.devspace_agents.llm import create_json
 from app.devspace_agents.pipeline.state import AgentState
 from app.models.post import Post
 from app.services.user_context_service import get_user_context
@@ -210,13 +211,13 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
             ],
         )
 
-        response = await groq_client.chat.completions.create(
+        response = await create_json(
+            groq_client,
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            response_format={"type": "json_object"},
         )
 
         response_text = response.choices[0].message.content or ""
@@ -246,7 +247,8 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
                      "content": "Your previous response was not valid JSON. Reply with ONLY: {\"topic\": \"...\", \"rationale\": \"...\"}"},
                 ],
             )
-            retry_response = await groq_client.chat.completions.create(
+            retry_response = await create_json(
+                groq_client,
                 model=settings.GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -254,7 +256,6 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
                     {"role": "assistant", "content": response_text},
                     {"role": "user", "content": "Your previous response was not valid JSON. Reply with ONLY: {\"topic\": \"...\", \"rationale\": \"...\"}"},
                 ],
-                response_format={"type": "json_object"},
             )
             retry_text = retry_response.choices[0].message.content or ""
             retry_generation.update(

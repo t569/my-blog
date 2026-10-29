@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.devspace_agents.langfuse.client import langfuse
+from app.devspace_agents.llm import create_json
 from app.devspace_agents.pipeline.state import AgentState
 from app.models.category import Category
 
@@ -243,13 +244,13 @@ async def writer_node(state: AgentState, config: RunnableConfig) -> dict:
             ],
         )
 
-        response = await groq_client.chat.completions.create(
+        response = await create_json(
+            groq_client,
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            response_format={"type": "json_object"},
             max_tokens=4096,
             temperature=0.7,
         )
@@ -284,7 +285,8 @@ async def writer_node(state: AgentState, config: RunnableConfig) -> dict:
                 ],
             )
 
-            retry_response = await groq_client.chat.completions.create(
+            retry_response = await create_json(
+                groq_client,
                 model=settings.GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -293,7 +295,6 @@ async def writer_node(state: AgentState, config: RunnableConfig) -> dict:
                     {"role": "user",
                      "content": "Your response was not valid JSON. Reply with ONLY the JSON object, no markdown, no preamble."},
                 ],
-                response_format={"type": "json_object"},
                 max_tokens=4096,
                 temperature=0.7,
             )
